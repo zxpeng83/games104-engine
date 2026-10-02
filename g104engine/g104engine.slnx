@@ -1,0 +1,12 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="samples/G104.Sandbox/G104.Sandbox.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="src/G104.Engine/G104.Engine.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+</Solution>
