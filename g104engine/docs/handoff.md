@@ -1,8 +1,12 @@
 # G104Engine V1 新对话交接
 
-更新：2026-10-03。完整V1已正式获准；首轮实现及保存后新增的独立评审修复已完成，架构/注释/笔记映射与本机证据已保存。当前进入用户体验验收和学习，同范围修复继续有效。
+更新：2026-10-03。完整V1及评审/转向退出修复已提交推送至d2e8d40，本轮已只读核实；本页随后交接更新仍仅本机。当前进入用户复试、体验验收和学习，同范围修复继续有效。
 
 ## 当前接续点
+
+最新已同步节点：`d2e8d40691dd76a4637e35ed2905a2ccfaefe3d2`，提交`fix:修复 V1 评审问题及角色转向退出`，2026-10-03 23:00:25 +08:00，38文件。root实查HEAD/main/origin/main及实时GitHub main一致，检查开始工作区干净；随后只更新本地同步/交接文档，不把这些新增文档更新冒称已再次上传。
+
+建议以此保存节点另开“V1验收与学习”聊天。这是按阶段聚焦的建议，不是压缩4–5次后必须换聊天的产品规则。使用同一个现有本地工作区，先恢复文件/Git和下一步；不要为换聊天新克隆/创建工作树或重启旧子任务。不同聊天保留自己的对话记录，而同一项目可以读取同一工作区文件，见 [OpenAI官方项目与聊天说明](https://learn.chatgpt.com/docs/projects)。进度、选型、授权、实际架构、学习关系和验证证据依靠仓库文档恢复，不依赖旧聊天逐句记忆或旧代理内存。
 
 最新用户反馈的球/Ramp附近退出已修：新截图SceneValidationException/exit1（原exit0作废），纯SceneGraph南向第35次更新复现近180°矩阵分解误拒，六球无Collider。Astra Ultra完成单字段TRS/稳定矩阵分解及角色Quaternion修复；root双配置38/38、11UI、完整verify、各800帧新九路及旧240帧通过，Astra有限独立复核闭环。待用户VS重建后复试，见 [本批记录](reviews/v1-contact-exit-fix-2026-10-03.md) 和执行台账。
 
@@ -10,7 +14,7 @@
 
 用户正式答复“同意，按以上完整范围正式开工”，已记录完整C#/GLSL/数据/必要配置、素材/OpenAL/便携FFmpeg、构建运行修复和文档/快照权限。Sol Ultra主实施、Astra Ultra评审/独立核查；同范围恢复不重复开工，Scope外变化才讨论。
 
-用户自行提交推送完整V1至b91dfe4，本轮起始只读核实本地/GitHub main一致、工作区干净；随后新增评审修复只在本机未提交。实际Core/Scene/Editor、Rendering/Assets/Animation、Physics/Navigation、Audio/Effects/ImGui及Sandbox规则/窗口已落地。素材和许可已部署；动画四状态/混合数据配置及逻辑/显示Pose分离已实现。
+实际Core/Scene/Editor、Rendering/Assets/Animation、Physics/Navigation、Audio/Effects/ImGui及Sandbox规则/窗口已落地。素材和许可已部署；动画四状态/混合数据配置及逻辑/显示Pose分离已实现。首轮V1节点b91dfe4及准备节点cbce581为历史，评审与转向修复已包含在d2e8d40，不再表述为尚未提交的源码。
 
 本轮三个Astra Ultra领域评审、Sol Ultra失败复现修复及Astra最终有限复核已闭环，未发现本轮剩余阻塞P1/P2；详见 [独立评审](reviews/v1-independent-review-2026-10-03.md)。Debug/Release0警告0错误，--verify全PASS、UI各11PASS/GPU各10PASS，最终全新数据隐藏GL各240帧无错误；同帧双管线MAE.0621/255、最大22/255。文本草稿/Undo事务/真实Saved基准、导航浮点边界/NPC朝向、GGX/HDR/粒子/资产覆盖等已修；HDR现32F，数值域限制及学习指南同步。视听、手感、真实键鼠/DPI/失焦组合仍待用户验收，单图PCF弱斜面acne限制保留。
 
@@ -103,16 +107,18 @@
 - Piccolo 固定 f5053707fed4d3f94d270a436fb0d3a8ae54e3e5；其已有行为和局限见来源核查，不从课名推断参考引擎完整实现了对应专题。
 - D5 克隆复现、CI、第二台设备测试仍全部暂缓。网络等后续模块的规划不恢复 D5。
 - 环境安装、工程创建/NuGet 和 Git 操作继续由用户在既有工具完成；编码分工不扩大这些授权。
-- 用户已提交推送完整V1节点b91dfe4，本轮起始只读核实本地/GitHub main一致，新增评审修复未提交；cbce581是 [开工前历史节点](reviews/v1-start-checkpoint-2026-10-03.md)。输入ZIP/日志/快照仍为忽略缓存。
+- 用户已提交推送修复节点d2e8d40，本轮核实本地/GitHub main一致；后续只有本地交接文档未再提交。b91dfe4为首轮V1、cbce581是 [开工前历史节点](reviews/v1-start-checkpoint-2026-10-03.md)。输入ZIP/日志/快照仍为忽略缓存；换设备不自动带这些文件，D5仍暂缓。
 - 不进入私有截图，不修改 Piccolo、原笔记和 26 处非发布链接，不清理上层仓库或扩大发布范围。
 
 ## 可复制的新对话提示
 
 ~~~text
-继续G104Engine，现有目录E:\game_study\games104。
-先按README读取AGENTS、status、handoff与execution/v1-progress.md，再读运行验收、实际架构/学习与v1-independent-review，核对Git/当前源码/相关日志。
-完整基础综合训练场V1已获正式弹窗同意，用户已保存b91dfe4，随后独立评审修复在本机完成但未提交；同范围验收与修复不重新询问开工。Sol Ultra主实施、Astra Ultra评审；架构/配置/依赖方向不重复选型。
-当前需要用户体验验收与学习；按反馈定位修复，保留未保存设计/Undo与源资料。若是意外中断，先检查实际文件和台账最新单元再恢复。
+继续G104Engine，使用现有目录E:\game_study\games104，不新克隆或创建工作树。
+先只读README.md、AGENTS.md、g104engine/docs/status.md、handoff.md和execution/v1-progress.md；核对实际Git/文件，简短报告接续点。
+已保存节点d2e8d40691dd76a4637e35ed2905a2ccfaefe3d2，完整V1与评审/近180°转向退出修复已在GitHub；上轮收尾同步/交接文档可能仍有本地未提交更新，不覆盖它们。
+下一步VS重建后复试球/Ramp路线并做V1体验验收、反馈修复和学习；用户人工复试尚未确认。自动双配置38专项、11UI、800/240帧通过不代替手感/试听。
+既有完整V1授权与同范围修复继续有效；模型均Ultra，长期Sol主实施/Astra评审，本次转向修复用户要求尽量Astra的任务分工亦有记录。架构/依赖已定，不重新选型。
+旧代理不自动当作仍在运行；需要任务时实际检查状态、重新分派/恢复并确认running，不以send_message成功代替执行。
 不安装或升级SDK/NuGet，不系统安装改PATH，不提交推送/发布，D5仍暂缓；长期专题不自动扩入V1。
 每批保存进度/验证/下一步，维护实际架构、注释与代码—笔记关系。
 ~~~

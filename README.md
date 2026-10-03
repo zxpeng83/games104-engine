@@ -28,8 +28,8 @@ D0–D4 已完成；D5（独立克隆复现、CI、第二台设备）按用户�
 
 ## 同步与资料
 公开仓库：[zxpeng83/games104-engine](https://github.com/zxpeng83/games104-engine)。
-用户已自行提交推送 b91dfe4（完整V1，待用户验收），2026-10-03本轮起始只读核实本地与GitHub main一致；cbce581为方案/准备历史节点，见 [开工前记录](g104engine/docs/reviews/v1-start-checkpoint-2026-10-03.md)。
-b91dfe4之后新增的独立评审修复和文档只在本机，未自动暂存/提交/推送；实时状态以Git为准。
+用户已自行提交推送 d2e8d40（V1独立评审及角色转向退出修复，38文件），2026-10-03只读核实HEAD/main/origin/main与实时GitHub main一致；b91dfe4为完整V1首轮、cbce581为准备历史节点。
+之后本轮只更新同步节点与新聊天交接记录，文档仍在本机未再次提交；源代码与已验证修复已在GitHub，实时状态以Git为准。接续见 [handoff](g104engine/docs/handoff.md)。
 Git 根是 games104，main 跟踪 origin/main；用户负责 Git Bash／Git GUI 操作。
 笔记保留原路径，26 处非发布本地引用按用户决定不处理；个人操作截图、Piccolo 和构建缓存不上传。
 详细操作和历史均保留在指南/归档中，不以旧记录覆盖当前决定。

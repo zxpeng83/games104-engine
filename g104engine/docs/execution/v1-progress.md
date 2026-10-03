@@ -6,9 +6,9 @@
 
 **最新单元已完成：用户靠近球/Ramp退出反馈。** 新截图SceneValidationException/exit1，旧exit0撤回。Astra Ultra复现/生产修复/窗口路线及有限独立复核，root统一实际验回；双配置38/38、11UI、完整verify及800/240帧通过，用户原路线待VS重建后复试。见 [专项记录](../reviews/v1-contact-exit-fix-2026-10-03.md)。此前130文件快照为本批前受保护基线，下方保留分批证据。
 
-- 工作区：`E:\game_study\games104`；分支 `main`；用户已自行提交推送完整V1节点 `b91dfe4137686d9a5f962e40e10a3afe939cfe4c`，本轮起始只读核实HEAD/跟踪/GitHub main一致、工作区干净。之后评审修复尚未提交；恢复时重新核实实际状态。
+- 工作区：`E:\game_study\games104`；分支`main`；用户已提交推送修复节点`d2e8d40691dd76a4637e35ed2905a2ccfaefe3d2`，本轮实查HEAD/main/跟踪/实时GitHub main一致，开始工作区干净。之后仅本地同步/交接文档更新未再次提交；源码与两批修复已远程保存，恢复仍先重新核实。
 - **代码开工已获明确同意。** 2026-10-03用户答复“同意，按以上完整范围正式开工”（call_gsRE59tQ8TeA5eqCjywBzR1M）。完整C#/GLSL/设计数据/必要复制配置、既有素材/OpenAL、便携FFmpeg校验转换、构建运行修复与文档/快照已授权；模型均Ultra，Git/SDK/NuGet/系统安装/D5边界保持。
-- 实际Engine/Sandbox正式模块、GLSL、设计/模板/动画配置、素材和OpenAL已落地；首轮完整V1保存于b91dfe4。本批进行Astra Ultra独立验收评审和Sol Ultra同范围修复，见 [独立评审记录](../reviews/v1-independent-review-2026-10-03.md)。
+- 实际Engine/Sandbox正式模块、GLSL、设计/模板/动画配置、素材和OpenAL已落地；首轮V1为b91dfe4，独立评审及转向退出修复已保存至d2e8d40。来源及分工见 [独立评审](../reviews/v1-independent-review-2026-10-03.md) 和专项记录。
 - 本批修复及最终有限复核已闭环：Debug/Release最终构建0warn0err、完整行为自检全PASS、11项原生UI/10项GPU读回各PASS；空尾格/内点舍入/非零1ULP容量均先失败后修，七个具名玩法/导航入口PASS。
 - root统一完成全新隔离设计各240帧集成，实际Forward→Deferred Play、2jump110move、无GLerror；MAE.0621/max22。全部实现代理结束写入，构建/测试已退出；若中断先核对实际源码与最新review日志，不重复启动写入者。
 - 用户统一手感、试听、编辑体验和学习验收仍待进行。四份原输入 ZIP/FFmpeg及各批日志快照位于忽略缓存，新克隆不会自动获得；已发布运行素材不依赖这些工具。
@@ -153,3 +153,11 @@
 - 所有原review改动保留，HEAD仍b91dfe4，没有Git写/SDK包变更或用户设计、原笔记、Piccolo改动。接下来用户重新构建复试，恢复读本页/专项记录/真实Git，不自动清目录或覆盖设计。
 - 最终本批快照：`g104engine/.cache/execution/snapshots/20261003-224220-v1-contact-fix`，133个源码/配置/文档/小素材文件逐一SHA核验，包含7个当前未跟踪路径及原review修复；原UAL/OpenAL DLL/源码tar三项仍由b91dfe4与来源SHA保护，不重复复制。进度登记后已刷新快照/manifest并再次核验，不代表异地备份或提交。
 - 收尾完整性：45份Markdown、498个代码块外实际本地链接、21资产SHA通过；status36行，Git diff --check与SDK/slnx/csproj/锁文件/原笔记/.gitignore/.gitattributes保护比较通过。HEAD/跟踪仍b91dfe4，当前36个改动/未跟踪路径都未由助手暂存或提交。
+
+## 用户已同步与新聊天接续
+
+- 用户报告已提交后，root只读确认最新d2e8d40691dd76a4637e35ed2905a2ccfaefe3d2，实际提交38文件与准备清单一致；main/HEAD/origin/main及实时GitHub main相同，提交时间2026-10-03 23:00:25 +08:00，起始工作区干净。
+- 本轮仅纠正README/status/handoff/本台账/publishing/修复提交清单的同步记录和可复制接续提示；这6份文档更新仅本机未再次提交，源代码/GLSL/数据/依赖未变，不重复构建或功能验证。
+- 用户报告聊天已压缩约4–5次，询问是否新开。建议以已保存修复节点新开“V1验收与学习”聊天，是阶段聚焦建议，不以压缩次数断定旧聊天不可继续。使用现有同目录，不新克隆/创建工作树；新聊天读取工作区文件恢复进度，而非假定完整旧聊天/旧代理内存被继承。
+- Astra Ultra只读交接核查未见阻碍恢复的真实遗漏：既有V1与同范围修复授权、依赖/私有资料/D5边界、双模型Ultra、源码—笔记要求、人工尚待验收和旧代理状态恢复均清楚。root完成实际节点更新后，自检当前表述/提示与Git事实一致。
+- 下一条具体工作：用户VS重新构建后复试S转身/球区、横斜移动与原Ramp上下/侧挡，再按运行指南统一反馈、学习。自动38专项/11UI/800及240帧不代替此用户确认；同范围修复无需重复开工，重大变化再讨论。
