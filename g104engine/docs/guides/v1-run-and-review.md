@@ -1,6 +1,6 @@
 # 基础综合训练场 V1：运行、验收与学习
 
-更新：2026-10-03。V1首轮完整实现已落地；本机Debug/Release构建、CPU/原生行为、实际音频上下文和隐藏图形回归通过。用户视觉、试听、操控和学习验收仍待进行，细项见 [验收记录](../reviews/v1-implementation-review-2026-10-03.md)。
+更新：2026-10-03。V1首轮完整实现及保存后独立评审修复已落地；Debug/Release构建、CPU/原生UI、GPU专项和隐藏图形回归通过。用户视觉、试听、操控和学习验收仍待进行；本轮证据见 [独立评审](../reviews/v1-independent-review-2026-10-03.md)，[首轮记录](../reviews/v1-implementation-review-2026-10-03.md)保留追溯。
 
 ## 在VS中运行
 
@@ -25,7 +25,9 @@
 
 左侧树选择对象，可创建Cube/Group/Light、修改局部位置/旋转/缩放、材质和已声明参数、重挂接及删除。连续拖动合并为一条Undo，Escape恢复原值。删除组覆盖整棵子树；若外部按钮仍引用门，先解除引用才能删除。玩家/NPC为根节点、单位缩放；有子对象的父节点用正统一缩放，角色/移动门下只允许纯显示后代。
 
-模型Base color是导入材质的实例tint，模型M/R保留导入值并在面板禁用；普通几何可编辑M/R。模型/贴图改变先准备资源，坏路径或坏内容被拒绝，原设计与历史保持。按钮Target只提供Door，`<none>`明确解除控制，不自动控制第一扇门。
+文本草稿在换选中对象、折叠或隐藏字段前提交，Escape取消文本草稿。非法拖动帧被拒绝后仍保留原事务，接着拖动仍一条Undo；Escape恢复整段起点。启动没有有效磁盘存档时显示Unsaved；Reset seed与实际存档不同也显示Unsaved，只有Save更新磁盘基准。
+
+模型Base color是导入材质的实例tint，最终有效反射色限定[0,1]，灯光HDR颜色另行校验；模型M/R保留导入值并在面板禁用。模型贴图覆盖需要网格有UV0。模型/贴图改变先准备资源，坏路径、坏内容或超出支持合同被拒绝，原设计与历史保持。按钮Target只提供Door，`<none>`明确解除控制，不自动控制第一扇门。
 
 Save design保存设计配置，不保存运行位置、动画游标或机关进度。默认路径为 `%LOCALAPPDATA%/G104Engine/TrainingGroundV1/Scenes/training-ground.json`，实际路径显示在右侧；重新构建输出不覆盖用户设计。
 
@@ -34,6 +36,8 @@ Load saved/Reset seed在未保存状态下提供Save and load、Discard and load
 Forward/Deferred在编辑态选择，下一次Play生效；共用场景、材质、骨骼与光源。右侧View可观察Base color、Normals、Roughness、Depth、Shadow，另外有选中骨架/路径叠加、动画状态与事件、声音测试、FPS/帧耗时。Loop test是低音测试信号，用于循环/停止观察，不是成品背景音乐。
 
 ## 建议的第一轮用户验收
+
+用户反馈的球/Ramp附近SceneValidationException已专项修复：先在VS重新构建当前Debug/x64，再复试南向转身、横向/斜向移动、坡低端上/下坡与高侧阻挡。六个PBR球是纯材质展示、没有Collider，经过它们是当前设计；Ramp有真实Box碰撞。完整用户体验尚未验收，专项证据见 [修复记录](../reviews/v1-contact-exit-fix-2026-10-03.md)。
 
 1. Debug/x64运行：移动/跑跳/墙滑/坡台，观察相机遮挡；用E开门并进入目标，观察NPC路径和反馈。
 2. Stop后切换Deferred再Play，对比相同设计；检查阴影、天空、PBR样例球、纹理探针和调试视图。
@@ -53,10 +57,18 @@ Forward/Deferred在编辑态选择，下一次Play生效；共用场景、材质
 dotnet build g104engine.slnx --no-restore --disable-build-servers -m:1 -c Debug -p:Platform=x64
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --smoke
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify --user-data-root .cache/execution/manual-verify
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-ui --user-data-root .cache/execution/manual-ui
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-render --user-data-root .cache/execution/manual-render
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-contacts --user-data-root .cache/execution/manual-contacts
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --exercise-contacts --user-data-root .cache/execution/manual-contact-window
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-audio --user-data-root .cache/execution/manual-audio
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --exercise --frames 240 --user-data-root .cache/execution/manual-graphics --capture-root .cache/execution/manual-captures
 ```
 
 `--smoke`只保留托管环境信息用途；`--verify`包括原生Jolt但不创建GL窗口；`--verify-audio`真的创建音频device/context；`--exercise`用隐藏GL窗口和脚本输入验证真实蒙皮/双管线/工具生命周期，必须显式提供隔离数据根，不代替人工键鼠、试听和手感。Windows受限沙箱可能拒绝File.Replace等原子文件操作；本次在获准环境重跑通过，未修改正确存档语义来绕过。
+
+`--verify-ui`调用真实原生cimgui输入检查草稿、拖动事务及Saved基准，不创建GL窗口；`--verify-render`创建隐藏GL4.3窗口，读回HDR/G-buffer并与独立公式比较，也检查覆盖拒绝及资产解释。都使用显式隔离根；Release把路径中的Debug替换为Release即可。`--review-baseline`为本轮七个具名导航/玩法入口，完整`--verify`也包含这些行为。
+
+`--verify-contacts`独立检查38种变换/真实种子运动路线，失败汇总后退出1；`--exercise-contacts`走真实隐藏窗口的6球及Ramp上/下/侧九路，默认800帧，显式frames不能少于800，并强制隔离数据根。后者不输出旧240帧截图序列；实际绘制由每段计数和GL错误检查验证，不把capture-root当作截图已产生。两个配置本批专项和旧240帧均通过；不会自动覆盖你的保存设计。
 
 素材来源及SHA见 [准备清单](../plans/v1-dependencies-and-assets.md) 和 `assets/licenses/asset-manifest.json`；`tools/prepare_assets.py`只负责已核对输入的提取/程序测试资产和离线转换，FFmpeg缓存不进入应用。D5、跨设备/CI、IBL与其他后移专题仍未恢复。

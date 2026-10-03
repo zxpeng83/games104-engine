@@ -4,13 +4,14 @@
 
 ## 当前接续点
 
-- 工作区：`E:\game_study\games104`；分支 `main`；用户最新提交推送节点 `cbce581c608412b6b981eb859ad73af7240c897b`，本轮只读核实GitHub main一致，见 [节点记录](../reviews/v1-start-checkpoint-2026-10-03.md)。恢复时重新核实，不凭本页覆盖实际状态。
+**最新单元已完成：用户靠近球/Ramp退出反馈。** 新截图SceneValidationException/exit1，旧exit0撤回。Astra Ultra复现/生产修复/窗口路线及有限独立复核，root统一实际验回；双配置38/38、11UI、完整verify及800/240帧通过，用户原路线待VS重建后复试。见 [专项记录](../reviews/v1-contact-exit-fix-2026-10-03.md)。此前130文件快照为本批前受保护基线，下方保留分批证据。
+
+- 工作区：`E:\game_study\games104`；分支 `main`；用户已自行提交推送完整V1节点 `b91dfe4137686d9a5f962e40e10a3afe939cfe4c`，本轮起始只读核实HEAD/跟踪/GitHub main一致、工作区干净。之后评审修复尚未提交；恢复时重新核实实际状态。
 - **代码开工已获明确同意。** 2026-10-03用户答复“同意，按以上完整范围正式开工”（call_gsRE59tQ8TeA5eqCjywBzR1M）。完整C#/GLSL/设计数据/必要复制配置、既有素材/OpenAL、便携FFmpeg校验转换、构建运行修复与文档/快照已授权；模型均Ultra，Git/SDK/NuGet/系统安装/D5边界保持。
-- 实际代码：Engine 空类、Sandbox 原 OpenGL/Smoke 探针。用户已配置新依赖并报告 Debug/Release 原程序正常；助手只读核对包图、输出及四份 ZIP，未验证新库功能调用。
-- 已保存：V1 范围、架构契约、依赖/素材核对与本恢复规程。未执行：素材部署/转换、正式功能实现、构建/新功能运行测试。本页不表示备份快照已创建。
-- 当前首轮V1代码/文档/本机验证完成，待用户统一验收；无运行中构建或子任务。Shader、配置/显示、场景错误保护等问题已修并复验。
-- 用户最新决定：自动压缩后暂不换新对话，继续本对话准备开工。恢复流程保留供意外中断或以后换对话使用；代码授权仍未获得。
-- 此前计划与用户项目配置已包含在cbce581，本轮记录前工作区干净、55个跟踪文件；本轮追加文档未自动提交推送。四份输入 ZIP 在忽略的 `.cache/v1-preparation`，详情见 [输入核对](../reviews/v1-input-archives-check-2026-10-03.md)，新克隆不会自动获得缓存。
+- 实际Engine/Sandbox正式模块、GLSL、设计/模板/动画配置、素材和OpenAL已落地；首轮完整V1保存于b91dfe4。本批进行Astra Ultra独立验收评审和Sol Ultra同范围修复，见 [独立评审记录](../reviews/v1-independent-review-2026-10-03.md)。
+- 本批修复及最终有限复核已闭环：Debug/Release最终构建0warn0err、完整行为自检全PASS、11项原生UI/10项GPU读回各PASS；空尾格/内点舍入/非零1ULP容量均先失败后修，七个具名玩法/导航入口PASS。
+- root统一完成全新隔离设计各240帧集成，实际Forward→Deferred Play、2jump110move、无GLerror；MAE.0621/max22。全部实现代理结束写入，构建/测试已退出；若中断先核对实际源码与最新review日志，不重复启动写入者。
+- 用户统一手感、试听、编辑体验和学习验收仍待进行。四份原输入 ZIP/FFmpeg及各批日志快照位于忽略缓存，新克隆不会自动获得；已发布运行素材不依赖这些工具。
 
 ## 连续执行约定
 
@@ -32,7 +33,7 @@
 | P1 核心循环、资源、场景与层级 | 已验证 | 时步/输入/层级/模板/保存/失败回滚及GUI资源生命周期通过 |
 | P2 资产、动画、渲染 | 已验证（本机自动/图像自查） | 65骨骼、四状态数据配置、局部Pose显示插值、双管线/阴影/后处理/PNG和GL回归通过；最终用户观感待验收 |
 | P3 角色、物理与相机 | 已验证（查询/控制/集成） | 墙滑/跳跃/坡台/刚体清理与GPU控制链通过；真实键鼠/镜头手感待用户 |
-| P4 Gameplay、AI、粒子与声音 | 已验证 | FSM/A*/门碰撞导航/目标一次事件、GPU粒子/OpenAL通过；试听与整体玩法观感待用户 |
+| P4 Gameplay、AI、粒子与声音 | 已验证 | FSM/A*/门碰撞导航/目标一次事件、CPU粒子绘制/OpenAL通过；试听与整体玩法观感待用户 |
 | P5 场景工具 | 已验证（代码/自动回归） | 层级/Undo/SaveLoad/PlayStop保留未保存设计及错误准备保护通过；人工编辑UX待用户 |
 | P6 集成、交付与学习资料 | 首轮已完成 | 双配置0warn0err、自检/真实GL/音频/Astra复查、架构/运行/学习/限制资料；等待统一人工验收 |
 
@@ -50,19 +51,19 @@
 | 字段 | 当前值 |
 | --- | --- |
 | 正式授权及边界 | 2026-10-03明确同意完整范围，均Ultra；不Git写操作/升级SDKNuGet/系统安装/D5 |
-| 正在进行的实现单元/文件责任人 | 无；各代理源码/文档已集成，Root完成最终验证/交接；同范围反馈后继续修复 |
+| 正在进行的实现单元/文件责任人 | 本批球/Ramp退出已修复并验证，无代理继续写入；Astra分别生产Scene/Core/Simulation、独立38例、Window/Options，root已统一集成 |
 | 已改实现文件 | Engine Core/Scene/Editor/Assets/Animation/Rendering/Physics/Navigation/Audio/Effects/Tools；Sandbox窗口/Gameplay/Tools/入口；assets、third_party、必要csproj复制配置；锁文件/SDK未变 |
-| 最近有效验证 | build-debug/release 0warn0err；verify-debug/release全PASS；音频API通过；delivery-debug/release各240frames无GLerror，2jump110move，pipeline mean.0651/max22 |
-| 操作/进程/日志/快照 | 日志在.cache/execution；43文件开工快照及122文件最终快照均逐一SHA核验，下方有精确路径；当前无运行进程 |
-| 未完成/失败/待人工验证 | 正式实现/本机必要验证已完成，无已知阻塞失败；用户手感/试听/实际键鼠DPI/失焦组合与演示验收待进行，PCF限制保留 |
-| 下一条可执行工作 | 用户按v1-run-and-review运行验收并学习，按反馈同范围修复；新对话先核对实际Git/日志/快照，已有授权不重问 |
+| 最近有效验证 | contact-build双配置0warn0err；contact-approaches各38PASS、完整verify/11UI PASS；contact-window各800frames九路668move无GLerror，contact-legacy各240frames2jump110move/mean.0621 max22；Astra有限复核闭环 |
+| 操作/进程/日志/快照 | 日志在.cache/execution；开工/首轮/本批快照精确路径见下方，覆盖未跟踪源码；本批构建/测试均已退出 |
+| 未完成/失败/待人工验证 | 本批确认异常及字段漂移已修，用户实际重建后原路线/手感复试未确认；其他人工体验和PCF/有限子集限制仍待 |
+| 下一条可执行工作 | 用户VS重建后复试S转身/球区、横/斜走、原Ramp上下/侧挡；无需清用户设计；按反馈同范围修复，Git保存由用户决定 |
 | 恢复时需要用户处理的事项 | 同范围无需再开工确认；重大新范围/权限或实际阻塞才讨论，最终用户体验待验收 |
 
 ## 新对话/意外中断恢复顺序
 
 1. 使用**同一个现有本地目录**；先读根 README → AGENTS → status/handoff → 本页，再按任务读取实施方案/准备清单/架构。不要重新讨论已经明确的选型，也不要先创建新克隆来“恢复”。
 2. 只读检查 Git 根、分支、HEAD、status、相关 diff/未跟踪文件及本页当前单元；核对用户改动、资源与已有日志，不能以文档声称完成代替文件事实。
-3. 确认旧任务/子任务/应用是否仍在写入或运行，再接管未完成单元；不盲目杀进程或启动第二个写入者。旧代理不可用不妨碍从文件重建任务。
+3. 确认旧任务/子任务/应用是否仍在写入或运行，再接管未完成单元；不盲目杀进程或启动第二个写入者。打断后实际检查代理列表，interrupted不能当作running；send_message仅投递，要followup_task明确恢复或重新分派后复核running。旧代理不可用不妨碍从文件重建任务。
 4. 若中断落在修改或构建中间，先检查这批文件是否完整，再做最小必要编译/行为验证；区分旧输出和本次产物。保留损坏或失败证据，不能自动回滚全部工作区。
 5. 修正台账：真实已完成/未验证/受阻项、最后有效检查、待做步骤以及授权。清晰记录的既有授权在范围不变时继续有效；新权限/范围变化按规则讨论。**当前完整V1已获明确授权；恢复同范围工作直接继续。**
 6. 继续未完成部分，实际验证后更新状态。恢复的是项目进度，不是原会话完整上下文、进程调用栈、内存或未保存内容；磁盘故障/目录丢失还需要独立备份，不能靠换对话解决。
@@ -115,3 +116,40 @@
 - 大型UAL GLB与OpenAL DLL未重复备份；工作区源文件/原ZIP及assets/licenses/asset-manifest.json SHA记录保留。日志/快照不是异地备份。
 - 最新双配置重建与CPU自检已在最后追加用例后重新通过；运行实现未变化，delivery GPU证据保持有效。41份文档/466实际渲染本地链接和21资产SHA检查通过。
 - 本轮无执行中的实现代理、构建或应用；下一步是用户运行验收/学习与同范围反馈修复。
+
+## 新独立评审批次：b91dfe4之后
+
+- 用户已自行保存完整V1到b91dfe4137686d9a5f962e40e10a3afe939cfe4c，HEAD/跟踪/GitHub main本轮核实一致，工作区起始干净。该提交是本批可恢复源码基线；原cbce581和122文件快照为前一阶段。
+- 3个Astra Ultra独立read-only评审已完成/分批反馈，3个Sol Ultra任务复现修复：Editor负责Window/Panel/History与UI验回；Gameplay负责Nav/Simulation/参数合同与行为回归；Visual负责PBR/粒子排序/材质UV/导入与GPU验回。root负责Program验证入口与唯一串行构建/测试、状态文档。
+- 发现及撤回猜测/证据级别见reviews/v1-independent-review-2026-10-03.md；当前先交付失败案例，不能把静态推测直接当实测。
+- 下一步：根任务运行各专项失败回归，修复后Debug/Release相关检查与GPU必要回归，再Astra检查修改；所有数据仍工作区隔离，现有授权继续有效。
+
+### 独立review中间阶段（历史）
+
+- 三组baseline在有效构建后实际复现：四物理/AI合同FAIL，UI6FAIL+4PASS，GPU六FAIL。有效修复构建后：四合同PASS、UI11PASS、GPU首批7PASS，日志review-*-after，旧DLL中途输出不作为后验结论。
+- Editor/Gameplay源码已冻结，Visual正在校正有效反射颜色/Gbuffer域与actual rough参考；root拥有唯一构建窗口，下一步新数值例baseline→修→GPU/双配置/整体回归→Astra变更复核。
+- Git基线b91dfe4保持，当前修复与文档仅本机；没有真实用户存档修改，原SDK/NuGet/后移专题/D5边界保持。
+
+### 本批最终闭环
+
+- 逐项失败复现、修复、独立参考和有限delta复核见独立评审记录。导航三轮真实失败→double容量/float格界校正后双配置七入口PASS；Editor真实UI各11PASS；Visual与独立BRDF/source-over各10GPU PASS。
+- 最新Debug/Release build/verify、graphics-final日志均成功；全新数据初次Forward随后Deferred，两配置240帧/2jump110move，无GLerror；MAE.0621/255 max22。最后源码只改一行导航中文注释，行为不变，不为该注释重复全量运行。
+- 只在本机保存，未Git写操作；HEAD/跟踪仍b91dfe4。README/status/handoff、真实参数合同、架构/指南与命令入口已同步；本批源码快照在下方登记实测结果。
+
+### 本批可恢复快照
+
+- 路径：`g104engine/.cache/execution/snapshots/20261003-212054-v1-independent-review`，130个源码/配置/文档/小型素材文件复制后逐一SHA-256核验，包含本批未跟踪验证源码和评审文档；清单为manifest.json，范围信息为snapshot-info.json。
+- 未重复复制UAL模型、OpenAL DLL与对应源码tar包，三者已在用户保存的b91dfe4及来源/SHA记录中；不纳入原笔记、私有目录、bin/obj或其他缓存。快照不代表Git提交或异地备份。
+- 文档检查：44份Markdown、482个代码块外实际本地文件/目录链接、21资产SHA和OpenAL源码包SHA通过；status31行。Git diff --check通过，SDK/slnx/csproj/锁文件/原笔记/.gitignore/.gitattributes与b91dfe4无差异。
+- 结束前快照中的进度文件及manifest已按最后登记更新、再次核验；新对话先以工作区当前文件为准，再按需核对快照，不自动整目录覆盖或回滚。
+
+## 用户球/Ramp退出：本批最终闭环
+
+- 用户先误发exit0截图，后纠正为SceneValidationException/exit1。独立C#38例有效baseline 4PASS/34FAIL（12真异常、22仅exactScale合同）；south无Physics第35次更新已复现非TRS误拒，不是球碰撞或scale超unit容差。
+- Astra runtime修改SceneGraph单字段setter、稳定double四分支TransformMath及finiteScale拒、根角色直接读Quaternion，有限Core数学/父链/非法矩阵/回滚检查；Astra regression只写38例；Astra窗口任务只写800帧独立flag/9路helper，生产Physics未改。
+- root有效Debug/Release build均0warn0err，contact-approaches各38/38、contact-verify完整、contact-ui各11PASS。contact-window各800帧6球+Ramp上下/侧九路、668moving无GLerror；contact-legacy各240帧2jump110moving、Forward/Deferred/保存与失败保护通过。真实数值及日志名见专项复查，测试数据全部隔离。
+- Astra regression最后只读生产delta和Debug日志未见有证据P1/P2；没有自行build/run，Release由root实测。写入任务均已结束，不依赖代理名当进度证据。
+- 协作失误已纠正：用户打断导致两旧代理interrupted，root曾只send_message而误以为运行；用户指出后followup_task恢复并实际核对running，之后才有正式修复。规则新增打断后代理状态检查，测试完成/生产修改/实际验回分开描述。
+- 所有原review改动保留，HEAD仍b91dfe4，没有Git写/SDK包变更或用户设计、原笔记、Piccolo改动。接下来用户重新构建复试，恢复读本页/专项记录/真实Git，不自动清目录或覆盖设计。
+- 最终本批快照：`g104engine/.cache/execution/snapshots/20261003-224220-v1-contact-fix`，133个源码/配置/文档/小素材文件逐一SHA核验，包含7个当前未跟踪路径及原review修复；原UAL/OpenAL DLL/源码tar三项仍由b91dfe4与来源SHA保护，不重复复制。进度登记后已刷新快照/manifest并再次核验，不代表异地备份或提交。
+- 收尾完整性：45份Markdown、498个代码块外实际本地链接、21资产SHA通过；status36行，Git diff --check与SDK/slnx/csproj/锁文件/原笔记/.gitignore/.gitattributes保护比较通过。HEAD/跟踪仍b91dfe4，当前36个改动/未跟踪路径都未由助手暂存或提交。

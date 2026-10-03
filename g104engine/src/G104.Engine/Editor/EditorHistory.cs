@@ -12,7 +12,7 @@ public sealed class EditorHistory
     private int _cursor;
     private SceneDocument? _transactionBefore;
     private string? _transactionLabel;
-    private string _saved;
+    private string? _saved;
 
     public EditorHistory(SceneGraph graph, int capacity = 100)
     {
@@ -29,7 +29,7 @@ public sealed class EditorHistory
     public bool CanUndo => !InTransaction && _cursor > 0;
     public bool CanRedo => !InTransaction && _cursor < _entries.Count;
     public bool InTransaction => _transactionBefore is not null;
-    public bool IsDirty => SceneSerializer.Serialize(_graph.Document) != _saved;
+    public bool IsDirty => _saved is null || SceneSerializer.Serialize(_graph.Document) != _saved;
     public int UndoCount => _cursor;
     public int RedoCount => _entries.Count - _cursor;
     public string? UndoLabel => CanUndo ? _entries[_cursor - 1].Label : null;
@@ -101,8 +101,14 @@ public sealed class EditorHistory
 
     public void MarkSaved()
     {
+        SetSavedBaseline(_graph.Document);
+    }
+
+    // 基准是实际保存目标的内容；切换到种子不会把种子误标成该文件已保存。
+    public void SetSavedBaseline(SceneDocument? savedDocument)
+    {
         if (InTransaction) throw new InvalidOperationException("Commit or cancel the editor transaction before saving.");
-        _saved = SceneSerializer.Serialize(_graph.Document);
+        _saved = savedDocument is null ? null : SceneSerializer.Serialize(savedDocument);
     }
 
     public void Clear(bool markSaved = true)

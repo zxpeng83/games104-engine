@@ -1,16 +1,20 @@
 # G104Engine V1 新对话交接
 
-更新：2026-10-03。完整V1已正式获准，首轮代码、架构/注释/笔记映射与本机验证已完成；当前进入用户体验验收和学习，同范围修复继续有效。
+更新：2026-10-03。完整V1已正式获准；首轮实现及保存后新增的独立评审修复已完成，架构/注释/笔记映射与本机证据已保存。当前进入用户体验验收和学习，同范围修复继续有效。
 
 ## 当前接续点
 
+最新用户反馈的球/Ramp附近退出已修：新截图SceneValidationException/exit1（原exit0作废），纯SceneGraph南向第35次更新复现近180°矩阵分解误拒，六球无Collider。Astra Ultra完成单字段TRS/稳定矩阵分解及角色Quaternion修复；root双配置38/38、11UI、完整verify、各800帧新九路及旧240帧通过，Astra有限独立复核闭环。待用户VS重建后复试，见 [本批记录](reviews/v1-contact-exit-fix-2026-10-03.md) 和执行台账。
+
+本批曾因用户打断后旧代理interrupted、root只send_message而没有恢复执行，造成无效等待；已followup_task明确恢复并核对running后真正完成。AGENTS/台账加入恢复检查规则。复现测试、生产落盘、实际验回分别记录，不能把测试代理完成称为修复完成。
+
 用户正式答复“同意，按以上完整范围正式开工”，已记录完整C#/GLSL/数据/必要配置、素材/OpenAL/便携FFmpeg、构建运行修复和文档/快照权限。Sol Ultra主实施、Astra Ultra评审/独立核查；同范围恢复不重复开工，Scope外变化才讨论。
 
-本地与GitHub准备节点cbce581一致；随后实现只在本机，未提交推送。实际Core/Scene/Editor、Rendering/Assets/Animation、Physics/Navigation、Audio/Effects/ImGui及Sandbox规则/窗口已落地。素材和许可已部署；动画四状态/混合数据配置及逻辑/显示Pose分离已实现。
+用户自行提交推送完整V1至b91dfe4，本轮起始只读核实本地/GitHub main一致、工作区干净；随后新增评审修复只在本机未提交。实际Core/Scene/Editor、Rendering/Assets/Animation、Physics/Navigation、Audio/Effects/ImGui及Sandbox规则/窗口已落地。素材和许可已部署；动画四状态/混合数据配置及逻辑/显示Pose分离已实现。
 
-Debug/Release0警告0错误，--verify与实际OpenAL通过；两配置隐藏GL240帧无错误，同帧双管线MAE0.0651/255、最大22/255；失败Play/坏资源/损坏存档备份/未保存设计与Undo跨PlayStop、120ms加载丢时和同GUID静态骨架空间已有证据。视听、手感、真实键鼠/DPI/失焦组合仍待用户验收，单图PCF弱斜面acne限制保留。
+本轮三个Astra Ultra领域评审、Sol Ultra失败复现修复及Astra最终有限复核已闭环，未发现本轮剩余阻塞P1/P2；详见 [独立评审](reviews/v1-independent-review-2026-10-03.md)。Debug/Release0警告0错误，--verify全PASS、UI各11PASS/GPU各10PASS，最终全新数据隐藏GL各240帧无错误；同帧双管线MAE.0621/255、最大22/255。文本草稿/Undo事务/真实Saved基准、导航浮点边界/NPC朝向、GGX/HDR/粒子/资产覆盖等已修；HDR现32F，数值域限制及学习指南同步。视听、手感、真实键鼠/DPI/失焦组合仍待用户验收，单图PCF弱斜面acne限制保留。
 
-从 [运行验收](guides/v1-run-and-review.md)、[实际架构/学习](guides/v1-architecture-and-learning.md) 与 [实施复查](reviews/v1-implementation-review-2026-10-03.md) 开始；恢复细节及最新快照见 [执行台账](execution/v1-progress.md)。不安装/升级SDK或NuGet、不系统安装改PATH、不Git提交推送发布，D5仍暂缓，不改Piccolo/原笔记/私有资料。
+从 [运行验收](guides/v1-run-and-review.md)、[实际架构/学习](guides/v1-architecture-and-learning.md) 与独立评审开始；[首轮复查](reviews/v1-implementation-review-2026-10-03.md)为追溯。恢复细节及最新快照见 [执行台账](execution/v1-progress.md)，本批写入代理已结束、测试已退出。不安装/升级SDK或NuGet、不系统安装改PATH、不Git提交推送发布，D5仍暂缓，不改Piccolo/原笔记/私有资料。
 
 ## 阅读顺序与状态含义
 
@@ -25,6 +29,8 @@ Debug/Release0警告0错误，--verify与实际OpenAL通过；两配置隐藏GL2
 ## 已确认决策索引
 
 以下是压缩索引；完整理由、边界和公式在链接文档中，不需要向用户从头重复提问。
+
+表内早期“待细化/未验证”保留决定提出时的讨论状态；现在已有完整实施和本机证据。当前参数/库调用/素材/验回以本页接续点、status及实际架构/指南为准，不把历史待项重新发起选型。
 
 | 编号 | 已确认决定 | 保存位置 |
 | --- | --- | --- |
@@ -97,15 +103,15 @@ Debug/Release0警告0错误，--verify与实际OpenAL通过；两配置隐藏GL2
 - Piccolo 固定 f5053707fed4d3f94d270a436fb0d3a8ae54e3e5；其已有行为和局限见来源核查，不从课名推断参考引擎完整实现了对应专题。
 - D5 克隆复现、CI、第二台设备测试仍全部暂缓。网络等后续模块的规划不恢复 D5。
 - 环境安装、工程创建/NuGet 和 Git 操作继续由用户在既有工具完成；编码分工不扩大这些授权。
-- 用户已提交推送cbce581，本轮只读核实本地与GitHub main一致，见 [开工前节点记录](reviews/v1-start-checkpoint-2026-10-03.md)。本轮追加的模型/节点记录仅在本机，未自动提交推送；输入ZIP仍为忽略缓存。
+- 用户已提交推送完整V1节点b91dfe4，本轮起始只读核实本地/GitHub main一致，新增评审修复未提交；cbce581是 [开工前历史节点](reviews/v1-start-checkpoint-2026-10-03.md)。输入ZIP/日志/快照仍为忽略缓存。
 - 不进入私有截图，不修改 Piccolo、原笔记和 26 处非发布链接，不清理上层仓库或扩大发布范围。
 
 ## 可复制的新对话提示
 
 ~~~text
 继续G104Engine，现有目录E:\game_study\games104。
-先按README读取AGENTS、status、handoff与execution/v1-progress.md，再读运行验收、实际架构/学习与实施复查，核对Git/当前源码/相关日志。
-完整基础综合训练场V1已获正式弹窗同意并完成首轮实现；同范围验收与修复不重新询问开工。Sol Ultra主实施、Astra Ultra评审；架构/配置/依赖方向不重复选型。
+先按README读取AGENTS、status、handoff与execution/v1-progress.md，再读运行验收、实际架构/学习与v1-independent-review，核对Git/当前源码/相关日志。
+完整基础综合训练场V1已获正式弹窗同意，用户已保存b91dfe4，随后独立评审修复在本机完成但未提交；同范围验收与修复不重新询问开工。Sol Ultra主实施、Astra Ultra评审；架构/配置/依赖方向不重复选型。
 当前需要用户体验验收与学习；按反馈定位修复，保留未保存设计/Undo与源资料。若是意外中断，先检查实际文件和台账最新单元再恢复。
 不安装或升级SDK/NuGet，不系统安装改PATH，不提交推送/发布，D5仍暂缓；长期专题不自动扩入V1。
 每批保存进度/验证/下一步，维护实际架构、注释与代码—笔记关系。

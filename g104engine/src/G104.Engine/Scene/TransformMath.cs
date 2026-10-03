@@ -25,17 +25,48 @@ public static class TransformMath
     {
         if (!Finite(matrix)) throw new SceneValidationException("Transform matrix must be finite.");
         var scale = matrix.ExtractScale();
-        if (scale.X <= Tolerance || scale.Y <= Tolerance || scale.Z <= Tolerance)
+        if (!Finite(scale) || scale.X <= Tolerance || scale.Y <= Tolerance || scale.Z <= Tolerance)
             throw new SceneValidationException("Transform scale must be positive and invertible.");
         var result = new TransformData
         {
             Position = Float3.From(matrix.ExtractTranslation()),
-            Rotation = RotationData.From(Normalize(matrix.ExtractRotation())),
+            Rotation = RotationData.From(ExtractRotation(matrix, scale)),
             Scale = Float3.From(scale)
         };
         if (!NearlyEqual(matrix, Compose(result)))
             throw new SceneValidationException("Transform contains shear, reflection or a non-TRS projection.");
         return result;
+    }
+
+    private static Quaternion ExtractRotation(Matrix4 matrix, Vector3 scale)
+    {
+        // 先移除行缩放；trace接近-1（180度）时用最大对角分支，避免除以接近零的w。
+        double m00 = matrix.M11 / (double)scale.X, m01 = matrix.M12 / (double)scale.X, m02 = matrix.M13 / (double)scale.X;
+        double m10 = matrix.M21 / (double)scale.Y, m11 = matrix.M22 / (double)scale.Y, m12 = matrix.M23 / (double)scale.Y;
+        double m20 = matrix.M31 / (double)scale.Z, m21 = matrix.M32 / (double)scale.Z, m22 = matrix.M33 / (double)scale.Z;
+        double trace = m00 + m11 + m22;
+        double x, y, z, w;
+        if (trace > 0)
+        {
+            double s = 2 * Math.Sqrt(1 + trace);
+            w = s / 4; x = (m12 - m21) / s; y = (m20 - m02) / s; z = (m01 - m10) / s;
+        }
+        else if (m00 >= m11 && m00 >= m22)
+        {
+            double s = 2 * Math.Sqrt(1 + m00 - m11 - m22);
+            x = s / 4; y = (m01 + m10) / s; z = (m02 + m20) / s; w = (m12 - m21) / s;
+        }
+        else if (m11 >= m22)
+        {
+            double s = 2 * Math.Sqrt(1 + m11 - m00 - m22);
+            x = (m01 + m10) / s; y = s / 4; z = (m12 + m21) / s; w = (m20 - m02) / s;
+        }
+        else
+        {
+            double s = 2 * Math.Sqrt(1 + m22 - m00 - m11);
+            x = (m02 + m20) / s; y = (m12 + m21) / s; z = s / 4; w = (m01 - m10) / s;
+        }
+        return Normalize(new Quaternion((float)x, (float)y, (float)z, (float)w));
     }
 
     public static Matrix4 Inverse(Matrix4 matrix)

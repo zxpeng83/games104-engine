@@ -68,29 +68,32 @@ public sealed class GltfModelLoader(AssetRoot assets)
         foreach (var node in Node.Flatten(scene))
         {
             if (node.Mesh is null) continue;
-            foreach (var primitive in node.Mesh.Primitives)
+            for (int primitiveIndex = 0; primitiveIndex < node.Mesh.Primitives.Count; primitiveIndex++)
             {
+                var primitive = node.Mesh.Primitives[primitiveIndex];
                 if (primitive.DrawPrimitiveType != PrimitiveType.TRIANGLES || primitive.MorphTargetsCount != 0)
                     throw new InvalidDataException($"节点{node.Name}只支持三角形且不支持Morph");
-                if (primitive.VertexAccessors.Keys.Any(k => k.StartsWith("JOINTS_", StringComparison.Ordinal) && k != "JOINTS_0" || k.StartsWith("WEIGHTS_", StringComparison.Ordinal) && k != "WEIGHTS_0"))
+                if (node.Skin is not null && primitive.VertexAccessors.Keys.Any(k => k.StartsWith("JOINTS_", StringComparison.Ordinal) && k != "JOINTS_0" || k.StartsWith("WEIGHTS_", StringComparison.Ordinal) && k != "WEIGHTS_0"))
                     throw new InvalidDataException($"节点{node.Name}超过V1每顶点四个骨骼影响");
                 string[] supported = ["POSITION", "NORMAL", "TEXCOORD_0", "TANGENT", "JOINTS_0", "WEIGHTS_0"];
                 // 未被材质引用的额外UV集不影响UV0绘制；真正引用UV1的贴图会在材质导入时报错。
-                bool Unsupported(string key) => !supported.Contains(key) && !key.StartsWith("TEXCOORD_", StringComparison.Ordinal);
+                bool Unsupported(string key) => !supported.Contains(key) && !key.StartsWith("TEXCOORD_", StringComparison.Ordinal)
+                    && !(node.Skin is null && (key.StartsWith("JOINTS_", StringComparison.Ordinal) || key.StartsWith("WEIGHTS_", StringComparison.Ordinal)));
                 if (primitive.VertexAccessors.Keys.Any(Unsupported))
                     throw new InvalidDataException($"节点{node.Name}包含V1不支持的顶点属性：{string.Join(",", primitive.VertexAccessors.Keys.Where(Unsupported))}");
                 var positions = primitive.GetVertexAccessor("POSITION")?.AsVector3Array() ?? throw new InvalidDataException("网格缺少POSITION");
                 var normals = primitive.GetVertexAccessor("NORMAL")?.AsVector3Array() ?? throw new InvalidDataException("V1网格需要NORMAL");
                 var uv = primitive.GetVertexAccessor("TEXCOORD_0")?.AsVector2Array();
                 var tangent = primitive.GetVertexAccessor("TANGENT")?.AsVector4Array();
-                var joints = primitive.GetVertexAccessor("JOINTS_0")?.AsVector4Array();
-                var weights = primitive.GetVertexAccessor("WEIGHTS_0")?.AsVector4Array();
+                // glTF允许同一mesh同时被skin/无skin节点引用；无skin引用忽略皮肤属性，按node变换刚性绘制。
+                var joints = node.Skin is null ? null : primitive.GetVertexAccessor("JOINTS_0")?.AsVector4Array();
+                var weights = node.Skin is null ? null : primitive.GetVertexAccessor("WEIGHTS_0")?.AsVector4Array();
                 if (node.Skin is not null && (joints is null || weights is null)) throw new InvalidDataException("蒙皮网格缺少JOINTS_0/WEIGHTS_0");
                 uint[] indices = primitive.IndexAccessor is null ? Enumerable.Range(0, positions.Count).Select(i => (uint)i).ToArray() : primitive.GetIndices().ToArray();
                 if (indices.Length % 3 != 0 || indices.Any(i => i >= positions.Count)) throw new InvalidDataException("三角形索引无效");
                 ModelMaterial material = ImportMaterial(primitive.Material);
                 if ((material.BaseColorImage is not null || material.NormalImage is not null || material.MetallicRoughnessImage is not null) && uv is null)
-                    throw new InvalidDataException("贴图材质需要TEXCOORD_0");
+                    throw new InvalidDataException($"模型{relativePath}节点{nodes[node.LogicalIndex].Name}[{node.LogicalIndex}] primitive{primitiveIndex}贴图材质需要TEXCOORD_0");
                 var vertices = new float[positions.Count * 20];
                 for (int i = 0; i < positions.Count; i++)
                 {
@@ -108,15 +111,16 @@ public sealed class GltfModelLoader(AssetRoot assets)
                         for (int c = 0; c < 4; c++)
                         {
                             if (weight[c] <= 0) joint[c] = 0; // shader仍会读取零权重槽，索引也必须有界。
-                            else if (joint[c] < 0 || joint[c] >= (node.Skin?.JointsCount ?? 0) || joint[c] != MathF.Floor(joint[c])) throw new InvalidDataException("骨骼索引无效");
+                            else if (joint[c] < 0 || joint[c] >= node.Skin!.JointsCount || joint[c] != MathF.Floor(joint[c])) throw new InvalidDataException($"模型{relativePath}节点{nodes[node.LogicalIndex].Name} primitive{primitiveIndex}骨骼索引{joint[c]}超出skin容量{node.Skin!.JointsCount}");
                         }
                         Put(vertices, offset + 12, joint, 4);
                         Put(vertices, offset + 16, weight / sum, 4);
                     }
                     else vertices[offset + 16] = 1;
                 }
-                if (tangent is null && uv is not null) GenerateTangents(vertices, indices);
-                primitives.Add(new(node.LogicalIndex, node.Skin?.LogicalIndex ?? -1, vertices, indices, material));
+                // 无UV也建立与法线正交的安全回退；不能把固定+X切线交给+X法线做normalize(0)。
+                if (tangent is null) GenerateTangents(vertices, indices);
+                primitives.Add(new(node.LogicalIndex, node.Skin?.LogicalIndex ?? -1, vertices, indices, material, uv is not null, primitiveIndex));
             }
         }
         var clips = new Dictionary<string, AnimationClip>(StringComparer.Ordinal);

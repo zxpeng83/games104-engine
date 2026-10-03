@@ -105,7 +105,7 @@ V1 不是把全部 Runtime 内存序列化的运行存档。GPU、Jolt、音频�
 
 glTF 读取集成 SharpGLTF，PNG/JPEG 解码集成 StbImageSharp；模型空间、有限格式检查、采样/状态、GPU 蒙皮和 Pass 组织自研。实际角色 67 节点/65 关节/43 clips，角色 +Z 前向在实例边界适配为 -Z，保留模型根固定旋转；独立材质探针补 PNG/法线贴图导入。支持子集与明确拒绝项见 [渲染动画指南](guides/rendering-and-animation.md)。
 
-固定渲染链已有代码：方向光阴影 → Forward 或 G-buffer/Deferred 光照 → 天空/透明 CPU Billboard → 曝光/Reinhard/Gamma → FXAA → UI。G-buffer 为 RGBA8 线性基础色/金属度、RGBA16F 世界法线/粗糙度、D24 深度；HDR 为 RGBA16F。光照为一盏方向光与最多四点光；方向光单张 2048 阴影及 3×3 PCF，天空只作背景，弱环境项不能称作 IBL。性能优劣和最终视觉一致性仍待实际评估。
+固定渲染链已有代码：方向光阴影 → Forward 或 G-buffer/Deferred 光照 → 天空/透明 CPU Billboard → 曝光/Reinhard/Gamma → FXAA → UI。G-buffer 为 RGBA8 线性基础色/金属度、RGBA16F 世界法线/粗糙度、D24 深度；HDR 为 RGBA32F。光照为一盏方向光与最多四点光；方向光单张 2048 阴影及 3×3 PCF，天空只作背景，弱环境项不能称作 IBL。性能优劣和最终视觉一致性仍待实际评估。
 
 音频使用既有 OpenTK OpenAL 与部署的 OpenAL Soft，运行时只读约定 PCM16 mono/stereo WAV；素材由已授权便携 FFmpeg 离线转换。3D 点声源要求 mono，Listener 跟随相机。当前 32 Voice 上限与 CPU 粒子 512 容量是实际有限预算，不能称为传播/混响/AI 听觉或 GPU 粒子系统。
 
@@ -142,3 +142,11 @@ Piccolo 固定参考为 [f5053707fed4d3f94d270a436fb0d3a8ae54e3e5](https://githu
 ## 配置与显示收尾索引
 
 有限四状态动画定义已在assets/config/character-animation.json落实，实际非默认行为经AnimationVerification验证；上一/当前局部Pose的显示插值与SceneGraph共用alpha，mesh/palette/skeleton一致，显示不推进逻辑或事件。暂停/恢复仅ResetDisplayHistory，场景成功切换ResetAnimations。Debug/Release最终--verify及delivery图形回归通过，详细结果与用户待验收项见实施复查/执行台账；声音听感和真实操控不由自动日志代替。
+
+## 独立验收后的数值与交互校正
+
+b91dfe4保存后独立review发现GGX固定分母偏置压低粗糙峰值，修正分布后高强度有效HDR超过half范围，实际HDR附件改RGBA32F（G-buffer仍RGBA8/RGBA16F/D24），每像素较旧HDR多8字节。这是保持正确能量的局部数值修复，验证见独立评审记录。编辑草稿/失败帧事务、Reset种子与磁盘saved基准、导航非整除范围和NPC当前朝向消费也已按失败回归修正，操作语义与原V1范围一致。
+
+最终反射色[0,1]与每灯radiance≤1e12分域、double预乘、共同BRDF的.045下限和缩放后的half真正单位化已实现；粒子按view-space Z排序，最终材质UV0校验与rigid节点皮肤属性解释也已修正。导航容量用double避免吞小尾段、实际格界与位置仍float，空尾格不采样，导入数组保持自己的覆盖上界。本轮双配置11项UI/10项GPU、完整行为及240帧集成通过；详细失败与独立参考见 [独立评审](reviews/v1-independent-review-2026-10-03.md)，用户体验未自动验收。
+
+随后用户球/Ramp路线退出已定位为Scene变换近180°矩阵往返误拒，非展示球碰撞。SceneGraph位置/旋转单字段写入保存其余TRS；通用分解改稳定四分支/double，并保留有限/正Scale/shear/reflection原校验；角色读取已存根Quaternion。本批Debug/Release38路线、11UI、完整verify及独立800帧/原240帧均通过，Astra Ultra有限复核闭环；代码/学习说明与代理中断恢复纠正见 [专项记录](reviews/v1-contact-exit-fix-2026-10-03.md)。

@@ -21,12 +21,20 @@ float shadowVisibility(vec3 world,vec3 normal,vec3 light) {
     return visible/9.0;
 }
 vec3 brdf(vec3 base,vec3 n,vec3 v,vec3 l,float metal,float rough) {
+    rough=clamp(rough,0.045,1.0); // G-buffer的半精度舍入不能使实际BRDF低于声明的粗糙度下限。
     vec3 sum=v+l;
-    vec3 h=sum/max(length(sum),0.000001);
-    float nv=max(dot(n,v),0.0001), nl=max(dot(n,l),0.0), nh=max(dot(n,h),0.0), vh=max(dot(v,h),0.0);
+    float sumScale=max(abs(sum.x),max(abs(sum.y),abs(sum.z)));
+    if(sumScale==0.0) return vec3(0.0); // 完全相反方向没有可定义的half，且不产生正面的共同反射。
+    // 先缩放再单位化：很小但非零的V+L不被epsilon缩短，也不因length平方下溢而破坏cross恒等式。
+    vec3 scaledSum=sum/sumScale;
+    vec3 h=scaledSum/length(scaledSum);
+    float nv=max(dot(n,v),0.0001), nl=max(dot(n,l),0.0), nh=clamp(dot(n,h),0.0,1.0), vh=clamp(dot(v,h),0.0,1.0);
     float a=rough*rough, a2=a*a;
-    float denominator=nh*nh*(a2-1.0)+1.0;
-    float distribution=a2/(PI*denominator*denominator+0.000001);
+    // 单位n/h有|n×h|²=1-(n·h)²；避免高光附近的相消，不给分母叠加改变GGX能量的偏移。
+    vec3 nxh=cross(n,h);
+    float denominator=nh>0.0 ? dot(nxh,nxh)+nh*nh*a2 : 1.0;
+    float ratio=a/max(denominator,1e-20); // rough>=.045时正常分母远大于此仅防零的下限。
+    float distribution=ratio*ratio/PI;
     float k=(rough+1.0)*(rough+1.0)/8.0;
     float geometry=(nv/(nv*(1.0-k)+k))*(nl/(nl*(1.0-k)+k));
     vec3 f0=mix(vec3(0.04),base,metal);

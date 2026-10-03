@@ -12,7 +12,7 @@ public static class CoreSelfChecks
         CheckClock(); passed.Add("Fixed step: 30/60/144 Hz, backlog drop and reset");
         CheckInput(); passed.Add("Input: zero-step edges, single consumption and capture clearing");
         CheckTransforms(); passed.Add("Hierarchy: row-vector TRS, interpolation, keep-world reparent and invalid transforms");
-        CheckHistory(); passed.Add("Editor: grouped undo, stable identity, subtree references, redo branch and dirty state");
+        CheckHistory(); passed.Add("Editor: grouped undo, rejected-frame continuation/cancel, saved-file baseline, stable identity, subtree references and redo branch");
         CheckTemplates(); passed.Add("Templates: independent one-level instances and explicit override whitelist");
         CheckSerialization(verificationRoot); passed.Add("Scene JSON: atomic replacement, corrupt-file preservation, schema and asset boundary rejection");
         return passed;
@@ -99,6 +99,70 @@ public static class CoreSelfChecks
         Reject(() => new SceneGraph(new SceneDocument { Objects = [door, attached] }), "Static collider under moving door was accepted.");
         attached.Collider = null;
         _ = new SceneGraph(new SceneDocument { Objects = [door, attached] });
+        CheckTransformUpdates();
+    }
+
+    private static void CheckTransformUpdates()
+    {
+        var leaf = Item("TRS leaf", ObjectKind.StaticMesh, new Vector3(1, 2, 3));
+        leaf.Transform.Scale = new Float3(2, 3, 4);
+        leaf.Transform.Rotation = RotationData.From(Quaternion.FromAxisAngle(Vector3.UnitX, 0.4f));
+        var graph = new SceneGraph(new SceneDocument { Objects = [leaf] });
+        var authored = TransformMath.Clone(leaf.Transform);
+        graph.SetWorldPosition(leaf.Id, new Vector3(-3, 4, 5));
+        Require(leaf.Transform.Scale == authored.Scale && leaf.Transform.Rotation == authored.Rotation,
+            "World position setter changed unrelated authored scale/rotation.");
+        var position = leaf.Transform.Position;
+        graph.SetWorldRotation(leaf.Id, Quaternion.FromAxisAngle(Vector3.UnitY, MathF.PI - 0.001f));
+        Require(leaf.Transform.Scale == authored.Scale && leaf.Transform.Position == position,
+            "World rotation setter changed unrelated authored scale/position.");
+
+        // 通用矩阵入口也须支持180度附近的所有主轴/混合轴；不能只绕开角色更新中的分解。
+        foreach (var axis in new[] { Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ, Vector3.Normalize(new Vector3(1, -2, 3)) })
+        foreach (float angle in new[] { 0.3f, MathF.PI - 0.001f, MathF.PI, -MathF.PI + 0.001f })
+        {
+            var expected = TransformMath.Compose(new TransformData
+            {
+                Position = position, Scale = authored.Scale,
+                Rotation = RotationData.From(Quaternion.FromAxisAngle(axis, angle))
+            });
+            graph.SetWorldMatrix(leaf.Id, expected);
+            Require(TransformMath.NearlyEqual(graph.WorldMatrix(leaf.Id), expected), "Near-half-turn matrix decomposition changed a valid TRS.");
+        }
+        var accepted = graph.WorldMatrix(leaf.Id);
+        var shear = Matrix4.Identity; shear.M12 = 0.5f;
+        Reject(() => graph.SetWorldMatrix(leaf.Id, shear), "World matrix setter accepted shear.");
+        Reject(() => graph.SetWorldMatrix(leaf.Id, Matrix4.CreateScale(-1, 1, 1)), "World matrix setter accepted reflection.");
+        Reject(() => TransformMath.Decompose(Matrix4.CreateScale(1e30f)), "Scale extraction overflow was accepted.");
+        Require(TransformMath.NearlyEqual(graph.WorldMatrix(leaf.Id), accepted), "Rejected world matrix changed the accepted pose.");
+
+        var grandparent = Item("Grandparent", ObjectKind.Group, new Vector3(3, -2, 7));
+        grandparent.Transform.Scale = new Float3(2, 2, 2);
+        grandparent.Transform.Rotation = RotationData.From(Quaternion.FromAxisAngle(Vector3.UnitY, 0.8f));
+        var parent = Item("Parent", ObjectKind.Group, new Vector3(-1, 2, 4));
+        parent.ParentId = grandparent.Id;
+        parent.Transform.Scale = new Float3(3, 3, 3);
+        parent.Transform.Rotation = RotationData.From(Quaternion.FromAxisAngle(Vector3.UnitX, -0.6f));
+        leaf.ParentId = parent.Id;
+        graph = new SceneGraph(new SceneDocument { Objects = [leaf, parent, grandparent] });
+        authored = TransformMath.Clone(leaf.Transform);
+        var targetPosition = new Vector3(8, 1, -6);
+        graph.SetWorldPosition(leaf.Id, targetPosition);
+        Near(graph.WorldPosition(leaf.Id), targetPosition, "World position conversion through rotated/scaled ancestors failed.");
+        Require(leaf.Transform.Scale == authored.Scale && leaf.Transform.Rotation == authored.Rotation,
+            "Parented world position setter changed unrelated local TRS.");
+        position = leaf.Transform.Position;
+        var targetRotation = Quaternion.FromAxisAngle(Vector3.Normalize(new Vector3(1, 2, -3)), MathF.PI - 0.001f);
+        graph.SetWorldRotation(leaf.Id, targetRotation);
+        Require(leaf.Transform.Scale == authored.Scale && leaf.Transform.Position == position,
+            "Parented world rotation setter changed unrelated local TRS.");
+        var expectedWorld = TransformMath.Compose(new TransformData
+        {
+            Position = Float3.From(targetPosition), Rotation = RotationData.From(targetRotation),
+            Scale = Float3.From(authored.Scale.ToVector() * 6)
+        });
+        Require(TransformMath.NearlyEqual(graph.WorldMatrix(leaf.Id), expectedWorld),
+            "World rotation conversion through noncommuting rotated/scaled ancestors failed.");
     }
 
     private static void CheckHistory()
@@ -148,6 +212,35 @@ public static class CoreSelfChecks
         editor.History.PrepareChange = _ => throw new InvalidDataException("Unavailable resource while undoing.");
         Reject(() => editor.History.Undo(), "Failed undo preparation committed.");
         Require(existing.Name == "Valid prepared edit" && editor.History.UndoCount == undoBefore + 1, "Failed prepared undo lost current design/cursor.");
+
+        var player = Item("Drag capsule", ObjectKind.Player, Vector3.Zero);
+        player.Parameters["radius"] = .35f; player.Parameters["height"] = 1.9f;
+        var drag = new SceneEditor(new SceneGraph(new SceneDocument { Objects = [player] }));
+        drag.History.BeginTransaction("Radius gesture");
+        drag.SetParameter(player.Id, "radius", .45f);
+        Reject(() => drag.SetParameter(player.Id, "radius", 1), "Invalid drag frame committed.");
+        Require(drag.History.InTransaction && player.Parameters["radius"] == .45f && drag.History.UndoCount == 0,
+            "Rejected frame ended its transaction or lost the preceding legal value.");
+        drag.SetParameter(player.Id, "radius", .55f); drag.History.CommitTransaction();
+        Require(drag.History.UndoCount == 1, "Rejected-frame continuation split a gesture into multiple history entries.");
+        drag.History.Undo();
+        Require(player.Parameters["radius"] == .35f && !drag.History.IsDirty, "One Undo did not restore the drag start and saved state.");
+        drag.History.BeginTransaction("Cancelled radius gesture");
+        drag.SetParameter(player.Id, "radius", .45f);
+        Reject(() => drag.SetParameter(player.Id, "radius", 1), "Invalid cancelled-drag frame committed.");
+        drag.SetParameter(player.Id, "radius", .55f); drag.History.CancelTransaction();
+        Require(player.Parameters["radius"] == .35f && drag.History.UndoCount == 0 && drag.History.RedoCount == 1,
+            "Cancel after a rejected frame lost the drag start or redo branch.");
+
+        var saved = SceneSerializer.Clone(drag.Graph.Document); saved.Name = "Custom saved design";
+        drag.History.SetSavedBaseline(saved);
+        Require(drag.History.IsDirty, "Reset seed was marked saved against another saved design.");
+        drag.History.Execute("Match saved design", () => drag.Graph.Document.Name = saved.Name);
+        Require(!drag.History.IsDirty, "Matching the saved-file contents stayed dirty.");
+        drag.History.Undo();
+        Require(drag.History.IsDirty, "Undo to seed forgot the separate saved-file baseline.");
+        drag.History.SetSavedBaseline(null);
+        Require(drag.History.IsDirty, "Missing or rejected saved file was marked saved.");
     }
 
     private static void CheckTemplates()

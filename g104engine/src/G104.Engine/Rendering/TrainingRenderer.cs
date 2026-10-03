@@ -27,6 +27,9 @@ public sealed class TrainingRenderer : IDisposable
     private bool zeroSize, disposed;
     private Matrix4 lightViewProjection;
     public const int ShadowResolution = 2048;
+    // 每灯RGB辐射最多1e12：反射基础色[0,1]、最多5灯与Exposure<=20的BRDF中间乘积仍在FP32内。
+    // 这是明确拒绝极端输入的数值子集，不截断高光、光照输出或粗糙度。
+    public const double MaximumShaderRadiance = 1e12;
     public RendererStatistics Statistics { get; private set; }
 
     public TrainingRenderer(string assetRoot, int width, int height)
@@ -86,15 +89,25 @@ public sealed class TrainingRenderer : IDisposable
         {
             foreach (var item in objects)
             {
+                if (item.Design.Kind == ObjectKind.PointLight)
+                    _ = CheckedRadiance(item.Design.Material.BaseColor.ToVector(), item.Design.Parameters.GetValueOrDefault("intensity", 25), $"点光{item.Design.Name}");
+                MaterialData drawingMaterial = DrawingMaterial(item.Design);
                 if (item.Design.Primitive == PrimitiveKind.Model)
                 {
                     string path = item.Design.ModelPath ?? "models/UAL1_Standard.glb";
                     if (!models.TryGetValue(path, out var model)) { model = LoadModel(path); models.Add(path, model); }
                     if (item.Design.Kind is ObjectKind.Player or ObjectKind.Npc) animationSettings.ValidateCharacterModel(model.Data);
                     for (int i = 0; i < model.Data.Primitives.Length; i++)
-                        LoadTextures(model.Data.Primitives[i].Material, path + "/" + i, item.Design.Material);
+                    {
+                        ValidateModelMaterial(model.Data, model.Data.Primitives[i], drawingMaterial);
+                        LoadTextures(model.Data.Primitives[i].Material, path + "/" + i, drawingMaterial);
+                    }
                 }
-                else LoadTextures(new(Vector4.One, 0, .6f, false, null, null, null, 1, -1), "", item.Design.Material);
+                else
+                {
+                    _ = CheckedReflectance(drawingMaterial.BaseColor.ToVector(), $"对象{item.Design.Name}反射基础色");
+                    LoadTextures(new(Vector4.One, 0, .6f, false, null, null, null, 1, -1), "", drawingMaterial);
+                }
             }
         }
         catch
@@ -128,6 +141,23 @@ public sealed class TrainingRenderer : IDisposable
     public string AnimationDebug(Guid id) => instances.TryGetValue(id, out var entry) ? entry.Controller.DebugText : "No animated model";
     public AnimationEvent[] DrainAnimationEvents(Guid id) => instances.TryGetValue(id, out var entry) ? entry.Controller.DrainEvents() : [];
 
+    internal Vector4 ReadHdrPixel(int x, int y) => ReadTargetPixel(x, y, false);
+    internal Vector4 ReadNormalRoughPixel(int x, int y) => ReadTargetPixel(x, y, true);
+    private Vector4 ReadTargetPixel(int x, int y, bool normalRough)
+    {
+        EnsureOwner();
+        if (targets is null || (uint)x >= targets.Width || (uint)y >= targets.Height) throw new ArgumentOutOfRangeException(nameof(x));
+        GL.GetInteger(GetPName.ReadFramebufferBinding, out int previous);
+        try
+        {
+            GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, normalRough ? targets.GBuffer : targets.HdrBuffer);
+            GL.ReadBuffer(normalRough ? ReadBufferMode.ColorAttachment1 : ReadBufferMode.ColorAttachment0);
+            var pixel = new float[4]; GL.ReadPixels(x, y, 1, 1, PixelFormat.Rgba, PixelType.Float, pixel);
+            return new(pixel[0], pixel[1], pixel[2], pixel[3]);
+        }
+        finally { GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, previous); }
+    }
+
     public IReadOnlyList<(Vector3 Start, Vector3 End)> SkeletonDebug(Guid id, Matrix4 instanceWorld, float alpha = 1)
     {
         if (!instances.TryGetValue(id, out var entry)) return [];
@@ -147,13 +177,19 @@ public sealed class TrainingRenderer : IDisposable
     public void Render(CameraState camera, IReadOnlyList<RenderObject> objects, RenderSettings settings, IReadOnlyList<ParticleVisual> particles, RenderDebugView debugView)
     {
         EnsureOwner(); if (zeroSize || targets is null) return;
+        _ = CheckedRadiance(settings.SunColor.ToVector(), settings.SunIntensity, "方向光");
+        if (!float.IsFinite(settings.Exposure) || settings.Exposure <= 0) throw new InvalidDataException("渲染曝光必须为有限正数");
         drawCalls = triangles = 0;
         usedTextures.Clear();
         Matrix4 viewProjection = camera.View * camera.Projection;
         Matrix4 inverseViewProjection = viewProjection.Inverted();
         Vector3 sunDirection = settings.SunDirection.ToVector();
-        if (sunDirection.LengthSquared < 1e-6f) sunDirection = new(-.5f, -1, -.4f);
-        sunDirection.Normalize();
+        // DTO的有限float分量仍可能在float LengthSquared中溢出；用double求方向长度。
+        if (!float.IsFinite(sunDirection.X) || !float.IsFinite(sunDirection.Y) || !float.IsFinite(sunDirection.Z)) throw new InvalidDataException("方向光方向必须有限");
+        double sunLengthSquared = (double)sunDirection.X * sunDirection.X + (double)sunDirection.Y * sunDirection.Y + (double)sunDirection.Z * sunDirection.Z;
+        if (sunLengthSquared < 1e-6) { sunDirection = new(-.5f, -1, -.4f); sunLengthSquared = .25 + 1 + .16; }
+        double sunLength = Math.Sqrt(sunLengthSquared);
+        sunDirection = new((float)(sunDirection.X / sunLength), (float)(sunDirection.Y / sunLength), (float)(sunDirection.Z / sunLength));
         Vector3 center = new(camera.Target.X, 0, camera.Target.Z);
         Vector3 up = MathF.Abs(Vector3.Dot(sunDirection, Vector3.UnitY)) > .98f ? Vector3.UnitZ : Vector3.UnitY;
         lightViewProjection = Matrix4.LookAt(center - sunDirection * 65, center, up) * Matrix4.CreateOrthographic(80, 80, 1, 140);
@@ -215,6 +251,7 @@ public sealed class TrainingRenderer : IDisposable
         foreach (var item in objects)
         {
             if (!item.Design.Visible || item.Design.Kind == ObjectKind.Group) continue;
+            MaterialData drawingMaterial = DrawingMaterial(item.Design);
             if (item.Design.Primitive == PrimitiveKind.Model)
             {
                 var entry = Instance(item);
@@ -224,6 +261,7 @@ public sealed class TrainingRenderer : IDisposable
                 for (int i = 0; i < entry.Model.Data.Primitives.Length; i++)
                 {
                     var primitive = entry.Model.Data.Primitives[i];
+                    ValidateModelMaterial(entry.Model.Data, primitive, drawingMaterial);
                     Matrix4 meshWorld = displayWorld[primitive.Node] * correction * item.ModelMatrix;
                     program.Set("uModel", meshWorld);
                     program.Set("uSkinned", primitive.Skin >= 0 ? 1 : 0);
@@ -232,7 +270,7 @@ public sealed class TrainingRenderer : IDisposable
                         Matrix4[] palette = entry.Model.Data.CreatePalette(primitive.Skin, primitive.Node, displayWorld);
                         GL.BindBuffer(BufferTarget.UniformBuffer, boneBuffer); GL.BufferSubData(BufferTarget.UniformBuffer, IntPtr.Zero, palette.Length * 64, palette);
                     }
-                    BindMaterial(program, primitive.Material, entry.Model.Path + "/" + i, item.Design.Material, true);
+                    BindMaterial(program, primitive.Material, entry.Model.Path + "/" + i, drawingMaterial, true);
                     SetCulling(primitive.Material.DoubleSided, meshWorld);
                     Draw(entry.Model.Meshes[i]);
                 }
@@ -240,7 +278,7 @@ public sealed class TrainingRenderer : IDisposable
             else if (primitives.TryGetValue(item.Design.Primitive, out var mesh))
             {
                 program.Set("uModel", item.ModelMatrix); program.Set("uSkinned", 0);
-                var material = item.Design.Material;
+                var material = drawingMaterial;
                 BindMaterial(program, new(new(material.BaseColor.ToVector(), 1), material.Metallic, material.Roughness, false, null, null, null, 1, -1), "", material, false);
                 SetCulling(item.Design.Primitive == PrimitiveKind.Plane, item.ModelMatrix); Draw(mesh);
             }
@@ -252,7 +290,12 @@ public sealed class TrainingRenderer : IDisposable
     private void BindMaterial(ShaderProgram program, ModelMaterial imported, string key, MaterialData design, bool useImported)
     {
         // 模型实例颜色作tint，保留同一GLB内不同子材质的颜色差异。
-        Vector4 baseColor = useImported ? imported.BaseColor * new Vector4(design.BaseColor.ToVector(), 1) : imported.BaseColor;
+        Vector3 tint = design.BaseColor.ToVector();
+        Vector4 baseColor = useImported ? new(
+            CheckedProduct(imported.BaseColor.X, tint.X, "模型有效基础色R"),
+            CheckedProduct(imported.BaseColor.Y, tint.Y, "模型有效基础色G"),
+            CheckedProduct(imported.BaseColor.Z, tint.Z, "模型有效基础色B"), imported.BaseColor.W) : imported.BaseColor;
+        _ = CheckedReflectance(baseColor.Xyz, "有效反射基础色");
         program.Set("uBaseColor", baseColor); program.Set("uMetallic", imported.Metallic); program.Set("uRoughness", imported.Roughness);
         program.Set("uNormalScale", imported.NormalScale); program.Set("uAlphaCutoff", imported.AlphaCutoff);
         var (baseTexture, normalTexture, mrTexture) = LoadTextures(imported, key, design);
@@ -271,9 +314,47 @@ public sealed class TrainingRenderer : IDisposable
         return (baseTexture, normalTexture, mrTexture);
     }
 
+    private static void ValidateModelMaterial(GltfModel model, ModelPrimitive primitive, MaterialData design)
+    {
+        ModelMaterial imported = primitive.Material;
+        _ = CheckedProduct(imported.BaseColor.X, design.BaseColor.X, "模型有效基础色R");
+        _ = CheckedProduct(imported.BaseColor.Y, design.BaseColor.Y, "模型有效基础色G");
+        _ = CheckedProduct(imported.BaseColor.Z, design.BaseColor.Z, "模型有效基础色B");
+        if (!primitive.HasUv0 && (design.BaseColorTexture is not null || imported.BaseColorImage is not null
+            || design.NormalTexture is not null || imported.NormalImage is not null || imported.MetallicRoughnessImage is not null))
+            throw new InvalidDataException($"模型{model.SourcePath}节点{model.Nodes[primitive.Node].Name}[{primitive.Node}] primitive{primitive.PrimitiveIndex}最终贴图材质需要TEXCOORD_0；源网格没有UV0");
+    }
+
+    private static MaterialData DrawingMaterial(SceneObjectData design)
+    {
+        MaterialData material = design.Material;
+        if (design.Kind != ObjectKind.PointLight) return material;
+        Vector3 color = material.BaseColor.ToVector();
+        float largest = Math.Max(1, Math.Max(color.X, Math.Max(color.Y, color.Z)));
+        if (largest == 1) return material;
+        // 灯的可见marker使用有限反射色；原设计RGB仍供SetLighting求真正radiance，不能回写设计/历史。
+        return new() { BaseColor = Float3.From(color / largest), Metallic = material.Metallic, Roughness = material.Roughness,
+            BaseColorTexture = material.BaseColorTexture, NormalTexture = material.NormalTexture };
+    }
+
+    private static float CheckedProduct(float left, float right, string label, double maximum = 1)
+    {
+        double product = (double)left * right;
+        if (!float.IsFinite(left) || !float.IsFinite(right) || left < 0 || right < 0 || product > maximum)
+        {
+            string range = maximum == 1 ? "反射基础色必须在[0,1]（RGBA8 G-buffer合同）" : $"GPU FP32 radiance必须有限、非负且不超过{maximum:G}";
+            throw new InvalidDataException($"{label}超出V1数值范围：{range}；实际乘积{product:G}");
+        }
+        return (float)product;
+    }
+    private static Vector3 CheckedReflectance(Vector3 color, string label) => new(
+        CheckedProduct(color.X, 1, label + " R"), CheckedProduct(color.Y, 1, label + " G"), CheckedProduct(color.Z, 1, label + " B"));
+    private static Vector3 CheckedRadiance(Vector3 color, float intensity, string label) => new(
+        CheckedProduct(color.X, intensity, label + " radiance R", MaximumShaderRadiance), CheckedProduct(color.Y, intensity, label + " radiance G", MaximumShaderRadiance), CheckedProduct(color.Z, intensity, label + " radiance B", MaximumShaderRadiance));
+
     private void SetLighting(ShaderProgram program, CameraState camera, IReadOnlyList<RenderObject> objects, RenderSettings settings, Vector3 direction)
     {
-        program.Set("uCamera", camera.Position); program.Set("uSunDirection", direction); program.Set("uSunRadiance", settings.SunColor.ToVector() * settings.SunIntensity);
+        program.Set("uCamera", camera.Position); program.Set("uSunDirection", direction); program.Set("uSunRadiance", CheckedRadiance(settings.SunColor.ToVector(), settings.SunIntensity, "方向光"));
         program.Set("uLightViewProjection", lightViewProjection); program.Set("uShadows", settings.Shadows ? 1 : 0); BindTexture(program, "uShadow", shadowTexture, 5);
         var lights = objects.Where(o => o.Design.Kind == ObjectKind.PointLight && o.Design.Visible).Take(4).ToArray();
         program.Set("uPointCount", lights.Length);
@@ -281,7 +362,9 @@ public sealed class TrainingRenderer : IDisposable
         {
             var light = lights[i]; Vector3 position = light.ModelMatrix.ExtractTranslation();
             float radius = light.Design.Parameters.GetValueOrDefault("radius", 10), intensity = light.Design.Parameters.GetValueOrDefault("intensity", 25);
-            program.Set($"uPointPositions[{i}]", new Vector4(position, radius)); program.Set($"uPointColors[{i}]", new Vector4(light.Design.Material.BaseColor.ToVector(), intensity));
+            // 先在double中相乘/检查，再一次转换到float；避免shader中先乘巨大色分量再乘微小强度而溢出。
+            Vector3 radiance = CheckedRadiance(light.Design.Material.BaseColor.ToVector(), intensity, $"点光{light.Design.Name}");
+            program.Set($"uPointPositions[{i}]", new Vector4(position, radius)); program.Set($"uPointColors[{i}]", new Vector4(radiance, 1));
         }
     }
 
@@ -369,7 +452,8 @@ public sealed class TrainingRenderer : IDisposable
     private void DrawParticles(CameraState camera, Matrix4 viewProjection, IReadOnlyList<ParticleVisual> visuals)
     {
         if (visuals.Count == 0) return;
-        var sorted = visuals.OrderByDescending(p => (p.Position - camera.Position).LengthSquared).Take(8192).ToArray();
+        // 相机平面Billboard按view-space Z排序；径向距离会被侧向偏移误导。右手view下更负的Z更远。
+        var sorted = visuals.OrderBy(p => Vector3.TransformPosition(p.Position, camera.View).Z).Take(8192).ToArray();
         Matrix4 inverseView = camera.View.Inverted(); Vector3 right = inverseView.Row0.Xyz, up = inverseView.Row1.Xyz;
         var vertices = new float[sorted.Length * 6 * 9]; int cursor = 0;
         void Vertex(ParticleVisual visual, float x, float y)

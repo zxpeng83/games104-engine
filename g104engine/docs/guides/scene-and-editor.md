@@ -8,6 +8,10 @@
 
 CPU 使用 OpenTK 原生行向量，`TransformMath.Compose` 为 S×R×T，场景 `world=local×parentWorld`。重挂接默认保持世界姿态：`newLocal=oldWorld×inverse(newParentWorld)`。分解后必须重新组合并在容差内还原原矩阵；矩阵不可逆、剪切、反射或非有限数据会拒绝。四元数在求值边界归一化。
 
+`SetWorldPosition/SetWorldRotation`是单字段操作：克隆已存TRS，仅改位置或旋转，不能从自身world矩阵反复分解并重估Scale。根位置直接保存；父级位置乘父world逆矩阵；行矩阵`local×parent`对应四元数`parent×local`，所以局部旋转为`inverse(parentRotation)×desiredWorldRotation`。Position/Rotation更新保留其余字段，Rebuild失败恢复旧TRS。Player/Npc已强制为根，Gameplay转向直接读存储的Quaternion。
+
+通用`SetWorldMatrix`和保持世界重挂接仍需分解。接近180°时四元数w接近0，若矩阵反求选择除以小w的路径，会放大浮点误差，合法TRS也可能在重建时被判为剪切。本实现去行缩放后用double中间值及trace/最大对角元素四分支选择稳定分母；保留原`Tolerance=1e-4`、正缩放、有限值及重建校验，并拒绝行长度提取溢出。它不通过调大容差或吞异常隐藏非法矩阵。用户球/Ramp退出的无物理复现、修复与双配置后验见 [专项记录](../reviews/v1-contact-exit-fix-2026-10-03.md)。
+
 加载与每次结构编辑检查非空且唯一 GUID、有效 ParentId/TargetId、环、128 层上限、枚举、有限 TRS/组件值。所有接收场景子对象的节点要求正统一缩放。玩家/NPC 保持根节点和单位缩放；尺寸由角色参数控制。V1 可编辑 DTO 尚无活动相机或动态刚体组件；动态刚体验证对象由物理模块独立创建，不加入任意可挂接设计对象。
 
 `SceneGraph(SceneDocument)` 保留传入文档，公开 `Document`、`OrderedIds`、`Object(Guid)`、`WorldMatrix(Guid)`、`WorldPosition(Guid)`、`SetWorldPosition`、`SetWorldRotation`、`SetWorldMatrix`、`Rebuild`、`CapturePrevious`、`ResetInterpolation`、`InterpolatedWorldMatrix(Guid,float)` 和 `Subtree(Guid)`。运行时改局部字段之后须 `Rebuild`；结构编辑走命令接口。每模拟步开始 `CapturePrevious`，显示时相同 alpha 插值全部节点的局部 TRS，再递归组合父显示世界。重挂接、Undo/Redo、瞬移/切场景应重置历史，碰撞读取逻辑世界。
@@ -28,19 +32,21 @@ CPU 使用 OpenTK 原生行向量，`TransformMath.Compose` 为 S×R×T，场景
 
 ## 命令与历史
 
-`Editor/SceneEditor` 提供 `Create(templateId,parentId?)`、`Create(SceneObjectData)`、`Delete`、`SetTransform`、`Reparent`、`SetParameter`、`SetMaterial`、`SetCollider`、`SetAsset`、`SetTarget`、`SetName`、`SetVisible`、`SetRenderPipeline`。`SetParameter` 只修改当前设计或模板已经声明的键；运行时字段不可临时加入。`SceneParameterRules` 校验 V1 消费字段的正值/非负约束、角色胶囊高大于直径、坡度/FOV、导航边界和最多 20,000 格等关联条件；未知扩展键仍须有限，不假称已有所有未来组件模式。UI 在模拟循环外的主线程安全点调用，编辑预览的碰撞准备/替换由 Sandbox 管理。
+`Editor/SceneEditor` 提供 `Create(templateId,parentId?)`、`Create(SceneObjectData)`、`Delete`、`SetTransform`、`Reparent`、`SetParameter`、`SetMaterial`、`SetCollider`、`SetAsset`、`SetTarget`、`SetName`、`SetVisible`、`SetRenderPipeline`。`SetParameter` 只修改当前设计或模板已经声明的键；运行时字段不可临时加入。`SceneParameterRules` 校验 V1 消费字段的正值/非负约束、角色胶囊高大于直径、坡度/FOV、导航边界和最多 20,000 格等关联条件；未知扩展键仍须有限，不假称已有所有未来组件模式。UI 在模拟循环外的主线程安全点调用；编辑时校验设计并准备渲染资源，下一次 Play 从当前设计重建真实物理世界。编辑预览没有独立碰撞世界。
 
 删除组形成一次整棵子树事务；外部对象 TargetId 指向任一后代时明确拒绝，必须先解除引用。必需玩家受删除保护。撤销恢复同一 GUID、局部姿态、父引用和所有设计字段，对仍在历史范围内的对象也复用同一 DTO 实例。
 
-`EditorHistory` 默认最多 100 条，采用设计快照，运行状态不入栈。`Execute(label,Action)` 验证和失败回滚；`BeginTransaction(label)`、`CommitTransaction()`、`CancelTransaction()` 合并拖动/多操作，取消恢复开始状态。Undo 后有效新编辑清空旧 Redo；取消或无变化事务不清空 Redo。`CanUndo`、`CanRedo`、`UndoCount`、`RedoCount`、标签和 `IsDirty` 可供 UI 展示。成功保存之后才调用 `MarkSaved`；Undo 回到已保存内容时清除 dirty，保存后 Undo 离开保存内容时重新 dirty。切换设计场景建立新编辑器或清历史。
+`EditorHistory` 默认最多 100 条，采用设计快照，运行状态不入栈。`Execute(label,Action)` 验证和失败回滚；拖动中无效帧只恢复到前一有效值，原事务仍可继续，最终一次 Undo 或取消恢复开始状态。`BeginTransaction(label)`、`CommitTransaction()`、`CancelTransaction()` 合并拖动/多操作。Undo 后有效新编辑清空旧 Redo；取消或无变化事务不清空 Redo。`CanUndo`、`CanRedo`、`UndoCount`、`RedoCount`、标签和 `IsDirty` 可供 UI 展示。成功保存之后才调用 `MarkSaved`；Undo 回到已保存内容时清除 dirty，保存后 Undo 离开保存内容时重新 dirty。`SetSavedBaseline(SceneDocument?)` 将实际保存目标的内容独立于当前设计与历史；Reset seed 建立新历史仍以用户保存文件为基准，内容不同则显示 Unsaved。Load saved 成功后以该文件内容为基准；保存文件缺失或被拒绝时传 null，不把回落种子误标为已保存。Play/Stop 保留该基准和原历史。
 
-Sandbox `Tools/SceneEditorPanel.cs` 的 `Draw(SceneEditor,bool,Guid?,Action<Action>)` 返回当前选择，通过传入队列提交全部设计命令；层级点击只改变选择。提供 cube/group/light 创建、子树删除、局部 TRS、父挂接保持世界、名字/显示、材质/纹理/模型、TargetId 与已声明参数、Undo/Redo。数值和颜色拖动使用上述事务，Escape 取消；文本在 Enter 或离开字段时一次提交。字符编辑保护、父候选约束与 Play 只读有明确提示。Play/Stop/Save/Load/Reset 和运行调试面板归主窗口，本面板不直接重建图形或碰撞。
+Sandbox `Tools/SceneEditorPanel.cs` 的 `Draw(SceneEditor,bool,Guid?,Action<Action>)` 返回当前选择，通过传入队列提交全部设计命令；层级点击改变选择并提交旧对象尚未提交的文本。提供 cube/group/light 创建、子树删除、局部 TRS、父挂接保持世界、名字/显示、材质/纹理/模型、TargetId 与已声明参数、Undo/Redo。数值和颜色拖动使用上述事务，Escape 取消并忽略当前按住手势的剩余移动；下一次按下可重新编辑。文本在 Enter、离开字段或字段因切换选择/收起而停止绘制时一次提交，草稿持有原对象回调；Escape 丢弃草稿，后续失焦不会再次提交被取消内容。字符编辑保护、父候选约束与 Play 只读有明确提示。Play/Stop/Save/Load/Reset 和运行调试面板归主窗口，本面板不直接重建图形或碰撞。
 
 ## CPU 检查与验收边界
 
 `CoreSelfChecks.Run()` 无新增测试框架：检查 30/60/144 Hz 时间步、五补步及丢时、输入边沿和 UI 捕获、父平移/旋转/统一缩放、保持世界重挂接、循环/剪切/角色父限制、插值重置、子树外部引用、稳定身份、拖动事务、Redo 分支、100 条上限、dirty、模板隔离与覆盖、JSON 保存重载/原子替换/损坏保留/字段和路径拒绝。文件检查只使用明确创建的随机临时目录，并在验证边界内清理，不访问真实用户 Scenes。
 
-主任务 `--verify` 调用该入口并记录实际结果。GL/音频、静态碰撞随预览编辑同步、Play/Stop 保留未保存设计、真实 UI 手感和保存后重建/重启均需各自行为验证，不由纯 CPU 检查代替。
+主任务 `--verify` 调用该入口并记录实际结果。GL/音频、编辑后下一次 Play 的物理重建、Play/Stop 保留未保存设计、真实 UI 手感和保存后重建/重启均需各自行为验证，不由纯 CPU 检查代替。
+
+Sandbox `--verify-ui` 使用现有 cimgui 的独立上下文，真实鼠标、键盘和字符输入驱动 `SceneEditorPanel.Draw` 后处理相同命令边界；不创建 GL 窗口、不写 imgui.ini、不访问真实用户保存目录。面板可选控件区域观察只用于定位点击，正常窗口不订阅。专项覆盖四种文本在树切换时提交、非法胶囊拖动继续/一次 Undo/Escape、文本 Enter/Escape、收起材质/窗口与工具栏按下释放顺序，以及显式工作区验证目录中的自定义保存→Reset seed→保存重载基准。编写用例不等于验证通过，实际执行结果由执行台账汇总。
 
 固定参考沿项目 Piccolo f5053707fed4d3f94d270a436fb0d3a8ae54e3e5；此模块的 GUID 设计格式、受控场景图、输入边沿和快照命令为本项目自研，概念与采用边界见 [完整实施方案](../plans/v1-implementation-draft.md) 第 3、4、7、9 节、[核心路线](../plans/core-architecture-roadmap.md) 与 [资产/场景路线](../plans/assets-scene-roadmap.md)。本页不声称逐项照搬 Piccolo。
 

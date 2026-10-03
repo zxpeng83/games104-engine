@@ -36,8 +36,9 @@ public sealed class NavigationGrid
         _world = world;
         Settings = settings ?? new NavigationSettings();
         Validate(Settings);
-        Width = (int)MathF.Ceiling((Settings.Maximum.X - Settings.Minimum.X) / Settings.CellSize);
-        Depth = (int)MathF.Ceiling((Settings.Maximum.Y - Settings.Minimum.Y) / Settings.CellSize);
+        // 容量用double跨度，避免float相减吞掉仍有可表示位置的非零小尾格。
+        Width = (int)Math.Ceiling(((double)Settings.Maximum.X - Settings.Minimum.X) / Settings.CellSize);
+        Depth = (int)Math.Ceiling(((double)Settings.Maximum.Y - Settings.Minimum.Y) / Settings.CellSize);
         if ((long)Width * Depth > 20000) throw new ArgumentException("Navigation area exceeds the V1 grid limit of 20,000 cells.");
         _walkable = new bool[Width * Depth];
         Rebuild();
@@ -53,7 +54,7 @@ public sealed class NavigationGrid
         if (Width == 0 || Depth == 0) throw new ArgumentException("Navigation grid cannot be empty.");
         _walkable = new bool[Width * Depth];
         for (int z = 0; z < Depth; z++)
-        for (int x = 0; x < Width; x++) _walkable[Index(x, z)] = cells[x, z];
+        for (int x = 0; x < Width; x++) _walkable[Index(x, z)] = CellInsideBounds(x, z) && cells[x, z];
         Revision = 1;
     }
 
@@ -64,6 +65,8 @@ public sealed class NavigationGrid
         for (int z = 0; z < Depth; z++)
         for (int x = 0; x < Width; x++)
         {
+            // 浮点格界舍入可能留下零宽尾格；它没有采样中心，不能交给物理查询。
+            if (!CellInsideBounds(x, z)) { _walkable[Index(x, z)] = false; continue; }
             var position = CellCenter(x, z);
             var support = _world.Raycast(position + Vector3.UnitY * 0.2f, -Vector3.UnitY, 0.4f);
             _walkable[Index(x, z)] = support is { } ground && ground.Normal.Y > 0.95f &&
@@ -73,9 +76,20 @@ public sealed class NavigationGrid
         Revision++;
     }
 
-    public Vector3 CellCenter(int x, int z) => new(Settings.Minimum.X + (x + 0.5f) * Settings.CellSize,
-        Settings.PlaneY, Settings.Minimum.Y + (z + 0.5f) * Settings.CellSize);
-    public bool IsWalkable(int x, int z) => x >= 0 && z >= 0 && x < Width && z < Depth && _walkable[Index(x, z)];
+    public Vector3 CellCenter(int x, int z)
+    {
+        if (!CellInsideBounds(x, z)) throw new ArgumentOutOfRangeException(nameof(x), "Cell must intersect the configured navigation rectangle.");
+        // ceil仅分配末格；实际区间仍是[Minimum,Maximum)，末格中心取裁剪后的中点。
+        var minimumX = Settings.Minimum.X + x * Settings.CellSize;
+        var minimumZ = Settings.Minimum.Y + z * Settings.CellSize;
+        var maximumX = MathF.Min(minimumX + Settings.CellSize, Settings.Maximum.X);
+        var maximumZ = MathF.Min(minimumZ + Settings.CellSize, Settings.Maximum.Y);
+        // 仅剩一个float ULP时，中点可能舍入为排除的最大值；取仍在格内的可表示坐标。
+        var centerX = MathF.Min(minimumX + (maximumX - minimumX) * 0.5f, MathF.BitDecrement(maximumX));
+        var centerZ = MathF.Min(minimumZ + (maximumZ - minimumZ) * 0.5f, MathF.BitDecrement(maximumZ));
+        return new Vector3(centerX, Settings.PlaneY, centerZ);
+    }
+    public bool IsWalkable(int x, int z) => CellInsideBounds(x, z) && _walkable[Index(x, z)];
     public IEnumerable<Vector3> WalkableCells()
     {
         for (int z = 0; z < Depth; z++)
@@ -139,12 +153,13 @@ public sealed class NavigationGrid
 
     public bool CanTraverse(Vector3 from, Vector3 to)
     {
+        if (!TryCell(from, out _, out _) || !TryCell(to, out _, out _)) return false;
         if (_world is not null && _world.SweepCapsule(from + Vector3.UnitY * 0.035f, Settings.AgentRadius, Settings.AgentHeight, to - from) is not null) return false;
         var steps = Math.Max(1, (int)MathF.Ceiling((to - from).Length / (Settings.CellSize * 0.2f)));
         int previousX = -1, previousZ = -1;
         for (int step = 0; step <= steps; step++)
         {
-            var point = Vector3.Lerp(from, to, (float)step / steps);
+            var point = step == 0 ? from : step == steps ? to : Vector3.Lerp(from, to, (float)step / steps);
             if (!TryCell(point, out var x, out var z) || !IsWalkable(x, z)) return false;
             if (previousX >= 0 && x != previousX && z != previousZ &&
                 (!IsWalkable(previousX, z) || !IsWalkable(x, previousZ))) return false;
@@ -179,10 +194,26 @@ public sealed class NavigationGrid
     }
     private bool TryCell(Vector3 position, out int x, out int z)
     {
-        x = (int)MathF.Floor((position.X - Settings.Minimum.X) / Settings.CellSize);
-        z = (int)MathF.Floor((position.Z - Settings.Minimum.Y) / Settings.CellSize);
-        return x >= 0 && z >= 0 && x < Width && z < Depth;
+        x = z = -1;
+        if (!float.IsFinite(position.Y) || !(position.X >= Settings.Minimum.X && position.X < Settings.Maximum.X &&
+            position.Z >= Settings.Minimum.Y && position.Z < Settings.Maximum.Y)) return false;
+        x = CellCoordinate(position.X, Settings.Minimum.X, Width);
+        z = CellCoordinate(position.Z, Settings.Minimum.Y, Depth);
+        return CellInsideBounds(x, z);
     }
+    private int CellCoordinate(float position, float minimum, int count)
+    {
+        // 导入数组可能只覆盖配置范围的一部分，不能把缺失区域夹进最后一格。
+        if (position >= minimum + count * Settings.CellSize) return -1;
+        var cell = Math.Clamp((int)MathF.Floor((position - minimum) / Settings.CellSize), 0, count - 1);
+        // 减法/除法舍入可能跨过真实float下界；与采样相同的下界负责最终归格。
+        while (cell > 0 && position < minimum + cell * Settings.CellSize) cell--;
+        while (cell + 1 < count && position >= minimum + (cell + 1) * Settings.CellSize) cell++;
+        return cell;
+    }
+    private bool CellInsideBounds(int x, int z) => x >= 0 && z >= 0 && x < Width && z < Depth &&
+        Settings.Minimum.X + x * Settings.CellSize < Settings.Maximum.X &&
+        Settings.Minimum.Y + z * Settings.CellSize < Settings.Maximum.Y;
     private int Index(int x, int z) => z * Width + x;
     private static int Heuristic(int x, int z, int goalX, int goalZ)
     {
@@ -191,7 +222,8 @@ public sealed class NavigationGrid
     }
     private static void Validate(NavigationSettings settings)
     {
-        if (!float.IsFinite(settings.CellSize) || settings.CellSize <= 0 || settings.Maximum.X <= settings.Minimum.X ||
+        if (!float.IsFinite(settings.Minimum.X) || !float.IsFinite(settings.Minimum.Y) || !float.IsFinite(settings.Maximum.X) ||
+            !float.IsFinite(settings.Maximum.Y) || !float.IsFinite(settings.PlaneY) || !float.IsFinite(settings.CellSize) || settings.CellSize <= 0 || settings.Maximum.X <= settings.Minimum.X ||
             settings.Maximum.Y <= settings.Minimum.Y || settings.SearchBudget <= 0)
             throw new ArgumentException("Invalid navigation dimensions or search budget.");
     }

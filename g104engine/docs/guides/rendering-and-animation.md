@@ -15,6 +15,7 @@
 | `src/G104.Engine/Rendering/GpuResources.cs` | GL程序/网格/贴图/帧缓冲的确定性资源所有权 |
 | `src/G104.Engine/Rendering/PrimitiveMeshes.cs` | 自有cube、plane、sphere几何与切线 |
 | `src/G104.Engine/Rendering/TrainingRenderer.cs` | 固定Forward/Deferred Pass、阴影、天空、透明粒子与后处理 |
+| `src/G104.Engine/Rendering/RenderingVerification.cs` | 当前GL上下文中的独立BRDF/HDR/source-over像素参考、失败Prepare和共享mesh引用回归 |
 | `assets/shaders/` | GLSL 4.30；共享mesh顶点、PBR函数和材质读取 |
 
 OpenTK 4.9.4负责OpenGL调用；StbImageSharp 2.30.16负责PNG/JPEG解码。格式读取使用第三方库，空间约定、采样/状态、蒙皮上传与Pass组织由本项目实现。
@@ -36,13 +37,17 @@ shader先在mesh局部空间加权蒙皮，再由drawModel进入世界；mesh节
 
 ## 实际导入子集
 
-支持未压缩glTF 2.0/GLB、默认场景三角形、POSITION/NORMAL、UV0/TANGENT、JOINTS_0/WEIGHTS_0、节点层级/TRS、基础金属度粗糙度材质、OPAQUE/MASK、double-sided、PNG/JPEG以及纹理Wrap/Min/Mag采样参数。缺少切线而存在UV时生成切线，退化UV采用正交回退。颜色纹理是sRGB格式，法线和金属粗糙度纹理是线性格式；金属读B、粗糙度读G。图像不额外翻转Y。
+支持未压缩glTF 2.0/GLB、默认场景三角形、POSITION/NORMAL、UV0/TANGENT、JOINTS_0/WEIGHTS_0、节点层级/TRS、基础金属度粗糙度材质、OPAQUE/MASK、double-sided、PNG/JPEG以及纹理Wrap/Min/Mag采样参数。缺少切线而存在UV时生成切线，退化UV或无UV时采用与法线正交的回退，避免固定+X切线遇到+X法线发生normalize(0)。无UV无切线的合法未贴图模型仍可绘制。颜色纹理是sRGB格式，法线和金属粗糙度纹理是线性格式；金属读B、粗糙度读G。图像不额外翻转Y。
 
 外部buffer/image URI可使用glTF标准的`../`相对路径，但最终路径必须留在资产根目录内。场景对象的模型路径本身仍服从场景资产路径规则。远程URI、根目录逃逸、链接路径、非2.0、非三角形、morph、扩展/压缩、其他顶点属性、材质实际引用UV1/纹理变换、Alpha BLEND、Occlusion/Emissive输入和CUBICSPLINE等显式报错，不静默改变解释方式。未被材质引用的额外UV集不参与当前绘制，允许存在；实际角色含此类TEXCOORD_1。每顶点最多4个影响，权重归一化；零权重槽也清为有效骨骼索引。
+
+是否蒙皮由引用mesh的`node.skin`决定；同一mesh可以被有skin和无skin的节点引用。无skin节点忽略未使用的JOINTS/WEIGHTS属性，按本节点变换刚性绘制；有skin节点仍严格验证必需属性、容量、权重与索引。[Khronos Validator的问题表](https://raw.githubusercontent.com/KhronosGroup/glTF-Validator/main/ISSUES.md)将`NODE_SKINNED_MESH_WITHOUT_SKIN`列为Warning，不能据此报告不存在的“0骨骼容量越界”。
 
 当前角色素材为`models/UAL1_Standard.glb`，实际67节点、65关节、43个LINEAR clip，无图片。自有`models/material-probe.glb`使用`../tests/checker.png`和`../tests/normal.png`补足贴图导入证据。
 
 模型的设计BaseColor是乘在glTF baseColorFactor上的**实例tint**，保留同一模型内不同子材质颜色。模型M/R使用导入因素，当前DTO没有显式覆盖字段；普通primitive的设计BaseColor/Metallic/Roughness直接生效。设计BaseColorTexture/NormalTexture可替换对应模型贴图。没有把模型的默认M/R值误判成用户已选择覆盖。
+
+每个导入primitive保留原始`HasUv0`及mesh内primitive序号；顶点数组中填零的UV槽不能代表模型具备UV0。Prepare和实际绘制均根据**最终有效材质**检查UV0，包含设计BaseColor/Normal贴图覆盖与导入贴图。无UV模型后来添加贴图时明确拒绝，错误包含模型、节点、primitive和`TEXCOORD_0`；失败准备释放本次新增模型/贴图，保留旧预览、动画游标及未消费事件。设计/Undo历史的事务边界由Scene/Editor调用者负责。
 
 ## Pass与颜色处理
 
@@ -62,7 +67,17 @@ flowchart LR
 
 方向光使用单张2048² D24 Shadow Map、3×3 PCF与有限坡度偏移；没有点光阴影或级联。Caster的PolygonOffset采用factor=3、units=2：±1 texel双轴邻域加Nearest半texel残差，斜面接收深度与邻居采样中心的差可达3倍最大坡度，原factor=1.5在无遮挡材质图中产生重复的小三角自阴影。Receiver还保留有限角度偏移；偏移过大会使接触阴影脱离，画面需同时复查，不以增大bias代替无限精度。光照含一盏方向光和最多4盏点光，点光依据设计radius/intensity作距离衰减。PBR采用GGX分布、Schlick Fresnel和Smith近似；固定弱环境项用于避免完全黑暗，天空cubemap只作背景，不称为IBL。
 
-G-buffer attachment0是**RGBA8线性基础色/金属度**，attachment1是**RGBA16F世界法线/粗糙度**，深度是D24纹理。Deferred由深度与逆ViewProjection重建世界位置，调用与Forward同一PBR/阴影函数。HDR颜色为RGBA16F；HDR使用独立D24 renderbuffer并从G-buffer blit深度，避免Deferred读取深度纹理时该纹理同时参与输出。CPU粒子按相机距离从后向前排序，深度测试开启、深度写入关闭，两条管线使用相同不透明深度。
+GGX采用`alpha=perceptualRoughness²`，粗糙度下限仍为0.045。分母用`|normal×half|² + (NoH*alpha)²`，比`NoH²*(alpha²-1)+1`在高光附近更稳定；仅保留1e-20防零下限，正常输入不会触及。旧式在整个平方分母后加1e-6会改变分布：正对时roughness0.045的D从参考77624.72降到约4.10，0.15从628.76降到280.45。采用的等价式与数值原因参见[Google Filament GGX说明](https://google.github.io/filament/main/filament.html#materialsystem/standardmodel/normaldistributionfunction(speculard))，没有移植其完整光照模型。
+
+该cross恒等式要求normal与half都是单位向量。half取`view+light`时，不能用`sum/max(length(sum),1e-6)`：近相反方向的非零sum会被缩短，仍不为单位向量。当前先除以sum的最大绝对分量，再真正归一化，避免小向量的长度平方下溢；完全零sum返回零反射。统一BRDF入口也重限roughness≥0.045，防止RGBA16F写入向下舍入后实际低于声明下限。这些是数值前提修复，没有抬高原粗糙度下限。
+
+G-buffer attachment0是**RGBA8线性基础色/金属度**，attachment1是**RGBA16F世界法线/粗糙度**，深度是D24纹理。Deferred由深度与逆ViewProjection重建世界位置，调用与Forward同一PBR/阴影函数。HDR颜色采用**RGBA32F**：修复GGX后，roughness0.045的正对白色金属BRDF约19406.18，方向光强度10即可得到约194061.8，超过RGBA16F的65504范围。只提高HDR颜色附件精度，每像素增加8 bytes（1440×900约9.89MiB），保持实际粗糙度和高光能量；G-buffer仍为原格式。HDR使用独立D24 renderbuffer并从G-buffer blit深度，避免Deferred读取深度纹理时该纹理同时参与输出。
+
+相机平面Billboard按view-space Z从后向前排序，右手view中越负越远。欧氏距离会被侧向偏移误导：相机位于原点朝-Z，近红粒子(1,0,-5)的距离平方26反而大于远蓝粒子(.99,0,-5.001)的25.9901，旧排序让远蓝覆盖近红。当前采用view变换后的Z，深度测试开启、深度写入关闭，两条管线使用相同不透明深度；仍是有序source-over透明绘制，未加入OIT。
+
+Scene DTO允许任意有限非负光色/强度和基础色，而有限输入的乘积仍可能超过FP32。Renderer将两种颜色的合同分开：**最终有效反射基础色须在[0,1]**，对应物理反射和RGBA8 G-buffer；**每灯RGB radiance允许[0,1e12]**，上限为`MaximumShaderRadiance`，为最多5灯、roughness≥0.045、后处理Exposure≤20的中间运算留出范围。材质factor×tint与光色×强度先以double相乘、检查后转为float；模型factor0.5×设计tint2的最终反射色1合法，factor1×tint2明确拒绝，不能让Deferred静默截到1。灯的可见marker只在临时绘制材质中除以`max(1,最大RGB)`形成反射色，原设计RGB仍完整参与radiance，设计数据和历史不被回写。
+
+超范围反射色报告[0,1]/G-buffer合同，超范围辐射报告FP32边界，不钳制D、粗糙度或最终光照能量；原始HDR光色2等仍合法。点灯上传预乘RGB与强度1，避免shader按原相乘次序溢出。方向长度也用double求值，使有限极大方向分量仍能归一化；这是局部颜色/辐射数值边界，不宣称任意极端世界坐标和矩阵都有足够精度。
 
 HDR经过曝光、Reinhard和一次Gamma进入RGBA8 LDR，再作FXAA。LDR输入采用双线性过滤支持FXAA亚像素采样；G-buffer/深度保持Nearest，避免在重建位置时跨物体混合。默认帧缓冲的自动sRGB转换关闭；FXAA不再次Gamma。G-buffer/深度/阴影调试视图在后处理入口输出，调试视图跳过FXAA。Depth视图用`1 - pow(rawDepth, 50)`强调近处差异，并非线性距离单位。
 
@@ -115,13 +130,29 @@ ShaderSource使用显式UTF8字节长度重载。真实GL初始化曾发现forwa
 
 ## 验证边界与参考
 
+`RenderingVerification.Run(assetRoot, verificationRoot)`要求调用线程已有当前GL4.3上下文，自己创建并确定性释放Renderer；Sandbox的`--verify-render --user-data-root <隔离测试根>`用隐藏窗口调用。fixture写到隔离测试根下随机子目录，只复制需要的shader/config/UAL模型，并生成无UV三角形、带UV三角形、共享skin/rigid mesh和+X法线PNG，不修改正式素材或用户存档。失败先汇总全部检查，再抛出包含结果的异常。
+
+正对/斜光白金属平面采用roughness0.045/0.15/0.6及光角0/0.08/0.6弧度，实际Forward和Deferred的HDR读回分别比较独立double GGX/geometry参考；这覆盖指定条件的D/geometry，不称为全部材质和角度的全面证明。Deferred参考读取实际存储roughness，再按BRDF同一0.045下限输入独立double公式，以包含驱动的Half写入舍入；相互吻合不是正确性的唯一证据。强光读回必须有限且大于65504，LDR必须有限；另外检查极值明确拒绝、double预乘可用输入、radiance支持上限、反射色2拒绝、合法tint组合与HDR灯色。透明测试在两色重叠像素独立算出粒子圆形衰减alpha和source-over参考，并交换输入顺序，验证排序不依赖枚举次序。无UV覆盖失败检查旧HDR、动画Debug和未消费Fall事件；用VerticalVelocity0离地确保不受合法可配置起跳阈值影响。共享mesh导入检查skin引用与rigid引用的不同解释。
+
+修复前实际日志`g104engine/.cache/execution/review-render-before.log`记录六项FAIL：Forward roughness0.045正对HDR为1.02441406而参考19406.1780572；两粒子像素R/B约0.2734/0.6221而参考0.4628/0.4328；Normal/Base覆盖均被误接受；共享mesh的rigid引用报“骨骼索引无效”。这组独立失败证据揭示了既有双管线比较没有覆盖的共同错误。修复后验证结果由本次最新日志另行记录，不沿用首轮delivery结果。
+
+第一批修复后`review-render-after.log`实测七项PASS，Debug构建0警告0错误：Forward正对roughness0.045/0.15/0.6的HDR分别19406.1797/157.190079/0.614023745，与独立double参考19406.1780572/157.190042267/0.614023602604一致；强光HDR194061.797及LDR1均有限。两条管线及两种输入枚举顺序的粒子R/B约0.46279246/0.43291038，独立source-over参考约0.46283174/0.43285507。UV错误包含`no-uv.gltf/NoUvNode[0]/primitive0/TEXCOORD_0`，旧显示/动画/事件保留；共享skin/rigid导入通过。另发现GPU的RGBA16F写入舍入与System.Half转换略有不同，参考已改为读取实际存储roughness，再独立计算BRDF；补充反射色2和量化后粗糙度下限的专项检查，证据见下方专项基线和最终后验。
+
+补充修复前`review-render-extra-before.log`已实测七PASS、两FAIL：BaseColor2的Forward/Deferred正对HDR约314.38/157.60，证明Deferred的RGBA8截断；G-buffer将0.045储存为0.04498291，未重限BRDF时HDR19435.69高于声明下限参考19406.18。已分别落实最终反射色检查和统一BRDF入口粗糙度下限，正确输出由第三次基线的前九项PASS确认。Astra独立数值复查还指出近反向V/L的half向量归一化前提，已增加直接调用生产BRDF的fullscreen float探针，先实测失败后修复，避免亚像素掠射平面无法稳定光栅覆盖的问题。
+
+第三次有效GPU基线`review-render-grazing-before.log`为前九项PASS、探针FAIL：normal=+Z、view=(1,0,1e-8)、light=(-1,0,1e-8)、roughness0.045，GPU结果6.50519562，独立单位half参考1.04083082919e-6，约625万倍假高光。对应半角单位化修复已落实；探针覆盖epsilon=1e-8/1e-12/1e-20及完全零sum，读取生产BRDF的浮点输出并比较独立double的原GGX公式和本实现geometry防零约定。
+
+最终版本（含稳健的VerticalVelocity0/Fall历史用例）已分别重新构建并运行Debug/Release：`review-render-final-debug.log`、`review-render-final-release.log`均实测十项PASS、GL无错误。Forward/Deferred在roughness0.045下均为HDR19406.1797；强光下均为194061.797、LDR1。Deferred实际存储roughness0.15/0.6的HDR157.600052/0.615625203，与采用实存roughness的独立double参考157.600083512/0.615625326217一致；0.045向下舍入的存储值也由统一BRDF下限恢复正确峰值。近反向探针epsilon1e-8/1e-12/1e-20分别读到1.04083097e-6/1.04083121e-14/1.04083103e-30，对应独立参考1.04083082919e-6/1.04083089935e-14/1.04083084162e-30；完全零sum输出0。Astra Ultra最终源码复核未发现本线剩余P1/P2。
+
+本轮整体图形回归`review-graphics-debug.log`、`review-graphics-release.log`均完成240帧exercise，未见GL错误；同帧实际Forward/Deferred读回RGB平均绝对差异0.0621/255、最大22/255。该对照仍只证明本次场景/相机条件下的两管线输出接近；公式正确性由上面的独立参考补充验证，用户视觉和操作体验仍单独验收。
+
 AnimationVerification检查真实角色骨骼/clip/米级高度、PNG/normal相对导入、LINEAR/STEP/短弧、独立非单位mesh空间例子、循环事件序列、跳跃/下落事实和65个有限palette矩阵；AN5检查实际JSON用于实例、非默认Run→Sprint的真实Pose/速度权重、独立响应系数/过渡/起落耗时、marker事件计数、共享定义但独立实例、防御复制以及错误配置/角色缺clip的拒绝。显示检查覆盖alpha0/1、中间局部TRS层级组合、区别世界矩阵/位置直接Lerp、重复显示不推进逻辑和事件、ResetInterpolation不丢失尚未消费事件。它不要求用户合法修改的JSON等于初始默认值；比较用已知内存默认和有效非默认定义，验证参数实际接线。需要图形窗口验证Shader编译、GL错误、Forward/Deferred一致性、阴影/调试视图、resize/最小化、蒙皮观感和粒子遮挡；用户的操作/视觉验收单独记录。
 
-本机最终收尾验证：Debug/Release构建零警告零错误，`g104engine/.cache/execution/verify-debug.log`与`verify-release.log`记录七项动画检查全部PASS，包含AN5配置、Jump/Fall事实和局部Pose显示插值。最新`delivery-debug.log`/`delivery-release.log`记录RTX 5060 Ti/OpenGL 4.3、Forward/Deferred的Play/Stop、保存/重载/Undo/Redo、失败Play保留原预览/设计并清理部分准备资源、未保存设计及Undo历史跨Play/Stop保留；两个配置各240帧练习、2个跳跃事件、110个移动步以及未见GL错误。Release的120ms加载注入后下一raw帧138.91ms被丢弃、模拟步0，Debug相应145.74ms也被丢弃；真实Renderer还验证同一模型/GUID从character切为StaticMesh时，骨架端点与raw bind-node world一致，不误套1.9m/180°角色修正。这些是真实本机集成证据，不能替代用户手感验收。
+首轮交付的历史收尾验证：Debug/Release构建零警告零错误，`g104engine/.cache/execution/verify-debug.log`与`verify-release.log`记录七项动画检查全部PASS，包含AN5配置、Jump/Fall事实和局部Pose显示插值。当时的`delivery-debug.log`/`delivery-release.log`记录RTX 5060 Ti/OpenGL 4.3、Forward/Deferred的Play/Stop、保存/重载/Undo/Redo、失败Play保留原预览/设计并清理部分准备资源、未保存设计及Undo历史跨Play/Stop保留；两个配置各240帧练习、2个跳跃事件、110个移动步以及未见GL错误。Release的120ms加载注入后下一raw帧138.91ms被丢弃、模拟步0，Debug相应145.74ms也被丢弃；真实Renderer还验证同一模型/GUID从character切为StaticMesh时，骨架端点与raw bind-node world一致，不误套1.9m/180°角色修正。这些是真实本机集成证据，不能替代用户手感验收。
 
-同一帧冻结对象/骨骼/相机、分别绘制Forward/Deferred并读回RGB：最终平均绝对差异`0.0651/255`，最大`22/255`（delivery这次运行/场景/相机，已包含配置与显示插值收尾）。这验证两条实际管线的输出在本次条件下接近，RGBA8基础色、RGBA16F法线/粗糙度与D24重建允许量化差异；不声称完全像素一致，也不以该数据证明Deferred更快。
+首轮同一帧冻结对象/骨骼/相机、分别绘制Forward/Deferred并读回RGB：当时平均绝对差异`0.0651/255`，最大`22/255`（delivery当时运行/场景/相机，已包含配置与显示插值收尾）。这仅验证当时两条实际管线的输出在该条件下接近，RGBA8基础色、RGBA16F法线/粗糙度与D24重建允许量化差异；不声称完全像素一致，也不以该数据证明Deferred更快。
 
-`g104engine/.cache/execution/captures-delivery-release/`保存最新Forward/Deferred/Jump/Landed/Normals/Shadow及材质对照截图；本轮复看material-probe/landed/normals，角色没有明显骨骼爆散，落地、粒子和对应阴影可见，世界法线地面+Y/背墙+Z一致；前轮腾空与阴影深度图也已检查。无遮挡`material-probe.png`清楚显示checker贴图；同相机`material-probe-no-shadow.png`移除阴影后小三角斑消失，确认原细斑来自阴影而非UV/网格接缝。PolygonOffset factor从1.5改为3后重复细斑明显减少，落地图鞋底附近阴影未见明显整块脱离；部分近看黄格仍有低对比斜面自阴影细斑，作为单张2048/3×3 PCF、有限bias与接触偏移取舍的当前限制保留，不称为工业阴影品质。自有probe的tangent.w已由素材生成端按UV/法线关系修为-1，shader完整消费手性；现有normal.png接近flat normal，这组截图本身不能证明复杂法线贴图的全部方向与滤波表现。
+`g104engine/.cache/execution/captures-delivery-release/`保存首轮Forward/Deferred/Jump/Landed/Normals/Shadow及材质对照截图；首轮复看material-probe/landed/normals，角色没有明显骨骼爆散，落地、粒子和对应阴影可见，世界法线地面+Y/背墙+Z一致；当时腾空与阴影深度图也已检查。无遮挡`material-probe.png`清楚显示checker贴图；同相机`material-probe-no-shadow.png`移除阴影后小三角斑消失，确认原细斑来自阴影而非UV/网格接缝。PolygonOffset factor从1.5改为3后重复细斑明显减少，落地图鞋底附近阴影未见明显整块脱离；部分近看黄格仍有低对比斜面自阴影细斑，作为单张2048/3×3 PCF、有限bias与接触偏移取舍的当前限制保留，不称为工业阴影品质。自有probe的tangent.w已由素材生成端按UV/法线关系修为-1，shader完整消费手性；现有normal.png接近flat normal，这组截图本身不能证明复杂法线贴图的全部方向与滤波表现。
 
 仍未取得FXAA开关与镜像对照的专项视觉截图；两者的评审修复已编译和进入真实GL运行，具体质量与手感/脚滑/最终观感仍由专项和用户验收分别确认。
 

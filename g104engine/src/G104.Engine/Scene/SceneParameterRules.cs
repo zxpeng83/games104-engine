@@ -1,8 +1,13 @@
+using G104.Engine.Physics;
+
 namespace G104.Engine.Scene;
 
 // 已声明键构成编辑白名单；这里校验V1实际消费的数值与关联约束，未知扩展键仍须有限。
 public static class SceneParameterRules
 {
+    // V1设计参数没有Skin字段，校验必须沿用角色控制器的同一默认值。
+    private static readonly float DefaultCharacterSkin = new CharacterSettings().Skin;
+
     public static void Validate(SceneObjectData item)
     {
         float Value(string key, float fallback) => item.Parameters.GetValueOrDefault(key, fallback);
@@ -20,6 +25,8 @@ public static class SceneParameterRules
         {
             Positive("radius", "height", "gravity");
             Nonnegative("walkSpeed", "runSpeed", "jumpSpeed", "stepHeight");
+            if (Value("radius", 0.35f) <= DefaultCharacterSkin)
+                throw new SceneValidationException($"{item.Name}: radius must exceed the default character skin ({DefaultCharacterSkin} m).");
             if (Value("height", 1.9f) <= Value("radius", 0.35f) * 2) throw new SceneValidationException($"{item.Name}: capsule height must exceed its diameter.");
             var slope = Value("maxSlopeDegrees", 45);
             if (slope is < 0 or > 80) throw new SceneValidationException($"{item.Name}: maxSlopeDegrees must be in [0,80].");

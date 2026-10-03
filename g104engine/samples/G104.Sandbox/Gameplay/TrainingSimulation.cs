@@ -39,7 +39,6 @@ public sealed class TrainingSimulation : IDisposable
     private float _searchTimer;
     private float _stuckTimer;
     private float _footstepTimer;
-    private float _npcFacing;
     private bool _disposed;
 
     public TrainingSimulation(SceneDocument document, SceneGraph graph)
@@ -145,9 +144,9 @@ public sealed class TrainingSimulation : IDisposable
         if (horizontal.LengthSquared < 0.0025f) return;
         var desiredYaw = MathF.Atan2(-intent.X, -intent.Z);
         var desired = Quaternion.FromAxisAngle(Vector3.UnitY, desiredYaw);
-        var current = _graph.WorldMatrix(id).ExtractRotation();
+        // Player/Npc由场景校验强制为根节点；直接读取已存四元数，避免每帧从矩阵反求近180度旋转。
+        var current = TransformMath.Normalize(_graph.Object(id).Transform.Rotation.ToQuaternion());
         _graph.SetWorldRotation(id, Quaternion.Slerp(current, desired, Math.Clamp(dt * 12, 0, 1)));
-        if (id == _npcObject?.Id) _npcFacing = desiredYaw;
     }
 
     private void Interact()
@@ -290,8 +289,10 @@ public sealed class TrainingSimulation : IDisposable
         var horizontal = toPlayer.Xz;
         var range = Parameter(_npcObject, "sightRange", 8);
         if (toPlayer.Length > range) return false;
-        var forward = new Vector2(-MathF.Sin(_npcFacing), -MathF.Cos(_npcFacing));
-        if (horizontal.Length > 1.8f && Vector2.Dot(horizontal.Normalized(), forward) < MathF.Cos(Parameter(_npcObject, "fieldOfView", 150) * MathF.PI / 360)) return false;
+        // 感知读取本步已提交的逻辑朝向；保留设计旋转，并随转向Slerp逐步改变视锥。
+        var forward = Vector3.TransformVector(-Vector3.UnitZ, _graph.WorldMatrix(_npcObject.Id)).Xz;
+        if (horizontal.Length > 1.8f && (forward.LengthSquared < 1e-8f ||
+            Vector2.Dot(horizontal.Normalized(), forward.Normalized()) < MathF.Cos(Parameter(_npcObject, "fieldOfView", 150) * MathF.PI / 360))) return false;
         var origin = _npc.State.Position + Vector3.UnitY * 1.45f;
         var direction = PlayerPosition + Vector3.UnitY * 1.1f - origin;
         return World.Raycast(origin, direction, direction.Length) is not { } hit || hit.Distance >= direction.Length - 0.05f;

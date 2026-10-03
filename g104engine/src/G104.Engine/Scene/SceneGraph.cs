@@ -50,16 +50,27 @@ public sealed class SceneGraph
     public void SetWorldPosition(Guid id, Vector3 position)
     {
         if (!TransformMath.Finite(position)) throw new SceneValidationException("World position must be finite.");
-        var world = WorldMatrix(id);
-        world.Row3 = new Vector4(position, 1);
-        SetWorldMatrix(id, world);
+        var item = Object(id);
+        var replacement = TransformMath.Clone(item.Transform);
+        replacement.Position = Float3.From(item.ParentId is Guid parent
+            ? Vector3.TransformPosition(position, TransformMath.Inverse(WorldMatrix(parent)))
+            : position);
+        SetLocalTransform(item, replacement);
     }
 
     public void SetWorldRotation(Guid id, Quaternion rotation)
     {
-        var world = TransformMath.Decompose(WorldMatrix(id));
-        world.Rotation = RotationData.From(TransformMath.Normalize(rotation));
-        SetWorldMatrix(id, TransformMath.Compose(world));
+        var item = Object(id);
+        rotation = TransformMath.Normalize(rotation);
+        if (item.ParentId is Guid parent)
+        {
+            var parentRotation = TransformMath.Decompose(WorldMatrix(parent)).Rotation.ToQuaternion();
+            // 行矩阵 local * parent 对应四元数 parent * local；父级只允许正统一缩放。
+            rotation = TransformMath.Normalize(Quaternion.Invert(parentRotation) * rotation);
+        }
+        var replacement = TransformMath.Clone(item.Transform);
+        replacement.Rotation = RotationData.From(rotation);
+        SetLocalTransform(item, replacement);
     }
 
     public void SetWorldMatrix(Guid id, Matrix4 world)
@@ -67,6 +78,12 @@ public sealed class SceneGraph
         var item = Object(id);
         var local = world * (item.ParentId is Guid parent ? TransformMath.Inverse(WorldMatrix(parent)) : Matrix4.Identity);
         var replacement = TransformMath.Decompose(local);
+        SetLocalTransform(item, replacement);
+    }
+
+    // 位移/旋转单字段更新不反复分解自身矩阵，保留无关的已存TRS，尤其角色的精确单位缩放。
+    private void SetLocalTransform(SceneObjectData item, TransformData replacement)
+    {
         var old = item.Transform;
         item.Transform = replacement;
         try { Rebuild(); }

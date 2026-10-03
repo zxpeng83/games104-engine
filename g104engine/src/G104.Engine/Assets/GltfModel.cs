@@ -76,7 +76,8 @@ public readonly record struct NodePose(Vector3 Translation, Quaternion Rotation,
 
 public sealed record ModelNode(string Name, int Parent, NodePose DefaultPose);
 public sealed record ModelSkin(int[] Joints, Matrix4[] InverseBind);
-public sealed record ModelPrimitive(int Node, int Skin, float[] Vertices, uint[] Indices, ModelMaterial Material);
+// 零填充的UV顶点槽不能代表源mesh具备UV；设计材质覆盖必须消费原始能力信息。
+public sealed record ModelPrimitive(int Node, int Skin, float[] Vertices, uint[] Indices, ModelMaterial Material, bool HasUv0, int PrimitiveIndex);
 public sealed record ModelMaterial(Vector4 BaseColor, float Metallic, float Roughness, bool DoubleSided,
     ModelTexture? BaseColorImage, ModelTexture? NormalImage, ModelTexture? MetallicRoughnessImage, float NormalScale, float AlphaCutoff);
 public sealed record ModelTexture(byte[] Encoded, int WrapS = 10497, int WrapT = 10497, int MinFilter = 9987, int MagFilter = 9729);

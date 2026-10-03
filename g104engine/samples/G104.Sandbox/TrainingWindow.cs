@@ -30,6 +30,7 @@ public sealed class TrainingWindow : GameWindow
     private readonly SceneEditorPanel _editorPanel=new();
     private SceneGraph _design=null!;
     private SceneEditor _editor=null!;
+    private SceneDocument? _savedDesignBaseline;
     private SceneGraph? _runtime;
     private TrainingSimulation? _simulation;
     private TrainingRenderer? _renderer;
@@ -56,6 +57,7 @@ public sealed class TrainingWindow : GameWindow
     private string? _pendingLoad;
     private bool _loadModalOpened;
     private RenderDebugView _debug;
+    private ContactWindowExercise? _contactExercise;
     private string SavePath=>Path.Combine(_options.UserDataRoot,"Scenes","training-ground.json");
     private bool Playing=>_simulation is not null;
 
@@ -76,7 +78,7 @@ public sealed class TrainingWindow : GameWindow
         TextInput += e=>_ui?.AddCharacter((uint)e.Unicode);
         SceneDocument initial;
         string seed=Path.Combine(_options.AssetRoot,"scenes","training-ground.json");
-        bool hadUserSave=File.Exists(SavePath);
+        bool hadUserSave=!_options.ContactExercise&&File.Exists(SavePath);
         if(hadUserSave)
         {
             try { initial=SceneSerializer.Load(SavePath,_options.AssetRoot); }
@@ -95,11 +97,14 @@ public sealed class TrainingWindow : GameWindow
             initial=SceneSerializer.Load(seed,_options.AssetRoot);_design=new SceneGraph(initial);_editor=new SceneEditor(_design);
             _activePipeline=initial.Rendering.Pipeline;_objects=BuildObjects(_design,1);_renderer.Prepare(_objects);
         }
+        _savedDesignBaseline=hadUserSave&&!_rejectedSavedDesign ? SceneSerializer.Clone(_design.Document) : null;
+        _editor=CreateDesignEditor(_design,_savedDesignBaseline);
         ConnectEditorPreparation();
         try { _audio=new AudioSystem(_options.AssetRoot);_audioStatus=_audio.Backend; }
         catch(Exception error) { _audioStatus="Unavailable: "+error.Message;Console.WriteLine(_audioStatus); }
         _selected=initial.Objects.FirstOrDefault(o=>o.Kind==ObjectKind.Player)?.Id;
         Console.WriteLine("Assets: "+_options.AssetRoot);Console.WriteLine("Design save: "+SavePath);
+        if(_options.ContactExercise) _contactExercise=new ContactWindowExercise(initial);
     }
 
     protected override void OnResize(ResizeEventArgs e)
@@ -126,7 +131,8 @@ public sealed class TrainingWindow : GameWindow
         DrawToolbar();_selected=_editorPanel.Draw(_editor,Playing,_selected,Enqueue);DrawStatus();
         if(MouseState.IsButtonPressed(MouseButton.Left)&&!ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow)) ImGui.SetWindowFocus(null!);
         ProcessCommands();
-        if(_options.Exercise) Exercise();
+        if(_options.ContactExercise) ExerciseContacts();
+        else if(_options.Exercise) Exercise();
         bool suspended=(!_options.Exercise&&(!IsFocused||WindowState==OpenTK.Windowing.Common.WindowState.Minimized))||_paused;
         if(suspended!=_suspended) { _suspended=suspended;_discardNextDelta=true;_clock.Reset();_input.Clear();_runtime?.ResetInterpolation();_renderer.ResetDisplayHistory();_audio?.SetPaused(suspended); }
         if(KeyboardState.IsKeyPressed(Keys.Escape)&&!_ui.WantsKeyboard) { if(Playing) Enqueue(Stop); else Close(); }
@@ -141,7 +147,12 @@ public sealed class TrainingWindow : GameWindow
                          (KeyboardState.IsKeyDown(Keys.W)?1:0)-(KeyboardState.IsKeyDown(Keys.S)?1:0));
         Vector2 look=MouseState.IsButtonDown(MouseButton.Right) ? MouseState.Delta : Vector2.Zero;
         bool jump=KeyboardState.IsKeyPressed(Keys.Space),interact=KeyboardState.IsKeyPressed(Keys.E),sprint=KeyboardState.IsKeyDown(Keys.LeftShift);
-        if(_options.Exercise)
+        if(_options.ContactExercise)
+        {
+            (move,sprint)=_contactExercise!.Input(_frame);
+            look=Vector2.Zero;jump=false;interact=false;
+        }
+        else if(_options.Exercise)
         {
             move=(_frame is >=6 and <=65 || _frame is >=80 and <=130) ? Vector2.UnitY : Vector2.Zero;
             look=Vector2.Zero;jump=_frame is 55 or 95;interact=false;sprint=_frame is >=35 and <=65 || _frame is >=80 and <=130;
@@ -150,7 +161,8 @@ public sealed class TrainingWindow : GameWindow
             !_options.Exercise&&_ui.WantsKeyboard,!_options.Exercise&&_ui.WantsMouse,sprint));
         Vector2 frameLook=_input.ConsumeLook();_yaw-=frameLook.X*.004f;_pitch=Math.Clamp(_pitch+frameLook.Y*.004f,.08f,1.25f);
         if(!_ui.WantsMouse) _distance=Math.Clamp(_distance-MouseState.ScrollDelta.Y*.5f,2.5f,15);
-        if(_options.Exercise) { _yaw=_frame>=225 ? .4f : 0;_pitch=.33f;_distance=_frame>=225 ? 4 : 7; }
+        if(_options.ContactExercise) { _yaw=0;_pitch=.33f;_distance=7; }
+        else if(_options.Exercise) { _yaw=_frame>=225 ? .4f : 0;_pitch=.33f;_distance=_frame>=225 ? 4 : 7; }
         if(Playing&&!suspended)
         {
             // 模拟、事实、动画/粒子按固定步推进；绘制只读取插值，不重发事件。
@@ -164,9 +176,10 @@ public sealed class TrainingWindow : GameWindow
                 foreach(var actor in _runtime.Document.Objects.Where(o=>o.Kind is ObjectKind.Player or ObjectKind.Npc))
                     foreach(var animationEvent in _renderer.DrainAnimationEvents(actor.Id))
                         _animationEvent=$"{actor.Name}: {animationEvent.Name} #{animationEvent.Sequence}";
+                _contactExercise?.Observe(_runtime,_simulation,input.Sprint);
             });
             _alpha=result.Alpha;
-            if(_options.Exercise&&_frame==206)
+            if(_options.Exercise&&!_options.ContactExercise&&_frame==206)
             {
                 if(!discardedThisFrame||result.Steps!=0) throw new InvalidOperationException("Synchronous preparation time entered simulation.");
                 Console.WriteLine($"Slow prepare 120ms: next raw frame {e.Time*1000:F2}ms, discarded; simulated steps {result.Steps}.");
@@ -192,15 +205,21 @@ public sealed class TrainingWindow : GameWindow
     {
         while(_commands.TryDequeue(out var action))
         {
-            try { action(); }
-            catch(Exception error) { _editor?.History.CancelTransaction();_message=error.Message;Console.WriteLine("Command rejected: "+error); }
+            ExecuteEditorCommand(_editor,action,error=>{ _message=error.Message;Console.WriteLine("Command rejected: "+error); });
         }
+    }
+
+    internal static void ExecuteEditorCommand(SceneEditor editor,Action action,Action<Exception> rejected)
+    {
+        try { action(); }
+        // Execute已恢复本次失败前的设计，保留拖动起点；面板继续负责提交/取消整段事务。
+        catch(Exception error) { rejected(error); }
     }
 
     private void Play()
     {
         if(Playing) return;
-        if(_options.Exercise&&_frame==205) Thread.Sleep(120);
+        if(_options.Exercise&&!_options.ContactExercise&&_frame==205) Thread.Sleep(120);
         if(_editor.History.InTransaction) _editor.History.CommitTransaction();
         var candidate=new SceneGraph(SceneSerializer.Clone(_design.Document));
         TrainingSimulation? simulation=null;
@@ -241,6 +260,7 @@ public sealed class TrainingWindow : GameWindow
             File.Copy(SavePath,backup,overwrite:false);_rejectedBackup=backup;Console.WriteLine("Rejected original backed up: "+backup);
         }
         SceneSerializer.Save(_design.Document,SavePath,_options.AssetRoot);_rejectedSavedDesign=false;
+        _savedDesignBaseline=SceneSerializer.Clone(_design.Document);
         _editor.History.MarkSaved();_message="Saved design: "+SavePath;
     }
 
@@ -249,11 +269,20 @@ public sealed class TrainingWindow : GameWindow
         if(Playing) throw new InvalidOperationException("Stop before loading another design.");
         var candidate=new SceneGraph(SceneSerializer.Load(path,_options.AssetRoot));
         _renderer!.Prepare(BuildObjects(candidate,1));
-        _design=candidate;_editor=new SceneEditor(candidate);_selected=null;_clock.Reset();_input.Clear();_message="Loaded "+path;
+        if(string.Equals(Path.GetFullPath(path),Path.GetFullPath(SavePath),StringComparison.OrdinalIgnoreCase))
+            _savedDesignBaseline=SceneSerializer.Clone(candidate.Document);
+        _design=candidate;_editor=CreateDesignEditor(candidate,_savedDesignBaseline);_selected=null;_clock.Reset();_input.Clear();_message="Loaded "+path;
         _activePipeline=candidate.Document.Rendering.Pipeline;
         _renderer.ResetAnimations();ConnectEditorPreparation();
         _audio?.StopAll();_loopVoice=0;_particles.Clear();
         _discardNextDelta=true;
+    }
+
+    internal static SceneEditor CreateDesignEditor(SceneGraph design,SceneDocument? savedBaseline)
+    {
+        var editor=new SceneEditor(design);
+        editor.History.SetSavedBaseline(savedBaseline);
+        return editor;
     }
 
     private void RequestLoad(string path)
@@ -433,6 +462,19 @@ public sealed class TrainingWindow : GameWindow
         if(_frame==238) _editor.History.Undo();
     }
 
+    private void ExerciseContacts()
+    {
+        if(!_contactExercise!.BeginFrame(_frame)) return;
+        Stop();
+        // 仅重建隔离的内存设计；从不保存路线起点，也不修改展示球或坡的几何/碰撞。
+        LoadDesign(Path.Combine(_options.AssetRoot,"scenes","training-ground.json"));
+        var player=_design.Document.Objects.Single(item=>item.Kind==ObjectKind.Player);
+        _editor.SetTransform(player.Id,_contactExercise.StartTransform(_design.Document));
+        _selected=player.Id;
+        Play();
+        _contactExercise.Prepared(_runtime!,_simulation!);
+    }
+
     private void DrawWorldDebug()
     {
         if(_debug!=RenderDebugView.Final) return;
@@ -487,10 +529,11 @@ public sealed class TrainingWindow : GameWindow
         if(!Playing) settings=new RenderSettings { Pipeline=_activePipeline,SunDirection=settings.SunDirection,SunColor=settings.SunColor,
             SunIntensity=settings.SunIntensity,Exposure=settings.Exposure,Shadows=settings.Shadows,Fxaa=settings.Fxaa };
         _renderer.Render(_camera,_objects,settings,_particles.Visuals(),_debug);
-        if(_options.Exercise&&_frame==125) ComparePipelines(settings);
+        if(_options.Exercise&&!_options.ContactExercise&&_frame==125) ComparePipelines(settings);
         _ui.Render();
         var error=GL.GetError();if(error!=OpenTK.Graphics.OpenGL4.ErrorCode.NoError) throw new InvalidOperationException("GL frame error: "+error);
-        if(_options.CaptureRoot is not null && (_frame==60||_frame==105||_frame==125||_frame==144||_frame==155||_frame==170||_frame==230||_frame==235))
+        _contactExercise?.Rendered(_frame);
+        if(!_options.ContactExercise&&_options.CaptureRoot is not null && (_frame==60||_frame==105||_frame==125||_frame==144||_frame==155||_frame==170||_frame==230||_frame==235))
         {
             string label=_frame switch {60=>"forward",105=>"jump",125=>"deferred",144=>"landed",155=>"normals",170=>"shadow",230=>"material-probe",_=>"material-probe-no-shadow"};
             FramebufferCapture.Save(Path.Combine(_options.CaptureRoot,label+".png"),FramebufferSize.X,FramebufferSize.Y);
@@ -498,7 +541,8 @@ public sealed class TrainingWindow : GameWindow
         SwapBuffers();
         if(_options.Frames>0&&_frame>=_options.Frames)
         {
-            if(_options.Exercise&&(_exerciseJumpEvents<2||_exerciseMovementFrames<30))
+            _contactExercise?.VerifyComplete();
+            if(_options.Exercise&&!_options.ContactExercise&&(_exerciseJumpEvents<2||_exerciseMovementFrames<30))
                 throw new InvalidOperationException($"Exercise movement/animation chain failed: jump events {_exerciseJumpEvents}, moving steps {_exerciseMovementFrames}.");
             Console.WriteLine($"Graphics exercise reached {_frame} frames; GL errors: none; jump events {_exerciseJumpEvents}; moving steps {_exerciseMovementFrames}.");Close();
         }

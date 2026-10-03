@@ -148,7 +148,8 @@ internal sealed class RenderTargets : IDisposable
             Attach(BaseMetal, FramebufferAttachment.ColorAttachment0); Attach(NormalRough, FramebufferAttachment.ColorAttachment1); Attach(Depth, FramebufferAttachment.DepthAttachment);
             GL.DrawBuffers(2, [DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1]); Check("G-buffer");
             HdrBuffer = GL.GenFramebuffer(); GL.BindFramebuffer(FramebufferTarget.Framebuffer, HdrBuffer);
-            HdrColor = Texture(width, height, PixelInternalFormat.Rgba16f, PixelFormat.Rgba, PixelType.HalfFloat); Attach(HdrColor, FramebufferAttachment.ColorAttachment0);
+            // .045粗糙度GGX金属峰值配合法强光可超过半精度65504；保留能量，不提高粗糙度或截断D。
+            HdrColor = Texture(width, height, PixelInternalFormat.Rgba32f, PixelFormat.Rgba, PixelType.Float); Attach(HdrColor, FramebufferAttachment.ColorAttachment0);
             // HDR使用独立深度附件，Deferred光照读取G-buffer深度时不会形成纹理反馈回路。
             HdrDepth = GL.GenRenderbuffer(); GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, HdrDepth);
             GL.RenderbufferStorage(RenderbufferTarget.Renderbuffer, RenderbufferStorage.DepthComponent24, width, height);

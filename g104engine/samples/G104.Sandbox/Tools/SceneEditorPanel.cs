@@ -7,22 +7,46 @@ using OQuaternion = OpenTK.Mathematics.Quaternion;
 
 namespace G104.Sandbox.Tools;
 
-// 面板只提交命令；实际设计/碰撞更新由窗口在模拟循环外安全点处理。
+// 面板只提交命令；设计/渲染准备由窗口安全点处理，下一Play重建物理世界。
 public sealed class SceneEditorPanel
 {
     private SceneEditor? _transactionEditor;
     private string? _transactionOwner;
     private Guid? _draftObject;
     private readonly Dictionary<string, string> _textDrafts = [];
+    private readonly Dictionary<string, string> _textOriginals = [];
+    private readonly Dictionary<string, Action<string>> _textApplications = [];
     private readonly HashSet<string> _activeText = [];
+    private readonly HashSet<string> _drawnText = [];
+    private readonly HashSet<string> _drawnEdits = [];
+    private SceneEditor? _draftEditor;
+    private string? _cancelledEditOwner;
     private bool _pendingSelection;
     private Guid? _nextSelection;
     private bool _cancelFrame;
+
+    // 验证时采集真实控件区域；正常窗口未订阅，不改变交互。
+    internal Action<string, NVector2, NVector2>? ObserveItem { get; set; }
 
     public Guid? Draw(SceneEditor editor, bool playing, Guid? selected, Action<Action> enqueue)
     {
         ArgumentNullException.ThrowIfNull(editor);
         ArgumentNullException.ThrowIfNull(enqueue);
+        _drawnText.Clear();
+        _drawnEdits.Clear();
+        _cancelFrame = ImGui.IsKeyPressed(ImGuiKey.Escape);
+        if (_cancelFrame)
+        {
+            _cancelledEditOwner = _transactionOwner;
+            FlushTextDrafts(enqueue, cancel: true);
+            FinishTransaction(enqueue, cancel: true);
+        }
+        if (!ReferenceEquals(_draftEditor, editor) || playing)
+        {
+            FlushTextDrafts(enqueue, cancel: _cancelFrame);
+            _draftEditor = editor;
+            _draftObject = null;
+        }
         if (_pendingSelection)
         {
             selected = _nextSelection;
@@ -30,8 +54,6 @@ public sealed class SceneEditorPanel
         }
         if (selected is Guid missing && !editor.Graph.Document.Objects.Any(item => item.Id == missing)) selected = null;
         if (_transactionEditor is not null && (!ReferenceEquals(_transactionEditor, editor) || playing)) FinishTransaction(enqueue, cancel: true);
-        _cancelFrame = ImGui.IsKeyPressed(ImGuiKey.Escape);
-        if (_cancelFrame && _transactionEditor is not null) FinishTransaction(enqueue, cancel: true);
 
         ImGui.SetNextWindowSize(new NVector2(350, 650), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowPos(new NVector2(12, 145), ImGuiCond.FirstUseEver);
@@ -40,6 +62,7 @@ public sealed class SceneEditorPanel
         {
             if (!open)
             {
+                FlushTextDrafts(enqueue, cancel: _cancelFrame);
                 FinishTransaction(enqueue, cancel: false);
                 return selected;
             }
@@ -75,8 +98,10 @@ public sealed class SceneEditorPanel
                 if (current == item.Id) flags |= ImGuiTreeNodeFlags.Selected;
                 if (descendants.Length == 0) flags |= ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.NoTreePushOnOpen;
                 var expanded = ImGui.TreeNodeEx($"{item.Name} [{item.Kind}]##{item.Id}", flags);
+                ObserveItem?.Invoke("Tree:" + item.Id, ImGui.GetItemRectMin(), ImGui.GetItemRectMax());
                 if (ImGui.IsItemClicked() && !ImGui.IsItemToggledOpen())
                 {
+                    if (current != item.Id) FlushTextDrafts(enqueue, cancel: _cancelFrame);
                     if (_transactionEditor is not null) FinishTransaction(enqueue, cancel: false);
                     current = item.Id;
                 }
@@ -92,6 +117,7 @@ public sealed class SceneEditorPanel
 
             if (selected is not Guid id)
             {
+                FlushTextDrafts(enqueue, cancel: _cancelFrame);
                 FinishTransaction(enqueue, cancel: false);
                 ImGui.TextDisabled("Select an object to edit.");
                 return selected;
@@ -99,10 +125,10 @@ public sealed class SceneEditorPanel
             var item = editor.Graph.Object(id);
             if (_draftObject != id)
             {
+                // 旧对象字段可能已不再绘制；先用它自己的回调提交，再切换草稿身份。
+                FlushTextDrafts(enqueue, cancel: _cancelFrame);
                 FinishTransaction(enqueue, cancel: false);
                 _draftObject = id;
-                _textDrafts.Clear();
-                _activeText.Clear();
             }
             ImGui.PushID(id.ToString());
             try
@@ -164,7 +190,9 @@ public sealed class SceneEditorPanel
                     ImGui.EndDisabled();
                     if (SceneValidator.RequiresRoot(item)) ImGui.TextDisabled("Character roots use unit scale; edit dimensions.");
 
-                    if (item.Kind != ObjectKind.Group && ImGui.CollapsingHeader("Material", ImGuiTreeNodeFlags.DefaultOpen))
+                    var materialExpanded = item.Kind != ObjectKind.Group && ImGui.CollapsingHeader("Material", ImGuiTreeNodeFlags.DefaultOpen);
+                    if (item.Kind != ObjectKind.Group) ObserveItem?.Invoke("Material header", ImGui.GetItemRectMin(), ImGui.GetItemRectMax());
+                    if (materialExpanded)
                     {
                         var color = ToUi(item.Material.BaseColor);
                         var changed = ImGui.ColorEdit3("Base color", ref color);
@@ -212,7 +240,13 @@ public sealed class SceneEditorPanel
             finally { ImGui.PopID(); }
             return selected;
         }
-        finally { ImGui.End(); }
+        finally
+        {
+            // 收起分组等隐藏边界不会再调用原InputText/DragFloat，须在帧末收尾。
+            FlushTextDrafts(enqueue, cancel: _cancelFrame, onlyUndrawn: true);
+            if (_transactionOwner is string owner && !_drawnEdits.Contains(owner)) FinishTransaction(enqueue, cancel: false);
+            ImGui.End();
+        }
     }
 
     private void QueueCreate(SceneEditor editor, ObjectKind kind, Action<Action> enqueue)
@@ -290,9 +324,16 @@ public sealed class SceneEditorPanel
 
     private void DrawText(string label, string current, Action<string> apply, Action<Action> enqueue)
     {
-        if (!_activeText.Contains(label)) _textDrafts[label] = current;
+        _drawnText.Add(label);
+        _textApplications[label] = apply;
+        if (!_activeText.Contains(label))
+        {
+            _textDrafts[label] = current;
+            _textOriginals[label] = current;
+        }
         var text = _textDrafts.GetValueOrDefault(label, current);
         bool enter = ImGui.InputText(label, ref text, 1024, ImGuiInputTextFlags.EnterReturnsTrue);
+        ObserveItem?.Invoke(label, ImGui.GetItemRectMin(), ImGui.GetItemRectMax());
         _textDrafts[label] = text;
         var commit = enter || ImGui.IsItemDeactivatedAfterEdit();
         if (ImGui.IsItemActive()) _activeText.Add(label); else _activeText.Remove(label);
@@ -301,11 +342,36 @@ public sealed class SceneEditorPanel
             FinishTransaction(enqueue, cancel: false);
             var value = text;
             enqueue(() => apply(value));
+            _textOriginals[label] = value;
+        }
+    }
+
+    private void FlushTextDrafts(Action<Action> enqueue, bool cancel, bool onlyUndrawn = false)
+    {
+        foreach (var label in _textDrafts.Keys.Where(label => !onlyUndrawn || !_drawnText.Contains(label)).ToArray())
+        {
+            var value = _textDrafts[label];
+            if (!cancel && value != _textOriginals.GetValueOrDefault(label, value) && _textApplications.TryGetValue(label, out var apply))
+            {
+                FinishTransaction(enqueue, cancel: false);
+                enqueue(() => apply(value));
+            }
+            _textDrafts.Remove(label);
+            _textOriginals.Remove(label);
+            _textApplications.Remove(label);
+            _activeText.Remove(label);
         }
     }
 
     private void TrackEdit(SceneEditor editor, string label, bool changed, Action apply, Action<Action> enqueue)
     {
+        ObserveItem?.Invoke(label, ImGui.GetItemRectMin(), ImGui.GetItemRectMax());
+        _drawnEdits.Add(label);
+        if (_cancelledEditOwner == label)
+        {
+            if (!ImGui.IsItemActive() || ImGui.IsItemActivated()) _cancelledEditOwner = null;
+            else return;
+        }
         if (_cancelFrame) return;
         if ((ImGui.IsItemActivated() || changed) && _transactionOwner != label)
         {

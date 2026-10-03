@@ -183,3 +183,7 @@ FFmpeg来自 [官方列出的Windows构建入口](https://ffmpeg.org/download.ht
 开工前方案与准备历史：当时未获代码批准；随后用户正式同意，实际实现/部署及验证见 [实施复查](../reviews/v1-implementation-review-2026-10-03.md)。用户已完成NuGet与双配置原探针运行，四份外部ZIP也已静态核对；OpenAL/角色输入已识别，声音按已选路线待离线转换，持久部署未执行。新增库加载与功能尚未验证，助手未安装、构建或运行应用。
 
 2026-10-03用户已提交推送cbce581并要求发起正式开工，见 [保存节点](../reviews/v1-start-checkpoint-2026-10-03.md)。D53明确Sol Ultra主实施、Astra Ultra评审/独立核查，所需任务使用指定Ultra模型，质量优先，不沿用此前High/额度节省建议；主对话选择由界面控制，子任务显式指定，实际调用异常如实记录。完整实施已获得明确同意，按连续推进、内部增量验证和 [执行台账](../execution/v1-progress.md) 持久化。
+
+## b91dfe4之后的独立验收修订
+
+原第9节HDR16F是起步定案；独立GPU数值参考确认GGX固定偏置错误，正确rough.045/强度10的HDR约194061.8超过half65504。保持粗糙度/能量，实际HDR改32F，增加8bytes/pixel，其他管线/Pass/G-buffer不变。交互和导航/朝向等同范围合同也按实测校正；详细先失败/后修复证据见 [独立评审](../reviews/v1-independent-review-2026-10-03.md)，不重新询问既定范围。
