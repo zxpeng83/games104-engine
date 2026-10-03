@@ -1,5 +1,7 @@
 # Gameplay 与 AI：规则、交互、决策和导航
 
+当前执行状态索引：V1完整范围已获2026-10-03正式同意并完成首轮实现；下文保留路线决策/后续专题规划，旧“未开工/待细化”不覆盖 [实施复查](../reviews/v1-implementation-review-2026-10-03.md)、[实际架构与学习](../guides/v1-architecture-and-learning.md) 和status的当前事实，不重复询问已定案事项。
+
 更新：2026-10-03。状态：**三项规则/决策/导航路线已获用户确认；具体契约、算法细节和分期仍待收敛，未实现**。
 
 本页细化 [总体覆盖表](../plan.md) 的 Gameplay 与 AI，连接已选的 [物理/角色](physics-character-roadmap.md)、[动画](animation-roadmap.md)、[资产/场景](assets-scene-roadmap.md) 及后续声音/粒子/工具。综合训练场不含战斗，NPC 与玩家复用角色执行能力；不把原笔记的射击案例转成新的战斗需求。

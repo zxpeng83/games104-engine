@@ -1,5 +1,7 @@
 # 动画模块：运行时、动作控制与进阶实践
 
+当前执行状态索引：V1完整范围已获2026-10-03正式同意并完成首轮实现；下文保留路线决策/后续专题规划，旧“未开工/待细化”不覆盖 [实施复查](../reviews/v1-implementation-review-2026-10-03.md)、[实际架构与学习](../guides/v1-architecture-and-learning.md) 和status的当前事实，不重复询问已定案事项。
+
 更新：2026-10-03。状态：**三项范围/组织选择已获用户明确确认；算法、数据契约与分期仍待细化，未实现**。
 
 本页细化 [总体覆盖表](../plan.md) 的动画部分，连接 [资产/场景](assets-scene-roadmap.md)、[物理/角色](physics-character-roadmap.md) 和 [渲染](rendering-roadmap.md)。沿用已确认的 glTF 2.0/GLB 输入方向、controller 驱动世界位移、in-place 基础动画和明确状态归属；不重新选择这些事项。

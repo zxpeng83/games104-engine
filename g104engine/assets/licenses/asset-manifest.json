@@ -1,0 +1,247 @@
+[
+  {
+    "path": "third_party/openal-soft/1.25.2/OpenAL32.dll",
+    "source": "https://openal-soft.org/openal-binaries/openal-soft-1.25.2-bin.zip#bin/Win64/soft_oal.dll",
+    "license": "LGPL-2.0-or-later / bundled pffft license",
+    "sha256": "3963b06e319180700be0bcc0d027336664bb3a4975876b4a5442f10746fab5b4"
+  },
+  {
+    "path": "third_party/openal-soft/1.25.2/COPYING",
+    "source": "https://openal-soft.org/openal-binaries/openal-soft-1.25.2-bin.zip#COPYING",
+    "license": "LGPL-2.0-or-later / bundled pffft license",
+    "sha256": "d808ce217e5b611854da622b57ec29fe545584c48bc5352fae72a4b6e5074a15"
+  },
+  {
+    "path": "third_party/openal-soft/1.25.2/LICENSE-pffft",
+    "source": "https://openal-soft.org/openal-binaries/openal-soft-1.25.2-bin.zip#LICENSE-pffft",
+    "license": "LGPL-2.0-or-later / bundled pffft license",
+    "sha256": "64056328b3e7bc104e24ef96accc1a7abead156f0c02d1b87c97e3f3a28030de"
+  },
+  {
+    "path": "third_party/openal-soft/1.25.2/readme.txt",
+    "source": "https://openal-soft.org/openal-binaries/openal-soft-1.25.2-bin.zip#readme.txt",
+    "license": "LGPL-2.0-or-later / bundled pffft license",
+    "sha256": "26535df83482a8a0377e6fc1b8171385c9fb41e78f7f39398dbf645960cd9438"
+  },
+  {
+    "path": "assets/models/UAL1_Standard.glb",
+    "source": "https://quaternius.itch.io/universal-animation-library#Standard/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+    "license": "CC0",
+    "sha256": "69591853d817488edaa8fd9bf8fc1d821eaeaf789f8627b3cd23b41c4ed67997"
+  },
+  {
+    "path": "assets/licenses/quaternius-0-License.txt",
+    "source": "Quaternius Standard ZIP#Universal Animation Library[Standard]/License.txt",
+    "license": "CC0",
+    "sha256": "6d01f55c6e4c49a2c9963e147e561945ae2c83958c8ca667d90a6bffdbfac061"
+  },
+  {
+    "path": "assets/licenses/quaternius-1-README.txt",
+    "source": "Quaternius Standard ZIP#Universal Animation Library[Standard]/README.txt",
+    "license": "CC0",
+    "sha256": "ccd02718886b5a57f10f0a8911a38cfe10c36880e1d6dfa3445923fba32d2a72"
+  },
+  {
+    "path": "assets/tests/checker.png",
+    "source": "G104Engine procedural checker",
+    "license": "project-authored",
+    "sha256": "7bd98170e0da25014ed96eb4c2f29f9e45758a3190394ad53129190e6e4fb95e"
+  },
+  {
+    "path": "assets/tests/normal.png",
+    "source": "G104Engine tangent-space flat normal",
+    "license": "project-authored",
+    "sha256": "a0377b3ffee07e830db9af26410cacb661e6ea3c93f20328b8b42e63ee1c7b99"
+  },
+  {
+    "path": "assets/models/material-probe.glb",
+    "source": "G104Engine procedural glTF material probe",
+    "license": "project-authored",
+    "sha256": "24930e92a3557723870b59729b38b9a147db88bddcf4789ca0ed8e201a59ef64"
+  },
+  {
+    "path": "assets/audio/loop-test.wav",
+    "source": "G104Engine 110Hz test signal",
+    "license": "project-authored",
+    "sha256": "d87320715f7c22ad433b99040d5cd7e0df2c143d31385b87c809a3da7f4ad9d7"
+  },
+  {
+    "path": "assets/licenses/kenney_impact-sounds-License.txt",
+    "source": "https://kenney.nl/assets/impact-sounds#License.txt",
+    "license": "CC0",
+    "sha256": "b49aa9c56b04528b95913de13e506a0f7c5e807b9925db9bfef86af1f91120db"
+  },
+  {
+    "path": "assets/audio/step0.wav",
+    "source": "kenney_impact-sounds.zip#Audio/footstep_concrete_000.ogg",
+    "license": "CC0",
+    "conversion": [
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\ffmpeg-9.0.2\\bin\\ffmpeg.exe",
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\selected-audio\\footstep_concrete_000.ogg",
+      "-ac",
+      "1",
+      "-ar",
+      "44100",
+      "-c:a",
+      "pcm_s16le",
+      "E:\\game_study\\games104\\g104engine\\assets\\audio\\step0.wav"
+    ],
+    "sha256": "5182f90416738da18c13694a5ed9e16ab1335b5065f13a00bb59d842e6446334"
+  },
+  {
+    "path": "assets/audio/step1.wav",
+    "source": "kenney_impact-sounds.zip#Audio/footstep_concrete_001.ogg",
+    "license": "CC0",
+    "conversion": [
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\ffmpeg-9.0.2\\bin\\ffmpeg.exe",
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\selected-audio\\footstep_concrete_001.ogg",
+      "-ac",
+      "1",
+      "-ar",
+      "44100",
+      "-c:a",
+      "pcm_s16le",
+      "E:\\game_study\\games104\\g104engine\\assets\\audio\\step1.wav"
+    ],
+    "sha256": "875b6c5b9dc875d4fa0a1929048d4d9756b1d3511bc1c349d1794ca9175fcc6c"
+  },
+  {
+    "path": "assets/audio/door.wav",
+    "source": "kenney_impact-sounds.zip#Audio/impactWood_medium_000.ogg",
+    "license": "CC0",
+    "conversion": [
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\ffmpeg-9.0.2\\bin\\ffmpeg.exe",
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\selected-audio\\impactWood_medium_000.ogg",
+      "-ac",
+      "1",
+      "-ar",
+      "44100",
+      "-c:a",
+      "pcm_s16le",
+      "E:\\game_study\\games104\\g104engine\\assets\\audio\\door.wav"
+    ],
+    "sha256": "723ac9fd2baf0de6087233670467601144cff4a6d4c5b8a29b762e3ef056dc98"
+  },
+  {
+    "path": "assets/audio/jump.wav",
+    "source": "kenney_impact-sounds.zip#Audio/impactMetal_light_000.ogg",
+    "license": "CC0",
+    "conversion": [
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\ffmpeg-9.0.2\\bin\\ffmpeg.exe",
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\selected-audio\\impactMetal_light_000.ogg",
+      "-ac",
+      "1",
+      "-ar",
+      "44100",
+      "-c:a",
+      "pcm_s16le",
+      "E:\\game_study\\games104\\g104engine\\assets\\audio\\jump.wav"
+    ],
+    "sha256": "9ebec4a7a364645d0f454def1fc5d5f867797500dce465b04b99e5cfde2c83dc"
+  },
+  {
+    "path": "assets/licenses/kenney_interface-sounds-License.txt",
+    "source": "https://kenney.nl/assets/interface-sounds#License.txt",
+    "license": "CC0",
+    "sha256": "f7966c773bbed0eca6a9c75081c44a178b38eae112724dbb5fdfbd4192d118a9"
+  },
+  {
+    "path": "assets/audio/click.wav",
+    "source": "kenney_interface-sounds.zip#Audio/click_001.ogg",
+    "license": "CC0",
+    "conversion": [
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\ffmpeg-9.0.2\\bin\\ffmpeg.exe",
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\selected-audio\\click_001.ogg",
+      "-ac",
+      "1",
+      "-ar",
+      "44100",
+      "-c:a",
+      "pcm_s16le",
+      "E:\\game_study\\games104\\g104engine\\assets\\audio\\click.wav"
+    ],
+    "sha256": "6d0bd4c51029701346bff8b122c604c96080c971557c6186c8557ff52202c7ba"
+  },
+  {
+    "path": "assets/audio/complete.wav",
+    "source": "kenney_interface-sounds.zip#Audio/confirmation_001.ogg",
+    "license": "CC0",
+    "conversion": [
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\ffmpeg-9.0.2\\bin\\ffmpeg.exe",
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\selected-audio\\confirmation_001.ogg",
+      "-ac",
+      "1",
+      "-ar",
+      "44100",
+      "-c:a",
+      "pcm_s16le",
+      "E:\\game_study\\games104\\g104engine\\assets\\audio\\complete.wav"
+    ],
+    "sha256": "53f2c0c0ace52e24f68eebc90d5884b0fad5d4ef37570d4c773c2810ae59c966"
+  },
+  {
+    "path": "assets/audio/switch.wav",
+    "source": "kenney_interface-sounds.zip#Audio/switch_001.ogg",
+    "license": "CC0",
+    "conversion": [
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\ffmpeg-9.0.2\\bin\\ffmpeg.exe",
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      "E:\\game_study\\games104\\g104engine\\.cache\\v1-preparation\\selected-audio\\switch_001.ogg",
+      "-ac",
+      "1",
+      "-ar",
+      "44100",
+      "-c:a",
+      "pcm_s16le",
+      "E:\\game_study\\games104\\g104engine\\assets\\audio\\switch.wav"
+    ],
+    "sha256": "a562d0a6f3dd0975fcd036803c34dda475de76817fe523214d941bc66b88fe7c"
+  },
+  {
+    "path": "assets/config/character-animation.json",
+    "source": "G104Engine finite animation configuration",
+    "license": "project-authored",
+    "sha256": "6cb76dc42879b3b643d33104a4614e8130c85f2b0fa3b829d88b46b284905f5d"
+  }
+]

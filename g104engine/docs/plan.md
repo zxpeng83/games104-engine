@@ -2,15 +2,15 @@
 
 最后更新：2026-10-03。本文件保存稳定需求、已确认方向和待讨论的整体覆盖；实际进度看 [status.md](status.md)，设计细节看 [architecture.md](architecture.md)。
 
-**当前集中收敛基础综合训练场 V1 的范围、依赖/素材与完整实施方案；尚未批准开始功能代码实现。** 长期路线保留，未来专题细节不作为 V1 启动前置。当前继续设计讨论并维护文档，不把保存草案理解为批准全部方案和参数。
+**当前基础综合训练场V1已正式获准并完成首轮实现，进入用户验收与学习。** 双配置构建/行为/原生/图形证据见 [实施复查](reviews/v1-implementation-review-2026-10-03.md)；长期路线保留，未来专题不自动纳入V1，后续同范围修复按已有授权继续。
 
 **首个目标版本统一称为“基础综合训练场 V1”，用途为“面试展示”。** 此前“面试 Demo/面试 V1”指同一版本。Deferred 和 Undo/Redo 已明确进入 V1；[V1 范围草案](plans/basic-training-ground-v1-draft.md)的其他保留/后移建议及具体实施细节待确认。既有模块能力目标继续保留，V1 之外的能力另行安排后续扩展；统一名称不自动批准完整范围。
 
-本轮已进一步确认：V1 保留 PBR/基础阴影/天空盒/HDR/色调映射/FXAA，IBL 后移；平地墙滑跳跃＋有限坡台，平台/推箱后移；有限创建/删除/变换/参数编辑＋Undo/Redo＋Play/Stop。依赖选择推荐组合（SharpGLTF、StbImageSharp、Jolt、ImGui.NET、OpenTK OpenAL＋OpenAL Soft）。具体契约见 [实施草案](plans/v1-implementation-draft.md)，版本/本机准备见 [依赖与素材](plans/v1-dependencies-and-assets.md)；NuGet已由用户完成并核对，原生功能/素材待验证，代码开始前必须弹窗同意。
+本轮已进一步确认：V1 保留 PBR/基础阴影/天空盒/HDR/色调映射/FXAA，IBL 后移；平地墙滑跳跃＋有限坡台，平台/推箱后移；有限创建/删除/变换/参数编辑＋Undo/Redo＋Play/Stop。依赖选择推荐组合（SharpGLTF、StbImageSharp、Jolt、ImGui.NET、OpenTK OpenAL＋OpenAL Soft）。具体契约见 [实施草案](plans/v1-implementation-draft.md)，版本/本机准备见 [依赖与素材](plans/v1-dependencies-and-assets.md)；NuGet已由用户完成并核对，素材已部署，原生/图形功能已有本机运行证据，用户体验待验收。
 
-实际输入已核对：四个ZIP在忽略的缓存内，角色GLB含65骨骼及全部基础动作；两个声音包均为Ogg，用户已选离线转PCM16 WAV，维持V1加载范围。详细条目/哈希见 [输入记录](reviews/v1-input-archives-check-2026-10-03.md)，转换、持久部署及效果验证尚未执行。
+实际输入已核对：四个ZIP在忽略的缓存内，角色GLB含65骨骼及全部基础动作；两个声音包均为Ogg，用户已选离线转PCM16 WAV，维持V1加载范围。详细条目/哈希见 [输入记录](reviews/v1-input-archives-check-2026-10-03.md)，转换与持久部署已执行，实际音频上下文/GL输出已验证，听感及用户视觉验收另记录。
 
-最新决定：用户已确认将“最小 3D 里程碑”合入 V1，并希望加快开发、尽可能一次取得完整成果。[合并与推进方式](plans/basic-training-ground-v1-draft.md#m1-integration-proposal)已记录；原 M1 已归档，不再独立交付/审批，基础验证保留在 V1 内。连续开发的预览/反馈节奏仍在讨论，整体清单和代码执行尚未批准。
+最新决定：用户已确认将“最小 3D 里程碑”合入 V1，并希望加快开发、尽可能一次取得完整成果。[合并与推进方式](plans/basic-training-ground-v1-draft.md#m1-integration-proposal)已记录；原 M1 已归档，不再独立交付/审批，基础验证保留在 V1 内。连续开发与内部增量验证已随正式弹窗批准并执行，用户回来统一验收与学习；Scope外重大变化再讨论。
 
 ## 项目目标与推进方式
 

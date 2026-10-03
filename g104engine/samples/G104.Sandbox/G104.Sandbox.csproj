@@ -12,6 +12,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\G104.Engine\G104.Engine.csproj" />
+    <Content Include="..\..\assets\**\*" Link="assets\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\openal-soft\1.25.2\OpenAL32.dll" Link="OpenAL32.dll" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\openal-soft\1.25.2\*.txt" Link="licenses\openal-soft\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\openal-soft\1.25.2\COPYING" Link="licenses\openal-soft\COPYING" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\openal-soft\1.25.2\LICENSE-pffft" Link="licenses\openal-soft\LICENSE-pffft" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

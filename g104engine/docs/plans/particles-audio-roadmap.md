@@ -1,5 +1,7 @@
 # 粒子与声音：生命周期、空间反馈与代表实验
 
+当前执行状态索引：V1完整范围已获2026-10-03正式同意并完成首轮实现；下文保留路线决策/后续专题规划，旧“未开工/待细化”不覆盖 [实施复查](../reviews/v1-implementation-review-2026-10-03.md)、[实际架构与学习](../guides/v1-architecture-and-learning.md) 和status的当前事实，不重复询问已定案事项。
+
 更新：2026-10-03。状态：**三项路线/范围/听者选择已获用户确认；后端、契约与分期仍待细化，未实现**。
 
 本页细化 [总体覆盖表](../plan.md) 的粒子与声音，连接 [Gameplay/AI](gameplay-ai-roadmap.md)、[动画](animation-roadmap.md)、[渲染](rendering-roadmap.md) 和场景资源生命周期。用脚步尘土、机关启动、喷泉/环境声等非战斗示例，不扩大已选训练场玩法范围。

@@ -1,0 +1,1388 @@
+{
+  "schemaVersion": 1,
+  "name": "Training Ground V1",
+  "rendering": {
+    "pipeline": "Forward",
+    "sunDirection": {
+      "x": -0.5,
+      "y": -1,
+      "z": -0.4
+    },
+    "sunColor": {
+      "x": 1,
+      "y": 0.94,
+      "z": 0.82
+    },
+    "sunIntensity": 3,
+    "exposure": 1,
+    "shadows": true,
+    "fxaa": true
+  },
+  "objects": [
+    {
+      "id": "27d291d4-b468-5899-8d95-3cef25d0fd86",
+      "name": "Ground",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": -0.25,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 30,
+          "y": 0.5,
+          "z": 30
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.27,
+          "y": 0.31,
+          "z": 0.35
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "3d4d71da-3bc0-54cc-80a8-2744ccd2e1b3",
+      "name": "Player",
+      "kind": "Player",
+      "primitive": "Model",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0.05,
+          "z": 7
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.25,
+          "y": 0.65,
+          "z": 0.95
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {
+        "walkSpeed": 2.4,
+        "runSpeed": 5.2,
+        "radius": 0.35,
+        "height": 1.9,
+        "stepHeight": 0.35,
+        "maxSlopeDegrees": 45,
+        "gravity": 20,
+        "jumpSpeed": 7
+      },
+      "modelPath": "models/UAL1_Standard.glb"
+    },
+    {
+      "id": "f07c8653-5574-5108-989a-563321702e98",
+      "name": "Guide NPC",
+      "kind": "Npc",
+      "primitive": "Model",
+      "transform": {
+        "position": {
+          "x": 5,
+          "y": 0.05,
+          "z": 5
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.95,
+          "y": 0.52,
+          "z": 0.25
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {
+        "walkSpeed": 2,
+        "runSpeed": 3,
+        "radius": 0.35,
+        "height": 1.9,
+        "stepHeight": 0.35,
+        "maxSlopeDegrees": 45,
+        "gravity": 20,
+        "jumpSpeed": 7,
+        "navMinX": -12,
+        "navMinZ": -12,
+        "navMaxX": 12,
+        "navMaxZ": 12,
+        "navPlaneY": 0,
+        "navCellSize": 0.65
+      },
+      "modelPath": "models/UAL1_Standard.glb"
+    },
+    {
+      "id": "d468a9f0-a744-54cb-9faa-4f0d107baa69",
+      "name": "Mechanism group",
+      "kind": "Group",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.6,
+          "y": 0.6,
+          "z": 0.6
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": false,
+      "parameters": {}
+    },
+    {
+      "id": "8d579578-a601-5dc9-ad27-b6d176188b07",
+      "name": "Door",
+      "kind": "Door",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 1.5,
+          "z": -4
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 3,
+          "y": 3,
+          "z": 0.4
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.15,
+          "y": 0.5,
+          "z": 0.75
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {
+        "openHeight": 3.6
+      },
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      },
+      "parentId": "d468a9f0-a744-54cb-9faa-4f0d107baa69"
+    },
+    {
+      "id": "28a3d877-9533-59f7-b4c0-f236fe39065c",
+      "name": "Button",
+      "kind": "Button",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": -2,
+          "y": 0.75,
+          "z": -2
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 0.6,
+          "y": 1.5,
+          "z": 0.6
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.9,
+          "y": 0.45,
+          "z": 0.12
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {
+        "interactDistance": 2.5
+      },
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      },
+      "parentId": "d468a9f0-a744-54cb-9faa-4f0d107baa69",
+      "targetId": "8d579578-a601-5dc9-ad27-b6d176188b07"
+    },
+    {
+      "id": "b053b734-890b-5484-a0ac-ec5219e7e0eb",
+      "name": "Goal",
+      "kind": "Goal",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0.05,
+          "z": -9
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 3,
+          "y": 0.1,
+          "z": 3
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.2,
+          "y": 0.9,
+          "z": 0.45
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {
+        "radius": 1.6
+      }
+    },
+    {
+      "id": "9b09e26e-3d1b-5e42-981d-992ef7327502",
+      "name": "West wall",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": -4,
+          "y": 1.5,
+          "z": -4
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 5,
+          "y": 3,
+          "z": 0.5
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.45,
+          "y": 0.47,
+          "z": 0.5
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "6f3989dd-e394-5c48-a0fb-63bb551a6429",
+      "name": "East wall",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": 4,
+          "y": 1.5,
+          "z": -4
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 5,
+          "y": 3,
+          "z": 0.5
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.45,
+          "y": 0.47,
+          "z": 0.5
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "a4a6b8ba-976f-538d-9e6c-0c80bb4a4a3f",
+      "name": "Slide wall",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": -5,
+          "y": 1.5,
+          "z": 2
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 0.5,
+          "y": 3,
+          "z": 7
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.3,
+          "y": 0.4,
+          "z": 0.52
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "2dc65f68-e6f9-512f-a52d-7d98b5246ed7",
+      "name": "Ramp",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": 9,
+          "y": 0.65,
+          "z": 1
+        },
+        "rotation": {
+          "x": -0.08715574274765817,
+          "y": 0,
+          "z": 0,
+          "w": 0.9961946980917455
+        },
+        "scale": {
+          "x": 3,
+          "y": 0.3,
+          "z": 7
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.62,
+          "y": 0.47,
+          "z": 0.28
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "f9cb53ac-e45e-5faa-8ce8-4754e266b524",
+      "name": "Imported texture probe",
+      "kind": "StaticMesh",
+      "primitive": "Model",
+      "transform": {
+        "position": {
+          "x": -6,
+          "y": 1,
+          "z": -8
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 2,
+          "y": 2,
+          "z": 2
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.6,
+          "y": 0.6,
+          "z": 0.6
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "modelPath": "models/material-probe.glb"
+    },
+    {
+      "id": "7a4d639f-afd6-589a-b1c4-502515eff98c",
+      "name": "Step 1",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": -9,
+          "y": 0.1,
+          "z": 5.0
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 2,
+          "y": 0.2,
+          "z": 0.8
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.55,
+          "y": 0.55,
+          "z": 0.6
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "6a2740e1-f566-5336-a8c1-165a7f668374",
+      "name": "Step 2",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": -9,
+          "y": 0.2,
+          "z": 4.2
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 2,
+          "y": 0.4,
+          "z": 0.8
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.55,
+          "y": 0.55,
+          "z": 0.6
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "bf9af48b-6092-5925-b8f1-f1495a5ccccb",
+      "name": "Step 3",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": -9,
+          "y": 0.30000000000000004,
+          "z": 3.4
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 2,
+          "y": 0.6000000000000001,
+          "z": 0.8
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.55,
+          "y": 0.55,
+          "z": 0.6
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "1dba43bb-56ae-5d77-a2af-cf4927904fa5",
+      "name": "Step 4",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": -9,
+          "y": 0.4,
+          "z": 2.5999999999999996
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 2,
+          "y": 0.8,
+          "z": 0.8
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.55,
+          "y": 0.55,
+          "z": 0.6
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "58082934-da41-5cec-b467-cbb0cbf05d9d",
+      "name": "PBR sample 1",
+      "kind": "StaticMesh",
+      "primitive": "Sphere",
+      "transform": {
+        "position": {
+          "x": -5,
+          "y": 0.55,
+          "z": 11
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.72,
+          "y": 0.42,
+          "z": 0.18
+        },
+        "metallic": 0.0,
+        "roughness": 0.15
+      },
+      "visible": true,
+      "parameters": {}
+    },
+    {
+      "id": "1d4a96d8-9892-598f-8046-9075aa5ecf74",
+      "name": "PBR sample 2",
+      "kind": "StaticMesh",
+      "primitive": "Sphere",
+      "transform": {
+        "position": {
+          "x": -3,
+          "y": 0.55,
+          "z": 11
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.72,
+          "y": 0.42,
+          "z": 0.18
+        },
+        "metallic": 0.2,
+        "roughness": 0.28
+      },
+      "visible": true,
+      "parameters": {}
+    },
+    {
+      "id": "8a78b1f2-8c5f-50cf-9591-00c93544f30f",
+      "name": "PBR sample 3",
+      "kind": "StaticMesh",
+      "primitive": "Sphere",
+      "transform": {
+        "position": {
+          "x": -1,
+          "y": 0.55,
+          "z": 11
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.72,
+          "y": 0.42,
+          "z": 0.18
+        },
+        "metallic": 0.4,
+        "roughness": 0.41000000000000003
+      },
+      "visible": true,
+      "parameters": {}
+    },
+    {
+      "id": "a1dd6fa0-05ea-5ce2-83b2-564b4c004480",
+      "name": "PBR sample 4",
+      "kind": "StaticMesh",
+      "primitive": "Sphere",
+      "transform": {
+        "position": {
+          "x": 1,
+          "y": 0.55,
+          "z": 11
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.72,
+          "y": 0.42,
+          "z": 0.18
+        },
+        "metallic": 0.6,
+        "roughness": 0.54
+      },
+      "visible": true,
+      "parameters": {}
+    },
+    {
+      "id": "41967950-8fa2-516d-892d-2b20fc51bcbc",
+      "name": "PBR sample 5",
+      "kind": "StaticMesh",
+      "primitive": "Sphere",
+      "transform": {
+        "position": {
+          "x": 3,
+          "y": 0.55,
+          "z": 11
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.72,
+          "y": 0.42,
+          "z": 0.18
+        },
+        "metallic": 0.8,
+        "roughness": 0.67
+      },
+      "visible": true,
+      "parameters": {}
+    },
+    {
+      "id": "e0cf855a-6533-5175-bf9a-b434ea719970",
+      "name": "PBR sample 6",
+      "kind": "StaticMesh",
+      "primitive": "Sphere",
+      "transform": {
+        "position": {
+          "x": 5,
+          "y": 0.55,
+          "z": 11
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.72,
+          "y": 0.42,
+          "z": 0.18
+        },
+        "metallic": 1.0,
+        "roughness": 0.8
+      },
+      "visible": true,
+      "parameters": {}
+    },
+    {
+      "id": "9dbcb177-d089-5d60-a0f1-2bea79d574a9",
+      "name": "Warm lamp",
+      "kind": "PointLight",
+      "primitive": "Sphere",
+      "transform": {
+        "position": {
+          "x": -3,
+          "y": 3,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 0.2,
+          "y": 0.2,
+          "z": 0.2
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 1,
+          "y": 0.45,
+          "z": 0.2
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {
+        "intensity": 8,
+        "radius": 8
+      }
+    },
+    {
+      "id": "776e9d96-d887-5053-b3dd-ffa53e2c119a",
+      "name": "Cool lamp",
+      "kind": "PointLight",
+      "primitive": "Sphere",
+      "transform": {
+        "position": {
+          "x": 3,
+          "y": 3,
+          "z": -7
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 0.2,
+          "y": 0.2,
+          "z": 0.2
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.2,
+          "y": 0.5,
+          "z": 1
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {
+        "intensity": 8,
+        "radius": 8
+      }
+    },
+    {
+      "id": "84e3bdcd-d5da-5c56-b051-a277ce1be64e",
+      "name": "North boundary",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 1,
+          "z": -14.5
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 30,
+          "y": 2,
+          "z": 0.4
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.18,
+          "y": 0.23,
+          "z": 0.28
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "134206f3-b0ac-5503-9a89-cf73312fa281",
+      "name": "South boundary",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 1,
+          "z": 14.5
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 30,
+          "y": 2,
+          "z": 0.4
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.18,
+          "y": 0.23,
+          "z": 0.28
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "cb0f397e-4424-5f3e-8b77-2fe6fd0b5ae8",
+      "name": "West boundary",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": -14.5,
+          "y": 1,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 0.4,
+          "y": 2,
+          "z": 30
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.18,
+          "y": 0.23,
+          "z": 0.28
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    },
+    {
+      "id": "ec3f813e-e50a-531b-9b9d-ad4d8b1235c0",
+      "name": "East boundary",
+      "kind": "StaticMesh",
+      "primitive": "Cube",
+      "transform": {
+        "position": {
+          "x": 14.5,
+          "y": 1,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0,
+          "z": 0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 0.4,
+          "y": 2,
+          "z": 30
+        }
+      },
+      "material": {
+        "baseColor": {
+          "x": 0.18,
+          "y": 0.23,
+          "z": 0.28
+        },
+        "metallic": 0,
+        "roughness": 0.6
+      },
+      "visible": true,
+      "parameters": {},
+      "collider": {
+        "kind": "Box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "friction": 0.6
+      }
+    }
+  ],
+  "templates": [
+    {
+      "id": "cube",
+      "defaults": {
+        "id": "bea06dc7-0897-5a39-aab5-4a3b6ef35fbb",
+        "name": "Cube",
+        "kind": "StaticMesh",
+        "primitive": "Cube",
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0.5,
+            "z": 0
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 0,
+            "z": 0,
+            "w": 1.0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        },
+        "material": {
+          "baseColor": {
+            "x": 0.55,
+            "y": 0.6,
+            "z": 0.7
+          },
+          "metallic": 0,
+          "roughness": 0.6
+        },
+        "visible": true,
+        "parameters": {},
+        "collider": {
+          "kind": "Box",
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "center": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "friction": 0.6
+        }
+      }
+    },
+    {
+      "id": "group",
+      "defaults": {
+        "id": "bf5e9289-5bcc-566e-8832-596d430b7628",
+        "name": "Group",
+        "kind": "Group",
+        "primitive": "Cube",
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 0,
+            "z": 0,
+            "w": 1.0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        },
+        "material": {
+          "baseColor": {
+            "x": 0.6,
+            "y": 0.6,
+            "z": 0.6
+          },
+          "metallic": 0,
+          "roughness": 0.6
+        },
+        "visible": false,
+        "parameters": {}
+      }
+    },
+    {
+      "id": "light",
+      "defaults": {
+        "id": "85d0e662-ddae-5b3b-b7f1-92b496c47612",
+        "name": "Point light",
+        "kind": "PointLight",
+        "primitive": "Sphere",
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 2,
+            "z": 0
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 0,
+            "z": 0,
+            "w": 1.0
+          },
+          "scale": {
+            "x": 0.2,
+            "y": 0.2,
+            "z": 0.2
+          }
+        },
+        "material": {
+          "baseColor": {
+            "x": 0.6,
+            "y": 0.6,
+            "z": 0.6
+          },
+          "metallic": 0,
+          "roughness": 0.6
+        },
+        "visible": true,
+        "parameters": {
+          "intensity": 6,
+          "radius": 7
+        }
+      }
+    }
+  ]
+}

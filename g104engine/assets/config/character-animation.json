@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "clipMap": {
+    "idle": "Idle_Loop",
+    "walk": "Walk_Loop",
+    "run": "Jog_Fwd_Loop",
+    "jumpStart": "Jump_Start",
+    "jumpLoop": "Jump_Loop",
+    "jumpLand": "Jump_Land"
+  },
+  "walkReferenceSpeed": 2.2,
+  "runReferenceSpeed": 4.8,
+  "speedResponse": 12.0,
+  "transitionSeconds": 0.12,
+  "jumpStartSeconds": 0.18,
+  "jumpLandSeconds": 0.22,
+  "minJumpVelocity": 0.1,
+  "footstepMarkers": [0.15, 0.65]
+}

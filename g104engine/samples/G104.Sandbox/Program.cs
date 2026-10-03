@@ -1,108 +1,67 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using G104.Engine.Animation;
+using G104.Engine.Audio;
+using G104.Engine.Core;
+using G104.Engine.Navigation;
+using G104.Engine.Physics;
+using G104.Engine.Scene;
+using G104.Sandbox;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
-using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
-using OpenTK.Windowing.GraphicsLibraryFramework;
 
-// 这是环境探针，只验证窗口、驱动和 OpenGL 上下文，不代表正式引擎架构。
-if (Array.Exists(
-        args,
-        argument => string.Equals(
-            argument,
-            "--smoke",
-            StringComparison.OrdinalIgnoreCase)))
+try
 {
-    // 非交互检查只加载托管程序集，不创建窗口或 OpenGL 上下文。
-    Console.WriteLine("Mode:             smoke");
-    Console.WriteLine($"Framework:        {RuntimeInformation.FrameworkDescription}");
-    Console.WriteLine($"OS:               {RuntimeInformation.OSDescription}");
-    Console.WriteLine($"Process arch:     {RuntimeInformation.ProcessArchitecture}");
-    Console.WriteLine($"OpenTK.Graphics:  {GetAssemblyVersion(typeof(GL).Assembly)}");
-    Console.WriteLine($"OpenTK.Windowing: {GetAssemblyVersion(typeof(GameWindow).Assembly)}");
-    Console.WriteLine($"OpenTK.Math:      {GetAssemblyVersion(typeof(Vector2i).Assembly)}");
-    Console.WriteLine("Smoke result:     PASS");
-    return;
-}
-using var window = new OpenGlProbeWindow();
-window.Run();
-
-static string GetAssemblyVersion(Assembly assembly)
-{
-    return assembly
-        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-        ?.InformationalVersion
-        ?? assembly.GetName().Version?.ToString()
-        ?? "unknown";
-}
-
-internal sealed class OpenGlProbeWindow : GameWindow
-{
-    public OpenGlProbeWindow()
-        : base(
-            GameWindowSettings.Default,
-            new NativeWindowSettings
-            {
-                ClientSize = new Vector2i(960, 540),
-                Title = "G104Engine - OpenGL Environment Probe",
-                API = ContextAPI.OpenGL,
-                APIVersion = new Version(4, 3),
-                Profile = ContextProfile.Core,
-                Flags = ContextFlags.ForwardCompatible
-            })
+    if(args.Contains("--smoke",StringComparer.OrdinalIgnoreCase))
     {
+        Console.WriteLine("Mode:             smoke");
+        Console.WriteLine($"Framework:        {RuntimeInformation.FrameworkDescription}");
+        Console.WriteLine($"OS:               {RuntimeInformation.OSDescription}");
+        Console.WriteLine($"Process arch:     {RuntimeInformation.ProcessArchitecture}");
+        Console.WriteLine($"OpenTK.Graphics:  {VersionOf(typeof(GL).Assembly)}");
+        Console.WriteLine($"OpenTK.Windowing: {VersionOf(typeof(GameWindow).Assembly)}");
+        Console.WriteLine($"OpenTK.Math:      {VersionOf(typeof(Vector2i).Assembly)}");
+        Console.WriteLine("Smoke result:     PASS");return 0;
     }
-
-    protected override void OnLoad()
+    var options=LaunchOptions.Parse(args);
+    if(args.Contains("--verify",StringComparer.OrdinalIgnoreCase))
     {
-        base.OnLoad();
-
-        // OpenGL 查询必须在上下文创建并绑定到当前线程后执行。
-        int major = GL.GetInteger(GetPName.MajorVersion);
-        int minor = GL.GetInteger(GetPName.MinorVersion);
-        int profileMask = GL.GetInteger(GetPName.ContextProfileMask);
-        bool isCoreProfile =
-            (profileMask & (int)ContextProfileMask.ContextCoreProfileBit) != 0;
-
-        Console.WriteLine($"OpenGL vendor:   {GL.GetString(StringName.Vendor)}");
-        Console.WriteLine($"OpenGL renderer: {GL.GetString(StringName.Renderer)}");
-        Console.WriteLine($"OpenGL version:  {GL.GetString(StringName.Version)}");
-        Console.WriteLine($"GLSL version:    {GL.GetString(StringName.ShadingLanguageVersion)}");
-        Console.WriteLine($"Numeric version: {major}.{minor}");
-        Console.WriteLine($"Core profile:    {isCoreProfile}");
-        Console.WriteLine("Resize the window; press Escape or close the window to exit.");
-
-        if (major < 4 || (major == 4 && minor < 3) || !isCoreProfile)
+        foreach(string check in CoreSelfChecks.Run(Path.Combine(options.UserDataRoot,"Checks"))) Console.WriteLine("PASS core: "+check);
+        NavigationVerification.Run();Console.WriteLine("PASS navigation: A* behavioral checks");
+        PhysicsVerification.Run();Console.WriteLine("PASS physics: Jolt queries/controller/rigid-body lifecycle");
+        G104.Sandbox.Gameplay.GameplayVerification.Run();Console.WriteLine("PASS gameplay: door/collision/navigation/goal events");
+        foreach(string check in AnimationVerification.Run(options.AssetRoot)) Console.WriteLine("PASS animation: "+check);
+        var scene=SceneSerializer.Load(Path.Combine(options.AssetRoot,"scenes","training-ground.json"),options.AssetRoot);
+        using(var simulation=new G104.Sandbox.Gameplay.TrainingSimulation(scene,new SceneGraph(scene)))
         {
-            throw new NotSupportedException(
-                $"Expected OpenGL 4.3 Core or newer, got {major}.{minor}, Core={isCoreProfile}.");
+            for(int i=0;i<180;i++) simulation.Tick(1f/60,new G104.Sandbox.Gameplay.GameInput(Vector2.Zero,false,false,false,0));
+            if(!simulation.PlayerState.Grounded) throw new InvalidOperationException("Default player did not become grounded.");
+            Console.WriteLine("PASS integration: default scene prepares, NPC ticks, player grounds, resources dispose");
         }
-
-        VSync = VSyncMode.On;
-        GL.ClearColor(0.06f, 0.10f, 0.16f, 1.0f);
-    }
-
-    protected override void OnResize(ResizeEventArgs e)
-    {
-        base.OnResize(e);
-        GL.Viewport(0, 0, e.Width, e.Height);
-    }
-
-    protected override void OnUpdateFrame(FrameEventArgs e)
-    {
-        base.OnUpdateFrame(e);
-
-        if (KeyboardState.IsKeyDown(Keys.Escape))
+        foreach(string path in Directory.EnumerateFiles(Path.Combine(options.AssetRoot,"audio"),"*.wav"))
         {
-            Close();
+            var wave=PcmWave.Load(path);if(wave.Channels!=1) throw new InvalidDataException("Prepared spatial WAV should be mono.");
         }
+        Console.WriteLine("PASS audio: prepared WAV chunk parsing/PCM16/mono");
+        Console.WriteLine("Verification complete; GPU/audio-device/hand-feel checks remain separate.");return 0;
     }
-
-    protected override void OnRenderFrame(FrameEventArgs e)
+    if(args.Contains("--verify-audio",StringComparer.OrdinalIgnoreCase))
     {
-        base.OnRenderFrame(e);
-        GL.Clear(ClearBufferMask.ColorBufferBit);
-        SwapBuffers();
+        using var audio=new AudioSystem(options.AssetRoot);
+        audio.SetListener(Vector3.Zero,-Vector3.UnitZ);
+        int source=audio.Play("loop-test",new Vector3(2,0,-2),true,true,.01f);
+        audio.SetPaused(true);audio.SetPaused(false);audio.Stop(source);
+        audio.Play("click",Vector3.Zero,false,gain:.01f);audio.StopAll();
+        Console.WriteLine("PASS OpenAL actual context/buffers/2D+3D sources/pause/resume/cleanup: "+audio.Backend);
+        return 0;
     }
+    using var window=new TrainingWindow(options);
+    try { window.Run(); }
+    finally { window.DisposeResources(); }
+    return 0;
 }
+catch(Exception error) { Console.Error.WriteLine(error);return 1; }
+
+static string VersionOf(Assembly assembly)=>assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+    ??assembly.GetName().Version?.ToString()??"unknown";

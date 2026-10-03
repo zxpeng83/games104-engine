@@ -1,6 +1,6 @@
 # 基础综合训练场 V1：依赖与素材准备清单
 
-更新：2026-10-03。状态：**NuGet与双配置输出已核对；四个外部ZIP已下载并完成静态内容检查，OpenAL Win64库及同骨架角色/基础动作已识别。** 声音实际为Ogg，用户已选离线转PCM16 WAV；工具、转换及持久部署待落实。没有新增库功能验证，代码开工仍需弹窗明确同意。
+更新：2026-10-03。当前V1已正式批准并实施：NuGet保持既有锁定；角色/OpenAL/许可已部署，FFmpeg9.0.2下载SHA一致并离线转换7段PCM16，原生/动画/GL实际证据见 [实施复查](../reviews/v1-implementation-review-2026-10-03.md)。下文保留准备步骤及来源历史，已完成步骤不要求重做。**NuGet与双配置输出已核对；四个外部ZIP已下载并完成静态内容检查，OpenAL Win64库及同骨架角色/基础动作已识别。** 声音实际为Ogg，用户已选离线转PCM16 WAV；工具、转换及持久部署待落实。没有新增库功能验证，代码开工仍需弹窗明确同意。
 
 ## 1. 当前基线与推荐版本
 
@@ -53,7 +53,7 @@ Jolt 绑定当前提供 CastRay、CastShape、CollideShape 等查询，见 [Narr
 4. 将两个项目的 RestoreLockedMode 恢复为 true、全部保存，再还原整个解决方案。若有报错，记录“输出”窗口中 NuGet 的具体错误；不要用删除锁文件或升级全部包来跳过问题。
 5. 完成后报告结果，由助手只读核对两个 csproj、两份锁文件和还原资产记录；预期 Engine 有原三包＋新增六包的直接引用，Sandbox 仍用项目引用。确认后继续 OpenAL Soft 原生库与素材准备；是否实际复制到运行输出仍需后续构建/加载验证。
 
-本批允许产生 NuGet 还原缓存与 obj 资产记录；当前助手没有执行安装、还原或构建。不得把已有项目构建成功误报为新音频/物理/UI 运行通过，代码开工弹窗尚未发起。
+本批允许产生 NuGet 还原缓存与 obj 资产记录；当前助手没有执行安装、还原或构建。不得把已有项目构建成功误报为新音频/物理/UI运行通过；代码开工确认已询问但未获批准，最新用户要求重新发起正式范围确认。
 
 ### 3.2 已核对：NuGet 配置及 Debug/Release 输出通过
 
@@ -69,7 +69,7 @@ Jolt 绑定当前提供 CastRay、CastShape、CollideShape 等查询，见 [Narr
 | Debug win-x64 原生文件 | runtimes/win-x64/native 下的 joltc.dll、joltc_double.dll、cimgui.dll 存在；PE Machine 为 0x8664，SHA-256 均与对应 NuGet 缓存文件一致；只查文件，不等于已成功初始化 |
 | Release x64 输出 | 用户补生成/运行后再次核对：deps.json 全部13包与Debug一致；五个新增托管DLL、三份win-x64原生DLL齐全，与Debug及NuGet缓存SHA-256一致；原生文件为AMD64。原探针运行反馈由用户提供，不等于新增功能调用通过 |
 | OpenAL Soft | 在 Sandbox/bin 范围未找到 OpenAL32.dll 或 soft_oal.dll，仍需单独部署；不能据此推断系统其他位置是否安装 OpenAL |
-| 非文档 Git 差异 | 仅 Engine.csproj 和两份锁文件；原 Class1.cs、Program.cs、global.json 与 slnx 未改变，未暂存/提交/推送 |
+| 当时非文档Git差异 | 仅Engine.csproj和两份锁文件，原Class1.cs/Program.cs/SDK/slnx未变；这些准备改动现已由用户提交推送至cbce581，见节点记录 |
 
 结论：本批 **NuGet 引用、锁定还原记录和 Debug/Release 文件部署核对通过**。用户反馈两个配置的原窗口/清屏探针正常；它没有调用新物理、UI 或音频接口，因此新增模块初始化、功能和退出清理仍待获准实施后验证。下一步准备 OpenAL Soft 原生库与素材，不再重复要求补 Release 输出。
 
@@ -132,6 +132,6 @@ Jolt 绑定当前提供 CastRay、CastShape、CollideShape 等查询，见 [Narr
 | 原生运行库 | Jolt/cimgui两配置输出已核对；OpenAL Win64实现库已在ZIP内核对，尚未部署/加载 |
 | 模型/同骨架动作/图片/声音 | 角色/基础动作静态核对通过；纹理/循环测试输入需补，Ogg→PCM16离线转换已选但未执行；效果仍待验收 |
 | 完整实施方案 | 见 [V1 实施草案](v1-implementation-draft.md)，仍待整体审阅 |
-| 开工弹窗 | **尚未发起、尚未获准，不写代码** |
+| 开工弹窗 | **2026-10-03已明确同意完整范围并执行；同范围恢复不重复询问** |
 
 外部原始文件已到齐；后续落实离线转换工具/条目与持久部署规则。获准实施后再验证原生初始化/退出、GLB/图片读取、角色查询、UI 输入/缩放和基本声像；文件与元数据检查通过不等于正式模块完成。
