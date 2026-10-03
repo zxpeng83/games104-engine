@@ -2,6 +2,37 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "ImGui.NET": {
+        "type": "Direct",
+        "requested": "[1.91.6.1, )",
+        "resolved": "1.91.6.1",
+        "contentHash": "Ph3j8pO6UM28PPJWP+5LEJSPVPkd8ivpVS8tRyY9b0IHn1HDIrMZ2o/FdiXaYW6YhNxMHmbevw6Jcfs+IDKi0Q=="
+      },
+      "JoltPhysics.Native": {
+        "type": "Direct",
+        "requested": "[1.1.0, )",
+        "resolved": "1.1.0",
+        "contentHash": "C3DO0ruZeUsOlcIWfGKK6x2yEWpH9dn4UMam1X+6YyAXqOE5p9bzihu1kedFeXXSK6J3fsNFPYfN3D78jgKtfQ=="
+      },
+      "JoltPhysicsSharp": {
+        "type": "Direct",
+        "requested": "[2.22.0, )",
+        "resolved": "2.22.0",
+        "contentHash": "CZnLNr2HnYHteGZge5xiz5UcN760QQiw9l03ap5fiJOBg7POtw+EFrZGlS7W3Mu/wM6rSLADMPiKy17uNMdgzA==",
+        "dependencies": {
+          "JoltPhysics.Native": "1.1.0"
+        }
+      },
+      "OpenTK.Audio.OpenAL": {
+        "type": "Direct",
+        "requested": "[4.9.4, )",
+        "resolved": "4.9.4",
+        "contentHash": "N/SCeFrLJ3ckUbshyfsonbtjmDxh55urGiR+Fe1iPkTWyEW5OKfQRoIOZyjEva/4eRqOXdt3bV2ka4IJ2+JvZw==",
+        "dependencies": {
+          "OpenTK.Core": "[4.9.4, 4.10.0)",
+          "OpenTK.Mathematics": "[4.9.4, 4.10.0)"
+        }
+      },
       "OpenTK.Graphics": {
         "type": "Direct",
         "requested": "[4.9.4, )",
@@ -29,6 +60,18 @@
           "OpenTK.Windowing.Common": "[4.9.4, 4.10.0)",
           "OpenTK.Windowing.GraphicsLibraryFramework": "[4.9.4, 4.10.0)"
         }
+      },
+      "SharpGLTF.Core": {
+        "type": "Direct",
+        "requested": "[1.0.7, )",
+        "resolved": "1.0.7",
+        "contentHash": "dZHCUl2jH1ViiLbAwyYbVfZnFqsF1e/9OhZAfLBoggOpqnsbgKQghldK3LnobmtNRp6GNZMyaNkPceqERkqmsQ=="
+      },
+      "StbImageSharp": {
+        "type": "Direct",
+        "requested": "[2.30.16, )",
+        "resolved": "2.30.16",
+        "contentHash": "qg1i+NHihXVKLKYacGKrauhSQIGL31eBWcTC4Vc7jnGmBFj87LkRuCdXB5aDZisWMRnB6x2mcfwYXQxMWEG/lw=="
       },
       "OpenTK.Core": {
         "type": "Transitive",
