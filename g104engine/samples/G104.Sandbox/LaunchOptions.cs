@@ -18,7 +18,7 @@ public sealed record LaunchOptions(string AssetRoot, string UserDataRoot, int Fr
                 case "--exercise": exercise=true; break;
                 case "--exercise-contacts": exercise=true; contactExercise=true; break;
                 case "--capture-root": captures=Path.GetFullPath(Value()); break;
-                case "--verify": case "--smoke": case "--verify-audio": case "--verify-ui": case "--verify-render": case "--review-baseline": case "--verify-contacts": break;
+                case "--verify": case "--smoke": case "--verify-audio": case "--verify-ui": case "--verify-ui-input": case "--verify-render": case "--review-baseline": case "--verify-contacts": break;
                 default: throw new ArgumentException("Unknown option: "+args[i]);
             }
         }

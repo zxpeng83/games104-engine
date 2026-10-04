@@ -1,6 +1,7 @@
 using ImGuiNET;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
+using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using NVector2 = System.Numerics.Vector2;
@@ -11,13 +12,16 @@ namespace G104.Engine.Tools;
 public sealed class ImGuiController : IDisposable
 {
     private readonly nint _context;
+    private readonly GameWindow _window;
     private int _vao, _vertices, _indices, _program, _font;
-    private bool _frame, _disposed;
+    private bool _frame, _disposed, _focused;
     public bool WantsKeyboard => ImGui.GetIO().WantCaptureKeyboard;
     public bool WantsMouse => ImGui.GetIO().WantCaptureMouse;
 
-    public ImGuiController()
+    public ImGuiController(GameWindow window)
     {
+        _window = window ?? throw new ArgumentNullException(nameof(window));
+        _focused = window.IsFocused;
         _context = ImGui.CreateContext(); ImGui.SetCurrentContext(_context);
         try
         {
@@ -66,26 +70,84 @@ public sealed class ImGuiController : IDisposable
             GL.TexParameter(TextureTarget.Texture2D,TextureParameterName.TextureMinFilter,(int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture2D,TextureParameterName.TextureMagFilter,(int)TextureMagFilter.Linear);
             io.Fonts.SetTexID((nint)_font); io.Fonts.ClearTexData(); GL.BindTexture(TextureTarget.Texture2D,0);
+            // 逐事件保留位置/按下/松开的顺序；帧间完整点击不能被最终MouseState吞掉。
+            _window.MouseMove += OnMouseMove;
+            _window.MouseDown += OnMouseDown;
+            _window.MouseUp += OnMouseUp;
+            _window.MouseWheel += OnMouseWheel;
+            _window.FocusedChanged += OnFocusedChanged;
+            _window.TextInput += OnTextInput;
+            io.AddFocusEvent(_focused);
+            AddMousePosition(io);
+            for (int button=0; button<5; button++)
+                io.AddMouseButtonEvent(button,_focused && _window.MouseState.IsButtonDown((MouseButton)button));
         }
         catch { Dispose(); throw; }
     }
 
     public void AddCharacter(uint codePoint) { ImGui.SetCurrentContext(_context); ImGui.GetIO().AddInputCharacter(codePoint); }
 
+    private void AddMousePosition(ImGuiIOPtr io)
+    {
+        io.AddMousePosEvent(_focused ? _window.MousePosition.X : -float.MaxValue,
+                            _focused ? _window.MousePosition.Y : -float.MaxValue);
+    }
+
+    private void OnMouseMove(MouseMoveEventArgs e)
+    {
+        if (!_focused) return;
+        ImGui.SetCurrentContext(_context); ImGui.GetIO().AddMousePosEvent(e.X,e.Y);
+    }
+
+    private void OnMouseDown(MouseButtonEventArgs e) => AddMouseButton(e.Button,true);
+    private void OnMouseUp(MouseButtonEventArgs e) => AddMouseButton(e.Button,false);
+
+    private void AddMouseButton(MouseButton button, bool down)
+    {
+        int index=(int)button;
+        if (index<0 || index>=5 || (down && !_focused)) return;
+        ImGui.SetCurrentContext(_context);
+        var io=ImGui.GetIO();
+        AddMousePosition(io);
+        io.AddMouseButtonEvent(index,down);
+    }
+
+    private void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        if (!_focused) return;
+        ImGui.SetCurrentContext(_context);
+        var io=ImGui.GetIO(); AddMousePosition(io); io.AddMouseWheelEvent(e.OffsetX,e.OffsetY);
+    }
+
+    private void OnFocusedChanged(FocusedChangedEventArgs e)
+    {
+        // OpenTK先派发事件后更新IsFocused，回调必须读取事件值。
+        _focused=e.IsFocused;
+        ImGui.SetCurrentContext(_context);
+        var io=ImGui.GetIO(); io.AddFocusEvent(_focused);
+        // 先使位置无效，再释放按钮；同一事件批次恢复焦点也不能完成旧点击。
+        AddMousePosition(io);
+        if (!_focused)
+            for (int button=0; button<5; button++) io.AddMouseButtonEvent(button,false);
+    }
+
+    private void OnTextInput(TextInputEventArgs e)
+    {
+        if (_focused) AddCharacter((uint)e.Unicode);
+    }
+
     public void BeginFrame(GameWindow window, float deltaTime)
     {
+        if (!ReferenceEquals(window,_window)) throw new ArgumentException("ImGui input belongs to its bound window.",nameof(window));
         ImGui.SetCurrentContext(_context);
         if (_frame) { ImGui.EndFrame(); _frame = false; }
         var io = ImGui.GetIO();
         io.DisplaySize = new NVector2(Math.Max(1,window.ClientSize.X),Math.Max(1,window.ClientSize.Y));
         io.DisplayFramebufferScale = new NVector2(window.FramebufferSize.X/io.DisplaySize.X,window.FramebufferSize.Y/io.DisplaySize.Y);
         io.DeltaTime = Math.Clamp(deltaTime, 1e-5f, 0.25f);
-        bool focused = window.IsFocused;
-        io.AddFocusEvent(focused);
-        io.AddMousePosEvent(focused ? window.MousePosition.X : -float.MaxValue,
-                            focused ? window.MousePosition.Y : -float.MaxValue);
-        for (int button=0; button<3; button++) io.AddMouseButtonEvent(button,focused && window.MouseState.IsButtonDown((MouseButton)button));
-        if (focused) io.AddMouseWheelEvent(window.MouseState.ScrollDelta.X,window.MouseState.ScrollDelta.Y);
+        bool focused = _focused;
+        // 位置可同步；按钮/滚轮/焦点只收事件，避免把排队的历史覆写成当前状态。
+        AddMousePosition(io);
         foreach (Keys key in Enum.GetValues<Keys>())
         {
             ImGuiKey mapped = MapKey(key);
@@ -192,6 +254,12 @@ public sealed class ImGuiController : IDisposable
     public void Dispose()
     {
         if(_disposed) return;
+        _window.MouseMove -= OnMouseMove;
+        _window.MouseDown -= OnMouseDown;
+        _window.MouseUp -= OnMouseUp;
+        _window.MouseWheel -= OnMouseWheel;
+        _window.FocusedChanged -= OnFocusedChanged;
+        _window.TextInput -= OnTextInput;
         ImGui.SetCurrentContext(_context); if(_frame) { ImGui.EndFrame(); _frame=false; }
         if(_font!=0) GL.DeleteTexture(_font); if(_program!=0) GL.DeleteProgram(_program);
         if(_vertices!=0) GL.DeleteBuffer(_vertices); if(_indices!=0) GL.DeleteBuffer(_indices); if(_vao!=0) GL.DeleteVertexArray(_vao);

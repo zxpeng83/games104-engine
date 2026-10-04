@@ -74,8 +74,7 @@ public sealed class TrainingWindow : GameWindow
         int major=GL.GetInteger(GetPName.MajorVersion),minor=GL.GetInteger(GetPName.MinorVersion);
         if(major<4||(major==4&&minor<3)) throw new NotSupportedException("OpenGL4.3Core required.");
         VSync=_options.Exercise ? VSyncMode.Off : VSyncMode.On;
-        _ui=new ImGuiController();
-        TextInput += e=>_ui?.AddCharacter((uint)e.Unicode);
+        _ui=new ImGuiController(this);
         SceneDocument initial;
         string seed=Path.Combine(_options.AssetRoot,"scenes","training-ground.json");
         bool hadUserSave=!_options.ContactExercise&&File.Exists(SavePath);
@@ -129,7 +128,7 @@ public sealed class TrainingWindow : GameWindow
         _fps=_frameMilliseconds>0 ? 1000/_frameMilliseconds : 0;
         _ui.BeginFrame(this,Math.Max(dt,1e-4f));
         DrawToolbar();_selected=_editorPanel.Draw(_editor,Playing,_selected,Enqueue);DrawStatus();
-        if(MouseState.IsButtonPressed(MouseButton.Left)&&!ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow)) ImGui.SetWindowFocus(null!);
+        ReleaseUiFocusForSceneClick(MouseState.IsButtonPressed(MouseButton.Left));
         ProcessCommands();
         if(_options.ContactExercise) ExerciseContacts();
         else if(_options.Exercise) Exercise();
@@ -198,6 +197,12 @@ public sealed class TrainingWindow : GameWindow
         _objects=BuildObjects(_runtime??_design,_alpha);UpdateCamera();
         DrawWorldDebug();
         _audio?.SetListener(_camera.Position,(_camera.Target-_camera.Position).Normalized());
+    }
+
+    internal static void ReleaseUiFocusForSceneClick(bool leftPressed)
+    {
+        // 控件激活会阻挡Hovered查询；Capture仍包含UI点击/拖动及弹窗归属。
+        if(leftPressed&&!ImGui.GetIO().WantCaptureMouse) ImGui.SetWindowFocus(null!);
     }
 
     private void Enqueue(Action action)=>_commands.Enqueue(action);

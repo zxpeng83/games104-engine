@@ -25,6 +25,11 @@ try
         Console.WriteLine("Smoke result:     PASS");return 0;
     }
     var options=LaunchOptions.Parse(args);
+    if(args.Contains("--verify-ui-input",StringComparer.OrdinalIgnoreCase))
+    {
+        using var verificationWindow=new G104.Sandbox.Tools.UiInputVerificationWindow();
+        verificationWindow.Run();return verificationWindow.Failed ? 1 : 0;
+    }
     if(args.Contains("--verify-contacts",StringComparer.OrdinalIgnoreCase))
     {
         G104.Sandbox.Gameplay.ContactApproachVerification.Run(options.AssetRoot);

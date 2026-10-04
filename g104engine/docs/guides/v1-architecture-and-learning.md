@@ -1,6 +1,6 @@
 # V1 实际架构、数据流与学习入口
 
-更新：2026-10-03。本文面向从课程笔记进入源码的阅读与解释，描述已经落地的基础综合训练场 V1，不把未来专题画成当前模块。正式范围已获用户弹窗批准；稳定约定见 [architecture](../architecture.md)，十份笔记的大章映射见 [learning-map](../learning-map.md)，操作/执行接续及最新证据见 [执行台账](../execution/v1-progress.md)。
+更新：2026-10-04（补充用户复试范围）。本文面向从课程笔记进入源码的阅读与解释，描述已经落地的基础综合训练场 V1，不把未来专题画成当前模块。正式范围已获用户弹窗批准；稳定约定见 [architecture](../architecture.md)，十份笔记的大章映射见 [learning-map](../learning-map.md)，操作/执行接续及最新证据见 [执行台账](../execution/v1-progress.md)。
 
 ## 当前证据先分层
 
@@ -10,7 +10,8 @@
 | `--verify` | Core/Nav/Physics/Gameplay/Animation/默认场景/WAV 全部 PASS | 创建 GL 上下文、图形效果和声音输出听感已验收 |
 | `--verify-audio` | OpenAL Soft 1.25.2 实际 device/context/buffer、2D/3D source、loop pause/resume/stop/cleanup PASS | 用户已听辨远近/左右，最终混音/音量合适 |
 | 自动图形 exercise | 修复后 240 帧、Forward→Deferred、Play/Stop、有限 resize、保存重载/UndoRedo；无 GL 错误，2次jump事实/110个移动步（最终配置批次） | 所有阴影/蒙皮/颜色/透明遮挡画面正确，全部 UI 和失焦/最小化已人工验收 |
-| 用户验收 | 本轮功能视觉、听感与操控仍待用户实际操作/反馈 | 不能写为用户已确认手感或最终交付无缺口 |
+| `--verify-ui-input` | 2026-10-04双配置各13PASS：隐藏窗口消息经生产输入适配器/共享清焦策略驱动按钮、Combo、勾选等 | 用户真实桌面鼠标/DPI已确认，或探针点击直接执行了完整Play准备 |
+| 用户验收 | 2026-10-04用户确认运行指南第1–5项初步体验无问题；V1首轮人工验收通过（非穷尽），后续Bug继续反馈 | 不等于全部分支/极端组合/跨设备或源码学习已通过，不以这些未穷尽项否定首轮通过 |
 
 日志是本机忽略缓存：`g104engine/.cache/execution/build-debug.log`、`verify-debug.log`、`verify-audio.log`、`graphics-debug.log`。它们不是已提交或远程同步证据；权威摘要保存在执行台账。图形首轮 Shader 展开源曾因 UTF16 字符数与 UTF8 字节数不一致报 EOF，已改显式 UTF8 长度并越过初始化；这条真实修复记录不应擦掉，也不应继续把首轮失败写成当前仍不能启动。
 
@@ -92,7 +93,9 @@ flowchart TD
 
 `FixedStepClock` 的步长 `1/60` 秒，最多五步、输入时间上限0.25秒；完整积压丢弃，余量产生alpha。零步保存Jump/Interact边沿，多步第一次消费后清边沿，Move/Sprint继续按住。窗口当前也限制显示delta，并在加载/切换/暂停转换时丢弃下一旧delta；时钟统计不代表所有系统耗时。鼠标以显示帧更新参考yaw，同一帧各补步不重复应用 Look。
 
-编辑命令不在物理更新或对象遍历中改集合，即使暂停/零步仍可响应。编辑态推进预览动画，运行态按固定步推进动画/粒子；`Render`只读显示输入。暂停与失焦清理不是确定性网络协议，实际恢复/最小化和连续人工操作仍需验收。
+编辑命令不在物理更新或对象遍历中改集合，即使暂停/零步仍可响应。编辑态推进预览动画，运行态按固定步推进动画/粒子；`Render`只读显示输入。暂停与失焦清理不是确定性网络协议，基本恢复/最小化体验随第5项初步通过，连续操作与特殊组合仍按实际覆盖记录。
+
+UI鼠标的位置、按钮、滚轮、焦点和文字由ImGuiController按窗口事件顺序入队，BeginFrame处理队列；逐帧最终按钮状态不能保留帧间完整点击。场景点击清焦使用WantCaptureMouse，不能用IsWindowHovered代替输入归属：已激活控件会阻挡默认Hovered查询，误清焦会让松开失效。窗口捕获/命令安全点与角色InputBuffer职责分开，见 [UI修复实证](../reviews/v1-ui-mouse-fix-2026-10-04.md)。
 
 ## 设计、运行、模板与准备提交
 
@@ -140,11 +143,15 @@ GL创建/上传/Prepare/Resize/Render/删除均在有效当前上下文所属线
 
 GL边界原始OpenTK行字节以`transpose=false`或std140 mat4上传，GLSL读为对应转置，用列向量`P*V*M*position`，不额外CPU转置。默认OpenGL投影NDC z范围[-1,1]与Piccolo Vulkan 0..1/Y翻转不同。非均匀缩放法线使用逆转置，切线另做正交化；刚性实例镜像与skin内部负/零缩放支持边界见 [渲染动画指南](rendering-and-animation.md#空间矩阵与蒙皮)。
 
-glTF每个mesh节点单独构建行矩阵palette：`inverseBind*jointWorld*inverse(meshWorld)`，绘制模型为`meshWorld*instanceCorrection*sceneWorld`。CPU检查包括非单位mesh空间，不只验证节点树名称/clip数。角色实例保留模型根固定旋转，按完整默认蒙皮边界进行1.9m/feet对齐，再将素材+Z前向适配-Z；65关节完整进入128矩阵UBO。GPU观感仍须看图和实际动作验收。
+glTF每个mesh节点单独构建行矩阵palette：`inverseBind*jointWorld*inverse(meshWorld)`，绘制模型为`meshWorld*instanceCorrection*sceneWorld`。CPU检查包括非单位mesh空间，不只验证节点树名称/clip数。角色实例保留模型根固定旋转，按完整默认蒙皮边界进行1.9m/feet对齐，再将素材+Z前向适配-Z；65关节完整进入128矩阵UBO。初步观感随第1–2项已获用户确认，骨骼/资产的全部专项仍需按问题取证。
 
 JoltPhysicsSharp固定2.22.0包装层`ToJolt`内部转置，形状查询的公开Matrix4x4参数不是直接接受本项目Numerics行Translation。`PhysicsWorld.QueryTransform`在边界预转置一次，再由绑定转换；向量/四元数Body接口单独传值。原生fraction/penetration异常曾帮助定位，修正后通过查询/角色检查。源码提交与推导见 [物理指南](physics-and-gameplay.md#固定jolt版本与矩阵边界)，不能将此预转置加到SceneGraph或GL上传处。
 
 ## 学习阅读顺序与自测问题
+
+**首轮人工验收通过后的第一个学习单元：启动、一帧和一次移动输入。** 先读Program/LaunchOptions如何创建TrainingWindow，再看OnLoad、OnUpdateFrame、OnRenderFrame与DisposeResources；辨认Engine的可复用能力和Sandbox的组装/玩法职责。随后沿W/Space→InputBuffer/FixedStepClock→TrainingSimulation→KinematicCharacter→SceneGraph/渲染跟踪一次输入，先理解数据与调用方向，不要求一次深入所有算法。
+
+本单元的自测成果：能画出简化调用图，说明为何模拟固定60Hz、Jump边沿只消费一次、绘制使用显示插值，并能在VS定位对应方法或断点。再跟一次E按钮事件，将命令、碰撞/导航变化与声音/粒子串起来；学习完成以实际讲解/操作为据，不能由体验验收自动打勾。
 
 | 阅读路线 | 原笔记大章 | 结合代码要能回答 |
 | --- | --- | --- |
@@ -163,8 +170,8 @@ JoltPhysicsSharp固定2.22.0包装层`ToJolt`内部转置，形状查询的公�
 
 网络、动态GI、GPU几何尚未实施，仍要求分别有可运行机制和基线对比；具体算法/后端另收敛。布局/小ECS/并行Job/Fiber、GPU粒子、IK/重定向、平台/推箱、IBL及更多渲染/AI/声音/工具深度沿各模块路线继续。图/论文/参考研读不能替代这些工程目标，也不要求同时把全部专题塞入V1。
 
-当前V1刻意保留有限范围：受控JSON/模板、单平面导航、有限坡台、即时门切换、in-place同骨架、单盏方向阴影、最多四点光、无IBL、CPU粒子、PCM16声音和有限编辑。自动GL/CPU/原生检查已给出真实证据；最终画面、听感、人工操作、重复恢复/失焦/最小化/文件重建后的体验仍按用户验收单独记录。D5独立克隆、CI和第二设备继续暂缓，助手没有恢复这些工作或执行Git发布。
+当前V1刻意保留有限范围：受控JSON/模板、单平面导航、有限坡台、即时门切换、in-place同骨架、单盏方向阴影、最多四点光、无IBL、CPU粒子、PCM16声音和有限编辑。自动GL/CPU/原生检查已给出真实证据；用户已确认指南1–5项的首轮整体体验初步通过，非穷尽覆盖；重复恢复/失焦、特殊DPI或其他未报告分支不推定逐项通过。D5独立克隆、CI和第二设备继续暂缓，助手没有恢复这些工作或执行Git发布。
 
 ## 配置与显示收尾索引
 
-有限四状态动画定义已在assets/config/character-animation.json落实，实际非默认行为经AnimationVerification验证；上一/当前局部Pose的显示插值与SceneGraph共用alpha，mesh/palette/skeleton一致，显示不推进逻辑或事件。暂停/恢复仅ResetDisplayHistory，场景成功切换ResetAnimations。Debug/Release最终--verify及delivery图形回归通过，详细结果与用户待验收项见实施复查/执行台账；声音听感和真实操控不由自动日志代替。
+有限四状态动画定义已在assets/config/character-animation.json落实，实际非默认行为经AnimationVerification验证；上一/当前局部Pose的显示插值与SceneGraph共用alpha，mesh/palette/skeleton一致，显示不推进逻辑或事件。暂停/恢复仅ResetDisplayHistory，场景成功切换ResetAnimations。Debug/Release最终--verify及delivery图形回归通过，详细结果、用户首轮初步通过及剩余专项/学习限制见执行台账；声音听感和真实操控的用户结论不由自动日志代替。

@@ -2,7 +2,7 @@
 
 本文件是长期发布边界；每次实际提交仍检查 Git 暂存区。
 
-首次提交的31文件、3f98d1b的40个文件及cbce581的55个文件为历史快照，见 [开工前节点](reviews/v1-start-checkpoint-2026-10-03.md)。完整V1为b91dfe4；用户已将38文件评审/转向修复提交推送至d2e8d40691dd76a4637e35ed2905a2ccfaefe3d2，2026-10-03只读核实HEAD/main/origin/main与实时GitHub main一致。实际范围见 [修复提交清单](reviews/v1-repair-commit-checklist-2026-10-03.md)；此后仅本地同步/交接文档未再提交，不扩大课程资料范围，也不要求后续文件数固定。
+首次提交的31文件、3f98d1b的40个文件及cbce581的55个文件为历史快照，见 [开工前节点](reviews/v1-start-checkpoint-2026-10-03.md)。完整V1为b91dfe4；38文件评审/转向修复为d2e8d40，2026-10-03曾核实实时GitHub main；之后六份交接文档已提交为4be648ea2923c62ccd561dfc0fc3cc4c771f2265，2026-10-04本地HEAD/main/origin/main一致，实时远端连接失败未核实。当前准备保存UI鼠标修复及首轮人工初步验收，16路径见 [本批提交清单](reviews/v1-ui-acceptance-commit-checklist-2026-10-04.md)，用户已选择提交后推送，但尚未暂存/提交/推送。不扩大课程资料范围，不要求后续文件数固定。
 
 <a id="发布文件范围"></a>
 ## 发布文件范围

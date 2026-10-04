@@ -1,8 +1,8 @@
 # G104Engine 实现与 GAMES104 笔记映射
 
-更新：2026-10-03。基础综合训练场 V1 已正式获准实施，实际模块主体已落地；本文更新代码入口和学习映射，保留十份原笔记。整体结构见 [architecture](architecture.md)，逐文件导航/实际流程见 [V1 架构与学习指南](guides/v1-architecture-and-learning.md)，真实验证与接续点见 [执行台账](execution/v1-progress.md)。原最小 3D 工作已并入 V1，旧草案只供追溯。
+更新：2026-10-04。基础综合训练场 V1 实现及修复已落地，用户已确认首轮人工验收初步通过；本文记录代码入口和学习映射，保留十份原笔记。整体结构见 [architecture](architecture.md)，逐文件导航/实际流程见 [V1 架构与学习指南](guides/v1-architecture-and-learning.md)，真实验证与接续点见 [执行台账](execution/v1-progress.md)。原最小 3D 工作已并入 V1，旧草案只供追溯。
 
-Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Physics/Gameplay/Animation/默认场景/WAV 全部通过；`--verify-audio` 实际 OpenAL 上下文/2D/3D/暂停清理通过。修复 ShaderSource UTF8 长度后，本机图形 exercise 完成 240 帧、两种管线和有限编辑/保存/重载路径且无 GL 错误。**这些证据分别证明所测行为，不等于最终视觉、声音听感、操控学习或用户验收完成。** IBL、平台/推箱以及网络/GI/GPU 几何等后续目标仍保留。
+Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Physics/Gameplay/Animation/默认场景/WAV 全部通过；`--verify-audio` 实际 OpenAL 上下文/2D/3D/暂停清理通过。修复 ShaderSource UTF8 长度后，本机图形 exercise 完成 240 帧、两种管线和有限编辑/保存/重载路径且无 GL 错误。**自动证据分别证明所测行为；2026-10-04用户明确确认[运行指南](guides/v1-run-and-review.md)“建议的第一轮用户验收”1–5初步没问题，V1首轮人工验收记为通过（初步、非穷尽）。这不等于各专项、极端分支、跨设备或学习掌握全部通过，后续bug继续反馈和修复。** IBL、平台/推箱以及网络/GI/GPU 几何等后续目标仍保留。
 
 ## 1. 学习与工程进度分别记录
 
@@ -18,20 +18,20 @@ Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Phys
 
 | 模块 | 理论/参考当前边界 | 本工程实际入口与证据 |
 | --- | --- | --- |
-| 渲染 | 已有笔记；固定 Piccolo Forward/Deferred/PBR/阴影/后处理局部核查，Vulkan细节需转换 | `TrainingRenderer/GpuResources` 与GLSL已实现；自动GL运行通过，画面质量/性能结论与用户视觉待验收；IBL等后移 |
-| 动画 | 已有笔记；采样/层级/palette及Piccolo首Clip固定权重差异已核查 | `GltfModel/AnimationController`、65关节素材与材质探针CPU检查通过；GPU蒙皮/脚滑/过渡观感待视觉与用户 |
-| 物理 | 已有笔记；Jolt查询/过滤/生命周期及固定包装层矩阵边界已核查 | `PhysicsWorld/KinematicCharacter`原生射线/扫掠/重叠、墙滑/跳跃/坡台/刚体与双世界清理通过；任意复杂接触与人工手感未验收 |
-| 粒子 | 已有笔记；Piccolo Compute池/Billboard与同步限制局部核查 | `ParticleSystem`自研CPU生成/运动/死亡/512容量，renderer透明Billboard已有代码；效果/遮挡视觉待验收，GPU Compute未开始 |
-| 声音 | 已有笔记；所查Piccolo未见完整音频链，使用OpenAL独立依据 | `PcmWave/AudioSystem`与七段离线PCM16已部署；WAV和真实OpenAL 2D/3D/暂停清理通过，方位听感/混音待用户 |
-| 工具链与资产 | 已有笔记；固定Piccolo资产/ID/编辑消费者与模式/重载差异已核查 | SharpGLTF导入、严格JSON/资产路径、单层模板、受控父子树、有限编辑/100条历史已有代码；CPU历史/保存检查与自动GL编辑路径通过，人工UI流程待用户 |
-| Gameplay/3C | 已有笔记；Piccolo输入/Motor/Camera及有限脚本路径局部核查 | `TrainingWindow/TrainingSimulation`镜头相对移动、按钮门目标、一次事实已实现并检查通过；镜头/角色操作待用户 |
+| 渲染 | 已有笔记；固定 Piccolo Forward/Deferred/PBR/阴影/后处理局部核查，Vulkan细节需转换 | `TrainingRenderer/GpuResources` 与GLSL已实现；自动GL运行通过，首轮画面检查初步通过；专项质量/性能未全面验收，IBL等后移 |
+| 动画 | 已有笔记；采样/层级/palette及Piccolo首Clip固定权重差异已核查 | `GltfModel/AnimationController`、65关节素材与材质探针CPU检查通过；首轮人工验收总体通过，GPU蒙皮/脚滑/过渡观感未逐专项验收 |
+| 物理 | 已有笔记；Jolt查询/过滤/生命周期及固定包装层矩阵边界已核查 | `PhysicsWorld/KinematicCharacter`原生射线/扫掠/重叠、墙滑/跳跃/坡台/刚体与双世界清理通过；首轮人工操控初步通过，极端复杂接触未验收 |
+| 粒子 | 已有笔记；Piccolo Compute池/Billboard与同步限制局部核查 | `ParticleSystem`自研CPU生成/运动/死亡/512容量，renderer透明Billboard已有代码；首轮人工验收总体通过，效果/遮挡未逐专项验收，GPU Compute未开始 |
+| 声音 | 已有笔记；所查Piccolo未见完整音频链，使用OpenAL独立依据 | `PcmWave/AudioSystem`与七段离线PCM16已部署；WAV和真实OpenAL 2D/3D/暂停清理通过，首轮试听初步通过，方位听感/混音未逐专项验收 |
+| 工具链与资产 | 已有笔记；固定Piccolo资产/ID/编辑消费者与模式/重载差异已核查 | SharpGLTF导入、严格JSON/资产路径、单层模板、受控父子树、有限编辑/100条历史已有代码；CPU历史/保存检查与自动GL编辑路径通过，首轮人工编辑/保存流程初步通过，全部控件/失败分支未逐项验收 |
+| Gameplay/3C | 已有笔记；Piccolo输入/Motor/Camera及有限脚本路径局部核查 | `TrainingWindow/TrainingSimulation`镜头相对移动、按钮门目标、一次事实已实现并检查通过；首轮镜头/角色操作初步通过，极端组合未穷尽 |
 | AI | 已有笔记；所查Piccolo无通用FSM/BT/感知/A*完整链 | `TrainingSimulation`巡逻/跟随/搜索/返回FSM与`NavigationGrid`平面A*实际跟随通过；BT/NavMesh/高级规划后续 |
 | 网络 | 已有笔记；Piccolo所查路径未见完整链路，另补固定参考 | 未开始；传输/复制/预测/校正模型尚未选，保留独立延迟/丢包实验 |
 | 核心架构 | 已有笔记；Piccolo串行主帧/双缓冲/对象组件/同步加载及后端线程局部核查 | `FixedStepClock/InputBuffer/SceneGraph/TrainingWindow`明确阶段已落地，30/60/144Hz及输入/层级/回滚CPU检查通过；布局/ECS/Job/Fiber专题未开始 |
 | 动态GI/Lumen | 已有笔记；所查Piccolo未见完整Lumen链，另补参考 | 后续机制实践未开始，具体GI方法待定，不承诺复刻Lumen |
 | GPU几何/Nanite | 已有笔记；Piccolo主几何链是CPU裁剪/直接提交，不是完整Nanite | 后续机制实践未开始，具体筛选/LOD/驻留方法待定，不承诺复刻Nanite |
 
-求职方向只影响优先级。模块能运行观察、能定位入口、能解释数据/寿命/简化、能指出失败条件，才形成可用学习成果；当前没有把用户未完成的复习、自测或体验写成已完成。
+求职方向只影响优先级。模块能运行观察、能定位入口、能解释数据/寿命/简化、能指出失败条件，才形成可用学习成果；首轮体验初步通过不代表用户已完成源码复习、独立调试或面试自测。
 
 ## 3. 十份笔记与实际代码
 
@@ -45,7 +45,7 @@ Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Phys
 - “第六章：阴影技术演进 — 从Shadow Map到Virtual Shadow Map”：对应单盏方向光2048 Shadow Map、3×3 PCF和偏移；级联、点光阴影、虚拟阴影未实现。
 - “第十四章：后处理 — “美颜相机””：对应HDR、曝光、Reinhard、一次Gamma和FXAA；“15.2 Forward Rendering”“15.7 串联渲染流程”对应实际两条管线/固定Pass。Render Graph/Frame Graph章节用于后续组织对比，当前没有通用Render Graph。
 - 性质：OpenTK绑定/窗口和StbImageSharp解码为第三方集成，Pass/PBR/目标管理/颜色与矩阵适配自研。固定Piccolo路径参见第4节及来源核查；不照搬Vulkan投影或资源布局。
-- 证据与学习验收：实际GL已完成240帧exercise、管线和调试入口；尚须看图核对阴影/深度/法线/贴图/粒子/蒙皮，人工操作与性能比较不由“无GL错误”证明。后续IBL、地形、天空/云、AO/雾等代表实验继续见 [渲染路线](plans/rendering-roadmap.md)。
+- 证据与学习验收：实际GL已完成240帧exercise、管线和调试入口；首轮画面检查初步通过，阴影/深度/法线/贴图/粒子/蒙皮仍可结合源码作专项学习核对，性能比较不由“无GL错误”证明。后续IBL、地形、天空/云、AO/雾等代表实验继续见 [渲染路线](plans/rendering-roadmap.md)。
 
 ### 3.2 动画：Clip、Pose、蒙皮与控制
 
@@ -56,7 +56,7 @@ Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Phys
 - “20. Clip Sampling：渲染帧不等于动画关键帧”“22. 基础动画运行时管线”：对应二分查找、STEP/LINEAR、短弧归一化和未动画节点默认值；当前不支持CUBICSPLINE，显式拒绝。
 - “36. 一维 Blend Space”“45. 动画树：Pose 的表达式系统”“48. Gameplay 与动画的职责边界”：对应Idle/Walk/Jog速度混合、同步步态相位、JumpStart/Loop/Land和平滑过渡。当前是有限配置/FSM，不是通用动画树编辑器；基础in-place不写角色世界位移。
 - 性质：SharpGLTF读取格式，采样/层级/混合/FSM/事件与上传自研；实际素材67节点/65关节/43个LINEAR clips，Run映射Jog。Piccolo首Clip固定权重与本工程混合不同，不据其数据结构推断功能完成。
-- 证据与学习验收：CPU真实素材、贴图探针、STEP/LINEAR/短弧、非单位mesh空间、palette和事件通过；GPU代码与自动绘制存在，绑定姿态画面、脚滑、过渡和跳跃节奏仍须视觉/用户。Two-Bone IK、Mask/Additive、重定向、表示/压缩/性能见 [动画路线](plans/animation-roadmap.md)，尚未实现。
+- 证据与学习验收：CPU真实素材、贴图探针、STEP/LINEAR/短弧、非单位mesh空间、palette和事件通过；GPU代码与自动绘制存在，首轮人工验收总体通过，绑定姿态画面、脚滑、过渡和跳跃节奏未逐专项验收。Two-Bone IK、Mask/Additive、重定向、表示/压缩/性能见 [动画路线](plans/animation-roadmap.md)，尚未实现。
 
 ### 3.3 物理：表示、检测、响应与游戏控制
 
@@ -67,7 +67,7 @@ Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Phys
 - “4. Broad Phase”“5. Narrow Phase”“6. 从检测到碰撞到让世界稳定”：Jolt提供后端碰撞、ray/shape cast/overlap，项目适配GUID/过滤/尺寸/空间与寿命，没有自研完整物理解算器。
 - “8. Character Controller：用反物理换取好操作”：对应feet胶囊、穿透恢复、有限墙滑、接地/撞顶、可走坡和有限台阶。父组变换/中心偏移只应用一次；当前包装层查询矩阵在QueryTransform边界单次转置。
 - 性质：JoltPhysicsSharp/JoltPhysics.Native集成；角色规则与后端查询适配自研，未以Jolt现成完整角色控制器代替。固定Piccolo Controller目标overlap不是本工程扫掠墙滑的完整参考实现。
-- 证据与学习验收：真实原生查询、高速墙阻挡/墙滑、跳跃落地/撞顶、初始重叠、30°坡/坡度拒绝、合法/超高台、动态箱、双世界、层级碰撞通过；人工手感、极端复杂接触仍未验收。第7章运行保障与第9–13章布娃娃、车辆、PBD/XPBD、破坏，以及平台/推箱各自继续见 [物理路线](plans/physics-character-roadmap.md)。
+- 证据与学习验收：真实原生查询、高速墙阻挡/墙滑、跳跃落地/撞顶、初始重叠、30°坡/坡度拒绝、合法/超高台、动态箱、双世界、层级碰撞通过；首轮人工操控初步通过，极端复杂接触仍未验收。第7章运行保障与第9–13章布娃娃、车辆、PBD/XPBD、破坏，以及平台/推箱各自继续见 [物理路线](plans/physics-character-roadmap.md)。
 
 ### 3.4 粒子与声音：生命周期、预算和事件
 
@@ -77,7 +77,7 @@ Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Phys
 - 粒子“2. Particle、Emitter 与 System”“3. Spawn、Simulation 与 Lifetime”：对应Burst、速度/重力、Life/死亡回收、512容量、按剩余寿命淡出和场景清理。“6. GPU粒子系统：Pool、Alive/Dead List”保留下一阶段CPU→Compute对比，没有将当前List实现冒称GPU粒子。
 - 声音“14. 三维声场的基本输入：Source 与 Listener”“16. Attenuation”“22. Voice Budget、延迟加载和关卡差量”：对应相机Listener、相对2D/世界3D、mono点声源、InverseDistanceClamped、共享Buffer/独立Voice和32源上限。当前启动同步载入七段WAV，没有完整延迟加载/差量音频流。
 - 性质：CPU粒子与事实映射自研；OpenTK OpenAL/OpenAL Soft后端集成，RIFF分块PCM16读取/Voice管理自研。Kenney Ogg经已授权便携FFmpeg离线转换，FFmpeg不是运行时依赖；不新增运行时Ogg解码。
-- 证据与学习验收：WAV解析及实际OpenAL context/buffer/2D/3D/暂停恢复/清理通过；粒子渲染链已有并参与GL运行，粒子排序/遮挡和声音远近左右听感待验收。传播/遮挡/混响、GPU池/排序/深度碰撞见 [粒子声音路线](plans/particles-audio-roadmap.md)。不把画面近似碰撞写回权威物理，不把玩家混音当AI听觉。
+- 证据与学习验收：WAV解析及实际OpenAL context/buffer/2D/3D/暂停恢复/清理通过；粒子渲染链已有并参与GL运行，首轮视听体验初步通过，粒子排序/遮挡和声音远近左右听感未逐专项验收。传播/遮挡/混响、GPU池/排序/深度碰撞见 [粒子声音路线](plans/particles-audio-roadmap.md)。不把画面近似碰撞写回权威物理，不把玩家混音当AI听觉。
 
 ### 3.5 工具链与资产：让数据能够生产和复现
 
@@ -88,7 +88,7 @@ Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Phys
 - “13.6 Command/Undo”“13.8 In-game Tool/PIE”“14.4 属性编辑”：对应命令安全点、100条快照历史、拖动事务/Escape取消、删除外部引用拒绝、保持世界重挂接、dirty/Redo分支及Play克隆/Stop保留未保存设计。
 - “14.1 交换/运行格式”“14.9 Reflection”：glTF读取与引擎CPU模型分层，ImGui控件使用有限显式字段命令；当前不是C++代码生成反射或通用C#反射编辑器。标准交换格式、Schema、实际运行消费者均需理解，不能用一次JSON库调用代替。
 - 性质：格式解码与ImGui.NET为第三方，设计DTO/路径/场景图/命令/输入渲染后端为自研。Piccolo模式切换/磁盘重载与本工程保留内存设计不同；原homework01案例按其版本解释，不改原笔记。
-- 证据与学习验收：CPU层级/非法字段/剪切/模板/历史/损坏保存检查通过，自动GL保存重载/UndoRedo路径通过；真实人工拖动/父子编辑/数据重建后重启保留仍应操作验收。完整工具、通用反射/导入管线和详细Profiler继续见 [资产场景路线](plans/assets-scene-roadmap.md)、[工具调试路线](plans/tools-debug-roadmap.md)。
+- 证据与学习验收：CPU层级/非法字段/剪切/模板/历史/损坏保存检查通过，自动GL保存重载/UndoRedo路径通过；首轮人工编辑/保存/重启恢复流程初步通过，全部控件及损坏数据等失败分支未穷尽。完整工具、通用反射/导入管线和详细Profiler继续见 [资产场景路线](plans/assets-scene-roadmap.md)、[工具调试路线](plans/tools-debug-roadmap.md)。
 
 ### 3.6 Gameplay 与 AI：意图、执行和一次反馈
 
@@ -98,7 +98,7 @@ Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Phys
 - 第15节“3. Event：横向解耦对象与系统”“6. 3C”：对应GameInput、镜头相对方向、查询自研角色、显示相机、按钮请求→校验→门姿态/Body/网格→一次反馈。事件每Tick发布/消费，Render不重发；完成目标锁存一次。
 - 第16节“7. A*”“13. FSM与HFSM”：对应平面八邻域Octile、角点/端点/路径简化净空、预算和Revision；NPC巡逻/跟随/搜索/返回、视距/FOV/视线/记忆、上一决定下一步执行。导航结果和角色受阻不同，FSM不直接绕过控制器写世界位置。
 - 当前自研C#规则/数据配置、FSM/A*与感知适配，没有通用AI框架、Lua/可视化脚本或完整NavMesh。角色胶囊不注册互推Body，NPC受控平面区域与玩家坡台区分开。
-- 证据与学习验收：机关画面数据/碰撞/网格同步、关闭占用拒绝、目标一次完成、NPC实际路径/控制器跟随通过；窗口人工游玩和镜头舒适度待验收。
+- 证据与学习验收：机关画面数据/碰撞/网格同步、关闭占用拒绝、目标一次完成、NPC实际路径/控制器跟随通过；首轮人工游玩和镜头体验初步通过，未逐项验证全部机关/NPC分支，也不代表已掌握实现原理。
 - 后续第15节“4. Script：纵向开放规则、迭代与热更新”、第16节“14. Behavior Tree：把条件、计划片段与中断组织成树”、第17节“4. HTN：用领域知识把高层任务分解为可执行计划”“5. GOAP：把显式目标回归成低成本动作计划”“13. 离线训练环与运行时推理环必须分开”均保留代表实验与BT对比/NavMesh扩展，见 [Gameplay/AI路线](plans/gameplay-ai-roadmap.md)，不由本FSM宣称全部AI掌握或实现。
 
 ### 3.7 网络：多份世界与一致性
@@ -139,7 +139,7 @@ Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Phys
 
 | 知识点 | 实际入口 | 笔记与已知边界 |
 | --- | --- | --- |
-| 一次输入如何变成画面 | TrainingWindow→InputBuffer→TrainingSimulation→KinematicCharacter→SceneGraph→RenderObject | 物理2.4/第8章、Gameplay 3C、动画in-place；实际CPU/原生链通过，人工操控待验收 |
+| 一次输入如何变成画面 | TrainingWindow→InputBuffer→TrainingSimulation→KinematicCharacter→SceneGraph→RenderObject | 物理2.4/第8章、Gameplay 3C、动画in-place；实际CPU/原生链通过，首轮人工操控初步通过，源码讲解/自测待完成 |
 | 三棵树与两类姿态 | 设计SceneGraph、glTF节点、skin关节；逻辑/显示TRS | 动画9/18/19、工具13.4；默认节点/root/mesh相对palette不可重复应用 |
 | 行列向量与三种边界 | TransformMath、GpuResources、PhysicsWorld.QueryTransform | 动画9.1/9.3/11.8、渲染基础；GL上传与Jolt包装层适配不同，不能二次转置 |
 | 请求、提交和一次事实 | Interact、World.SetEnabled、NavigationGrid.Rebuild、Events、Feedback | Gameplay第15节Event；关闭占用拒绝、一次目标事件已有行为检查 |
@@ -192,4 +192,4 @@ Debug x64 构建当前 0 警告、0 错误；完整 `--verify` 的 Core/Nav/Phys
 
 ## 配置与显示收尾索引
 
-有限四状态动画定义已在assets/config/character-animation.json落实，实际非默认行为经AnimationVerification验证；上一/当前局部Pose的显示插值与SceneGraph共用alpha，mesh/palette/skeleton一致，显示不推进逻辑或事件。暂停/恢复仅ResetDisplayHistory，场景成功切换ResetAnimations。Debug/Release最终--verify及delivery图形回归通过，详细结果与用户待验收项见实施复查/执行台账；声音听感和真实操控不由自动日志代替。
+有限四状态动画定义已在assets/config/character-animation.json落实，实际非默认行为经AnimationVerification验证；上一/当前局部Pose的显示插值与SceneGraph共用alpha，mesh/palette/skeleton一致，显示不推进逻辑或事件。暂停/恢复仅ResetDisplayHistory，场景成功切换ResetAnimations。Debug/Release最终--verify及delivery图形回归通过，详细结果与剩余限制见实施复查/执行台账；声音听感和真实操控的首轮初步通过来自用户确认，不由自动日志代替。
