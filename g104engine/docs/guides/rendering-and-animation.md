@@ -1,6 +1,6 @@
 # V1 渲染、glTF 导入与动画实现
 
-更新：2026-10-03。本文描述实际代码和采用的简化；构建、CPU自检、GPU运行和用户视觉验收是不同证据。最终验证结果统一见执行台账，不从源码存在推断画面已经通过。
+本页说明已采用的glTF子集、空间/蒙皮、固定渲染Pass、数值域、动画配置及生命周期。当前任务/验收查 [status.md](../status.md)，操作政策查 [agent-workflow.md](../agent-workflow.md)。公式修正理由就地保留，长历史日志在页末折叠为可选证据；本轮文档改造不构建或运行。
 
 ## 代码入口与职责
 
@@ -20,6 +20,7 @@
 
 OpenTK 4.9.4负责OpenGL调用；StbImageSharp 2.30.16负责PNG/JPEG解码。格式读取使用第三方库，空间约定、采样/状态、蒙皮上传与Pass组织由本项目实现。
 
+<a id="skinning-space"></a>
 ## 空间、矩阵与蒙皮
 
 世界采用Y-up、右手、米和秒。CPU矩阵用行向量，局部TRS为`S * R * T`，节点世界为`local * parentWorld`。OpenTK的Matrix4行字节通过`UniformMatrix4(..., false, ref matrix)`或UBO上传；GLSL按列主序读取这些字节，相当于读取CPU矩阵的转置，因此shader使用`P * V * M * position`。上传时再次转置会破坏这个对应关系。
@@ -41,7 +42,7 @@ shader先在mesh局部空间加权蒙皮，再由drawModel进入世界；mesh节
 
 外部buffer/image URI可使用glTF标准的`../`相对路径，但最终路径必须留在资产根目录内。场景对象的模型路径本身仍服从场景资产路径规则。远程URI、根目录逃逸、链接路径、非2.0、非三角形、morph、扩展/压缩、其他顶点属性、材质实际引用UV1/纹理变换、Alpha BLEND、Occlusion/Emissive输入和CUBICSPLINE等显式报错，不静默改变解释方式。未被材质引用的额外UV集不参与当前绘制，允许存在；实际角色含此类TEXCOORD_1。每顶点最多4个影响，权重归一化；零权重槽也清为有效骨骼索引。
 
-是否蒙皮由引用mesh的`node.skin`决定；同一mesh可以被有skin和无skin的节点引用。无skin节点忽略未使用的JOINTS/WEIGHTS属性，按本节点变换刚性绘制；有skin节点仍严格验证必需属性、容量、权重与索引。[Khronos Validator的问题表](https://raw.githubusercontent.com/KhronosGroup/glTF-Validator/main/ISSUES.md)将`NODE_SKINNED_MESH_WITHOUT_SKIN`列为Warning，不能据此报告不存在的“0骨骼容量越界”。
+是否蒙皮由引用mesh的`node.skin`决定；同一mesh可以被有skin和无skin的节点引用。无skin节点忽略未使用的JOINTS/WEIGHTS属性，按本节点变换刚性绘制；有skin节点仍严格验证必需属性、容量、权重与索引。[ISSUES.md](https://raw.githubusercontent.com/KhronosGroup/glTF-Validator/main/ISSUES.md)将`NODE_SKINNED_MESH_WITHOUT_SKIN`列为Warning，不能据此报告不存在的“0骨骼容量越界”。
 
 当前角色素材为`models/UAL1_Standard.glb`，实际67节点、65关节、43个LINEAR clip，无图片。自有`models/material-probe.glb`使用`../tests/checker.png`和`../tests/normal.png`补足贴图导入证据。
 
@@ -49,6 +50,7 @@ shader先在mesh局部空间加权蒙皮，再由drawModel进入世界；mesh节
 
 每个导入primitive保留原始`HasUv0`及mesh内primitive序号；顶点数组中填零的UV槽不能代表模型具备UV0。Prepare和实际绘制均根据**最终有效材质**检查UV0，包含设计BaseColor/Normal贴图覆盖与导入贴图。无UV模型后来添加贴图时明确拒绝，错误包含模型、节点、primitive和`TEXCOORD_0`；失败准备释放本次新增模型/贴图，保留旧预览、动画游标及未消费事件。设计/Undo历史的事务边界由Scene/Editor调用者负责。
 
+<a id="render-passes"></a>
 ## Pass与颜色处理
 
 ```mermaid
@@ -81,8 +83,9 @@ Scene DTO允许任意有限非负光色/强度和基础色，而有限输入的�
 
 HDR经过曝光、Reinhard和一次Gamma进入RGBA8 LDR，再作FXAA。LDR输入采用双线性过滤支持FXAA亚像素采样；G-buffer/深度保持Nearest，避免在重建位置时跨物体混合。默认帧缓冲的自动sRGB转换关闭；FXAA不再次Gamma。G-buffer/深度/阴影调试视图在后处理入口输出，调试视图跳过FXAA。Depth视图用`1 - pow(rawDepth, 50)`强调近处差异，并非线性距离单位。
 
-阴影固定80m正交范围跟随相机目标平面，有限训练场起步使用；范围外不产生阴影。粒子最多绘制8192个，是V1上限，不是无限GPU粒子系统。DrawCalls/Triangles包含所有Pass和全屏三角形，不能等同于唯一场景几何数量或GPU时间。
+阴影固定80m正交范围跟随相机目标平面，有限训练场起步使用；范围外不产生阴影。Renderer一次最多取8192个ParticleVisual进行Billboard绘制；当前训练场CPU ParticleSystem实际容量是512，两者是不同层的预算，不宣称支持8192个同时存活的训练场粒子或GPU模拟。DrawCalls/Triangles包含所有Pass和全屏三角形，不能等同于唯一场景几何数量或GPU时间。
 
+<a id="animation-events"></a>
 ## 动画求值与事件
 
 动画有三层不同的插值。Clip采样根据逻辑游标在关键帧之间求TRS；状态/速度混合组合不同clip得到逻辑Pose；显示插值则在相邻固定逻辑步的previous/current局部Pose之间按与SceneGraph相同的alpha求TRS，再计算模型节点世界矩阵。不能把逻辑当前骨骼直接搭配身体的插值世界位置，也不直接Lerp最终世界骨骼矩阵，后者会缩短骨链并产生剪切。
@@ -91,9 +94,11 @@ AnimationController的Pose/World保持当前逻辑步，Update前复制上一逻
 
 SharpGLTF提供关键帧，运行时不调用其现成曲线采样器。自研采样先复制所有节点默认TRS，再对clip中的channel覆写，避免未动画节点丢失根变换。二分查找关键帧；STEP在精确关键帧取当前帧，LINEAR对位置/缩放插值，对四元数走最短弧并归一化。
 
-Idle/Walk/Run依据平滑速度混合；Walk/Run使用同步步态相位，Idle独立推进时间。默认Run映射`Jog_Fwd_Loop`，没有不存在的Run_Loop，但配置可改映射至`Sprint_Loop`等实际同骨架动作。Grounded→非接地且VerticalVelocity大于配置minJumpVelocity时进入JumpStart并发Jump；向下或低于阈值离地直接进入JumpLoop并发Fall，走下坡台不会伪装主动起跳。JumpStart按配置时长切JumpLoop；真正重新接地进入JumpLand并发Land，按配置落地时长回Locomotion。默认姿态过渡0.12s，起跳/落地clip压缩至0.18/0.22s以适应物理跳跃；clip时长不决定物理高度或世界位移。该节奏需实际视觉验收，脚滑/动作观感不能由CPU自检证明。
+Idle/Walk/Run依据平滑速度混合；Walk/Run使用同步步态相位，Idle独立推进时间。默认Run映射 `Jog_Fwd_Loop`，配置可改至 `Sprint_Loop` 等实际同骨架动作。Grounded→非接地且VerticalVelocity大于minJumpVelocity时进入JumpStart并发Jump；向下或低于阈值离地进入JumpLoop并发Fall，走下坡台不伪装主动起跳。JumpStart按配置时长切JumpLoop；真正接地进入JumpLand并发Land，再按落地时长回Locomotion。默认过渡0.12s，起跳/落地clip重定时为0.18/0.22s；clip时长不决定物理高度或世界位移。动作观感、脚滑和全部动作映射需人工专项观察，不能由CPU采样结果推定；历史体验反馈属于独立证据。
 
 Footstep按配置marker跨越触发，默认相位0.15/0.65；跨循环处理次数，空marker列表禁用脚步事件。Jump/Fall/Land按事实边沿只发一次。每个事件有单调序列号，队列最多保留64项，调用Drain后清空。Update推进时间/事件，Render不推进动画；暂停或dt=0不产生事件。本渲染器的动画事件队列由表现使用者按需消费，不自动绑定声音或玩法系统，避免与外部事实事件重复播放。
+
+窗口只将DrainAnimationEvents作为动画调试事件字符串；实际Voice与Burst消费TrainingSimulation.Events的一次事实。两条队列职责分开，不能因两处都有Jump/Footstep名字而双播或反写Gameplay。
 
 ### AN5有限数据配置与使用
 
@@ -116,6 +121,7 @@ TrainingRenderer启动时从assetRoot加载一次配置，所有角色引用同�
 
 修改工程内JSON后重新构建并重启应用，让既有assets复制规则将配置带到Debug/Release输出；只改输出目录会在之后构建时被工程源覆盖。当前没有运行中热重载；Play/Stop仅重置实例游标，使用启动时已验证的共享定义。可以将run改为Sprint_Loop、调整参考速度/时长与markers，观察相应采样、权重、状态耗时和事件变化，而非只保存无效字段。
 
+<a id="renderer-lifecycle"></a>
 ## API、准备和生命周期
 
 公开入口为`TrainingRenderer(assetRoot,width,height)`、`Prepare(objects)`、`Resize`、`UpdateAnimations`、`Render`、`ResetScene`、`ResetAnimations`、`ResetDisplayHistory`和幂等Dispose；额外提供Statistics、AnimationDebug、DrainAnimationEvents和SkeletonDebug。Prepare预加载候选模型与全部材质贴图，失败释放本次新增资源，保持原动画实例和原有缓存。调用者在全部场景准备成功后才提交候选，成功Play/Stop/Load提交后调用ResetAnimations，以同GUID重新建立FSM/clip时间/事件队列且保留已验证GPU资源；不要在成功Prepare后无条件ResetScene并删掉刚准备的资源。
@@ -134,7 +140,14 @@ ShaderSource使用显式UTF8字节长度重载。真实GL初始化曾发现forwa
 
 正对/斜光白金属平面采用roughness0.045/0.15/0.6及光角0/0.08/0.6弧度，实际Forward和Deferred的HDR读回分别比较独立double GGX/geometry参考；这覆盖指定条件的D/geometry，不称为全部材质和角度的全面证明。Deferred参考读取实际存储roughness，再按BRDF同一0.045下限输入独立double公式，以包含驱动的Half写入舍入；相互吻合不是正确性的唯一证据。强光读回必须有限且大于65504，LDR必须有限；另外检查极值明确拒绝、double预乘可用输入、radiance支持上限、反射色2拒绝、合法tint组合与HDR灯色。透明测试在两色重叠像素独立算出粒子圆形衰减alpha和source-over参考，并交换输入顺序，验证排序不依赖枚举次序。无UV覆盖失败检查旧HDR、动画Debug和未消费Fall事件；用VerticalVelocity0离地确保不受合法可配置起跳阈值影响。共享mesh导入检查skin引用与rigid引用的不同解释。
 
-修复前实际日志`g104engine/.cache/execution/review-render-before.log`记录六项FAIL：Forward roughness0.045正对HDR为1.02441406而参考19406.1780572；两粒子像素R/B约0.2734/0.6221而参考0.4628/0.4328；Normal/Base覆盖均被误接受；共享mesh的rigid引用报“骨骼索引无效”。这组独立失败证据揭示了既有双管线比较没有覆盖的共同错误。修复后验证结果由本次最新日志另行记录，不沿用首轮delivery结果。
+<details>
+<summary>可选：2026-10-03独立GPU评审的失败、数值对照与验回</summary>
+
+### 2026-10-03独立评审批的历史GPU失败与验回
+
+以下第一/第三批及“最终”均指当时的渲染独立评审批，不是2026-10-04文档审计重测；日志/读回数值保留追溯，最新UI批证据见 [v1-ui-mouse-fix-2026-10-04.md](../reviews/v1-ui-mouse-fix-2026-10-04.md)。
+
+修复前日志 `g104engine/.cache/execution/review-render-before.log` 记录六项FAIL：Forward roughness0.045正对HDR为1.02441406而参考19406.1780572；两粒子像素R/B约0.2734/0.6221而参考0.4628/0.4328；Normal/Base覆盖被误接受；共享mesh的rigid引用报“骨骼索引无效”。这揭示既有双管线比较没有覆盖的共同错误，修复后的对应新构建/日志另行记录，没有沿用首轮delivery结果。
 
 第一批修复后`review-render-after.log`实测七项PASS，Debug构建0警告0错误：Forward正对roughness0.045/0.15/0.6的HDR分别19406.1797/157.190079/0.614023745，与独立double参考19406.1780572/157.190042267/0.614023602604一致；强光HDR194061.797及LDR1均有限。两条管线及两种输入枚举顺序的粒子R/B约0.46279246/0.43291038，独立source-over参考约0.46283174/0.43285507。UV错误包含`no-uv.gltf/NoUvNode[0]/primitive0/TEXCOORD_0`，旧显示/动画/事件保留；共享skin/rigid导入通过。另发现GPU的RGBA16F写入舍入与System.Half转换略有不同，参考已改为读取实际存储roughness，再独立计算BRDF；补充反射色2和量化后粗糙度下限的专项检查，证据见下方专项基线和最终后验。
 
@@ -144,16 +157,29 @@ ShaderSource使用显式UTF8字节长度重载。真实GL初始化曾发现forwa
 
 最终版本（含稳健的VerticalVelocity0/Fall历史用例）已分别重新构建并运行Debug/Release：`review-render-final-debug.log`、`review-render-final-release.log`均实测十项PASS、GL无错误。Forward/Deferred在roughness0.045下均为HDR19406.1797；强光下均为194061.797、LDR1。Deferred实际存储roughness0.15/0.6的HDR157.600052/0.615625203，与采用实存roughness的独立double参考157.600083512/0.615625326217一致；0.045向下舍入的存储值也由统一BRDF下限恢复正确峰值。近反向探针epsilon1e-8/1e-12/1e-20分别读到1.04083097e-6/1.04083121e-14/1.04083103e-30，对应独立参考1.04083082919e-6/1.04083089935e-14/1.04083084162e-30；完全零sum输出0。Astra Ultra最终源码复核未发现本线剩余P1/P2。
 
-本轮整体图形回归`review-graphics-debug.log`、`review-graphics-release.log`均完成240帧exercise，未见GL错误；同帧实际Forward/Deferred读回RGB平均绝对差异0.0621/255、最大22/255。该对照仍只证明本次场景/相机条件下的两管线输出接近；公式正确性由上面的独立参考补充验证，用户视觉和操作体验仍单独验收。
+该评审批整体图形回归 `review-graphics-debug.log`、`review-graphics-release.log` 均完成240帧exercise，无GL错误；同帧双管线读回RGB平均绝对差异0.0621/255、最大22/255。它只证明当时场景/相机条件下输出接近，公式正确性由独立参考补充；用户视觉/操作的首轮初步通过是2026-10-04后来取得的独立反馈，不回写成GPU运行当时已人工验收。
 
-AnimationVerification检查真实角色骨骼/clip/米级高度、PNG/normal相对导入、LINEAR/STEP/短弧、独立非单位mesh空间例子、循环事件序列、跳跃/下落事实和65个有限palette矩阵；AN5检查实际JSON用于实例、非默认Run→Sprint的真实Pose/速度权重、独立响应系数/过渡/起落耗时、marker事件计数、共享定义但独立实例、防御复制以及错误配置/角色缺clip的拒绝。显示检查覆盖alpha0/1、中间局部TRS层级组合、区别世界矩阵/位置直接Lerp、重复显示不推进逻辑和事件、ResetInterpolation不丢失尚未消费事件。它不要求用户合法修改的JSON等于初始默认值；比较用已知内存默认和有效非默认定义，验证参数实际接线。需要图形窗口验证Shader编译、GL错误、Forward/Deferred一致性、阴影/调试视图、resize/最小化、蒙皮观感和粒子遮挡；用户的操作/视觉验收单独记录。
 
-首轮交付的历史收尾验证：Debug/Release构建零警告零错误，`g104engine/.cache/execution/verify-debug.log`与`verify-release.log`记录七项动画检查全部PASS，包含AN5配置、Jump/Fall事实和局部Pose显示插值。当时的`delivery-debug.log`/`delivery-release.log`记录RTX 5060 Ti/OpenGL 4.3、Forward/Deferred的Play/Stop、保存/重载/Undo/Redo、失败Play保留原预览/设计并清理部分准备资源、未保存设计及Undo历史跨Play/Stop保留；两个配置各240帧练习、2个跳跃事件、110个移动步以及未见GL错误。Release的120ms加载注入后下一raw帧138.91ms被丢弃、模拟步0，Debug相应145.74ms也被丢弃；真实Renderer还验证同一模型/GUID从character切为StaticMesh时，骨架端点与raw bind-node world一致，不误套1.9m/180°角色修正。这些是真实本机集成证据，不能替代用户手感验收。
+</details>
+
+### 动画检查的现有覆盖
+
+AnimationVerification检查真实角色骨骼/clip/米级高度、PNG/normal相对导入、LINEAR/STEP/短弧、独立非单位mesh空间例子、循环事件序列、跳跃/下落事实和65个有限palette矩阵；AN5检查实际JSON用于实例、非默认Run→Sprint的真实Pose/速度权重、独立响应系数/过渡/起落耗时、marker事件计数、共享定义但独立实例、防御复制以及错误配置/角色缺clip的拒绝。显示检查覆盖alpha0/1、中间局部TRS层级组合、区别世界矩阵/位置直接Lerp、重复显示不推进逻辑/事件、ResetInterpolation保留未消费事件。它不要求合法JSON等于初始默认值，使用已知默认/有效非默认定义核对接线。Shader编译/GL错误/双管线输出/阴影等有真实图形证据；人工动作/画面与学习讲解属于独立证据，实际覆盖可选查台账，不要求因本文阅读重做整轮验收。
+
+<details>
+<summary>可选：2026-10-03首轮交付与截图检查的历史证据</summary>
+
+### 2026-10-03首轮交付的历史收尾与截图
+
+Debug/Release构建零警告零错误，`g104engine/.cache/execution/verify-debug.log` 与 `verify-release.log` 记录七项动画PASS（AN5/Jump/Fall/显示插值）。当时delivery日志记录RTX5060Ti/OpenGL4.3、两管线Play/Stop、保存/重载/Undo/Redo、失败Play清理且保留原预览/设计、未保存设计/历史跨PlayStop；各240帧、2jump/110moving且无GL错误。Release120ms加载注入后下一raw帧138.91ms丢弃、模拟步0，Debug为145.74ms；同模型/GUID切StaticMesh时骨架与raw bind-node world一致，不误套角色修正。这些历史集成证据没有替代后来独立评审或用户体验反馈。
 
 首轮同一帧冻结对象/骨骼/相机、分别绘制Forward/Deferred并读回RGB：当时平均绝对差异`0.0651/255`，最大`22/255`（delivery当时运行/场景/相机，已包含配置与显示插值收尾）。这仅验证当时两条实际管线的输出在该条件下接近，RGBA8基础色、RGBA16F法线/粗糙度与D24重建允许量化差异；不声称完全像素一致，也不以该数据证明Deferred更快。
 
 `g104engine/.cache/execution/captures-delivery-release/`保存首轮Forward/Deferred/Jump/Landed/Normals/Shadow及材质对照截图；首轮复看material-probe/landed/normals，角色没有明显骨骼爆散，落地、粒子和对应阴影可见，世界法线地面+Y/背墙+Z一致；当时腾空与阴影深度图也已检查。无遮挡`material-probe.png`清楚显示checker贴图；同相机`material-probe-no-shadow.png`移除阴影后小三角斑消失，确认原细斑来自阴影而非UV/网格接缝。PolygonOffset factor从1.5改为3后重复细斑明显减少，落地图鞋底附近阴影未见明显整块脱离；部分近看黄格仍有低对比斜面自阴影细斑，作为单张2048/3×3 PCF、有限bias与接触偏移取舍的当前限制保留，不称为工业阴影品质。自有probe的tangent.w已由素材生成端按UV/法线关系修为-1，shader完整消费手性；现有normal.png接近flat normal，这组截图本身不能证明复杂法线贴图的全部方向与滤波表现。
 
-仍未取得FXAA开关与镜像对照的专项视觉截图；两者的评审修复已编译和进入真实GL运行，具体质量与手感/脚滑/最终观感仍由专项和用户验收分别确认。
+FXAA开关与镜像对照的专项视觉截图仍未收集；相关实现/修复已编译并进入真实GL运行。用户第1–5项的整体初步体验通过保留，专项质量、全部动作/脚滑或特殊组合不因此推定穷尽覆盖，后续Bug继续反馈。
 
-glTF格式/蒙皮/插值依据[Khronos glTF 2.0规范](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html)。课程对应渲染与动画章节见`docs/learning-map.md`；Piccolo学习参考固定提交`f5053707fed4d3f94d270a436fb0d3a8ae54e3e5`，本实现未照搬其render graph/资源布局，也未声明完成IBL、IK、重定向、根运动、GPU粒子或其他后续专题。
+
+</details>
+
+glTF格式/蒙皮/插值依据 [Khronos glTF2.0规范](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html)。课程渲染/动画章节见 [learning-map.md](../learning-map.md)；Piccolo固定参考仍为 `f5053707fed4d3f94d270a436fb0d3a8ae54e3e5`，本实现没有照搬其render graph/资源布局。IBL、IK、重定向、根运动、GPU粒子等后续专题尚未实施，D5独立克隆/CI/第二设备仍整体暂缓。

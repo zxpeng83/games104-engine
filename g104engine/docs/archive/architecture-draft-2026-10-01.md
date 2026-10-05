@@ -2,7 +2,7 @@
 
 归档日期：2026-10-01。本文件仅保存此前架构草案，不是已确认设计、实现约束或验收标准。
 
-用户已明确：当前仅搭建开发基础，具体软件实现架构与细节在后续阶段讨论。当前有效入口是 [架构占位文档](../architecture.md) 和 [阶段边界决策](../decisions/0002-defer-implementation-architecture.md)。
+用户已明确：当前仅搭建开发基础，具体软件实现架构与细节在后续阶段讨论。当前有效入口是 [architecture.md](../architecture.md) 和 [decisions.md](../decisions.md#legacy-0002)。
 
 下面以文本代码块完整保留原文，原文中的相对链接和图示仅属于历史文本，不作为当前导航或设计依据。
 

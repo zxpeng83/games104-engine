@@ -1,6 +1,10 @@
 # 设计前参考源码核查：2026-10-03
 
+<a id="historical-evidence"></a>
+
 本页保存本次设计对话中的源码核查、数学推导及证据边界。它不是 G104Engine 功能完成报告，也不代表用户已批准某项候选架构或实现方式。
+
+**适用范围（2026-10-04补记）：** 以下记录形成于2026-10-03开工前设计讨论；“UI库尚未选定”“补步策略待确认”“没有本工程运行验证”等均保留当时状态，固定参考源码结论不因此变成本工程的实现/验收证据。后续库与设计已收敛、完整V1已正式授权并实施，M1已合入V1，用户已确认运行指南第1–5项首轮人工验收初步通过。当前设计和实际调用链见 [architecture.md](../architecture.md)、[learning-map.md](../learning-map.md)，最新状态见 [status.md](../status.md)。本次补记没有重新读取Piccolo、运行测试或改变原核查结论。
 
 ## 核查范围与证据等级
 
@@ -8,7 +12,7 @@
 - OpenTK 固定版本：`4.9.4`；核对官方源码及本机该版本 NuGet XML 文档。GL 上传、上下文和 .NET 清理规则另参考官方文档。
 - “源码事实”表示所列路径可证明的行为；“推导”表示从具体公式或调用顺序推出的结论；“建议”仅表示后续设计可采用的做法。
 - 本次没有构建、运行窗口或 GPU 探针，也没有安装依赖、修改源码/项目/包锁或执行 Git 写操作。下面的数值计算不是 OpenTK 库测试或 GPU 测试。
-- 既往 D0–D4 的开发基础验证仍以 [阶段复查](foundation-review-2026-10-02.md) 和 [当前状态](../status.md) 中记录的证据为准；D5 的克隆、CI、第二台设备测试继续暂缓。
+- 既往 D0–D4 的开发基础验证仍以 [foundation-review-2026-10-02.md](foundation-review-2026-10-02.md) 和 [status.md](../status.md) 中记录的证据为准；D5 的克隆、CI、第二台设备测试继续暂缓。
 
 ## Piccolo：源码能够支持的结论
 
@@ -52,7 +56,7 @@
 | Color Grading 与未完成通道 | ColorGradingPass 已初始化并调用，但 Shader 只获取 LUT 尺寸、读取输入后原样输出，尚未应用 LUT 调色。也不能从 AO/emissive sampler 声明推断功能完成；所查 G-buffer emissive 输出被注释。[调色 main](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/color_grading.frag#L13)、[G-buffer emissive](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/mesh_gbuffer.frag#L56) |
 | 限定检查未发现 | 在上述范围未发现 Bloom、地形、体积云、SSAO、TAA 的完整主链接入；未发现 Bloom 的明确 TODO。这不代表所有仓库路径或历史版本绝无实现。[初始化列表](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/render_pipeline.cpp#L20)、[主绘制顺序](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/main_camera_pass.cpp#L1948) |
 
-本地渲染笔记按第 1–16 章标题及相关段落定位，未做全文事实审计。它提供课程思路，但其中性能、硬件和算法能力的简化表述仍应结合源码/资料核查，不直接写成工程保证。模块范围讨论见 [渲染路线](../plans/rendering-roadmap.md)。
+本地渲染笔记按第 1–16 章标题及相关段落定位，未做全文事实审计。它提供课程思路，但其中性能、硬件和算法能力的简化表述仍应结合源码/资料核查，不直接写成工程保证。模块范围讨论见 [rendering-roadmap.md](../plans/rendering-roadmap.md)。
 
 ## 补充核查：资产、场景与模板（2026-10-03）
 
@@ -67,7 +71,7 @@
 | 资产路径与 GuidAllocator | AssetManager 拼接资源根与相对路径，动画缓存以文件路径作 key；渲染 GuidAllocator 是来源描述到运行期整数的映射，没有证明存在跨移动/重命名的持久 UUID。[路径解析](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/resource/asset_manager/asset_manager.cpp#L11)、[动画缓存](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/animation/animation_system.cpp#L10)、[运行期映射](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/render_guid_allocator.h#L15) |
 | 反射生成 | 预编译 CMake 调用 PiccoloParser，Parser 建立序列化与反射生成器。这是元数据/JSON 读写基础设施，不自动包含资产增量导入、依赖构建、Prefab 变体或 Undo/Redo。[生成器](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/meta_parser/parser/parser/parser.cpp#L42)、[构建调用](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/precompile/precompile.cmake#L35) |
 
-glTF 的网格/材质/蒙皮/动画与坐标语义另查 Khronos 2.0 规范；JSON 读写能力查 System.Text.Json 官方资料。它们用于本项目的格式/数据边界选择，不是新解析库的兼容性测试或安装记录。具体方向与待办见 [资产/场景路线](../plans/assets-scene-roadmap.md)。
+glTF 的网格/材质/蒙皮/动画与坐标语义另查 Khronos 2.0 规范；JSON 读写能力查 System.Text.Json 官方资料。它们用于本项目的格式/数据边界选择，不是新解析库的兼容性测试或安装记录。具体方向与待办见 [assets-scene-roadmap.md](../plans/assets-scene-roadmap.md)。
 
 ## 补充核查：物理查询、过滤与所有权（2026-10-03）
 
@@ -83,7 +87,7 @@ glTF 的网格/材质/蒙皮/动画与坐标语义另查 Khronos 2.0 规范；JS
 
 PhysicsScene 构造对全局 `JPH::Factory::sInstance` 赋值，析构删除该全局槽位；本次没有验证多个物理场景同时存在。这种所有权安排不能当作本项目“新场景准备成功后替换旧场景”的现成实现依据。我们需要分别管理库级初始化与场景世界，并让对象清理明确指向所属场景，而非依赖任意时刻的活动场景。[构造与析构](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/physics/physics_scene.cpp#L34)
 
-所查适配链没有建立完整可配置物理材质、动力学、Trigger、Joint、Ragdoll、Cloth、Vehicle 功能证明。对应本工程的范围、分工选择与待办见 [物理/角色路线](../plans/physics-character-roadmap.md)。
+所查适配链没有建立完整可配置物理材质、动力学、Trigger、Joint、Ragdoll、Cloth、Vehicle 功能证明。对应本工程的范围、分工选择与待办见 [physics-character-roadmap.md](../plans/physics-character-roadmap.md)。
 
 ## 补充核查：动画求值、蒙皮与跨 Pass 一致性（2026-10-03）
 
@@ -97,7 +101,7 @@ PhysicsScene 构造对全局 `JPH::Factory::sInstance` 赋值，析构删除该�
 | Palette 与索引 | Skeleton 输出元素标记 boneID+1；MeshComponent 先放 identity，再按结果数组顺序放矩阵，没有按元素 index 定位。JSON 绑定索引被原样复制，主 Shader 仅累计至多四个 index>0 且 weight>0 的项。顺序与索引必须相容，identity 槽也不自动成为 fallback；不能把该约定照搬为 glTF Joint 0 无效。[输出](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/animation/skeleton.cpp#L119)、[Palette](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/framework/component/mesh/mesh_component.cpp#L70)、[绑定加载](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/render_resource_base.cpp#L133)、[主 Shader](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/mesh.vert#L72) |
 | 阴影与 Pick | 方向光/点光阴影消费蒙皮后的 model_position；Pick Shader 虽计算该变量，最终 gl_Position 却使用原始 in_position，且 PickPass 实际使用此 Shader。这是所查路径不一致的源码证据，不是本次已运行观察到的画面结果。[方向光](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/mesh_directional_light_shadow.vert#L30)、[点光](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/mesh_point_light_shadow.vert#L30)、[Pick Shader](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/mesh_inefficient_pick.vert#L42)、[PickPass](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/pick_pass.cpp#L208) |
 
-在所查动画与相关资源路径未建立状态机、BlendSpace、IK、Root Motion 提取/应用、事件及通用 Retarget 完整链路的证据。可借鉴基础数据流，但不把占位结构当作本工程的已完成方案。glTF 采样语义与本项目候选实验另见 [动画路线](../plans/animation-roadmap.md)；采样/蒙皮、输入格式子集、状态/事件和跨 Pass 一致性均需实际实现后验收。
+在所查动画与相关资源路径未建立状态机、BlendSpace、IK、Root Motion 提取/应用、事件及通用 Retarget 完整链路的证据。可借鉴基础数据流，但不把占位结构当作本工程的已完成方案。glTF 采样语义与本项目候选实验另见 [animation-roadmap.md](../plans/animation-roadmap.md)；采样/蒙皮、输入格式子集、状态/事件和跨 Pass 一致性均需实际实现后验收。
 
 ## 补充核查：Gameplay、Lua 与 AI 边界（2026-10-03）
 
@@ -111,7 +115,7 @@ PhysicsScene 构造对全局 `JPH::Factory::sInstance` 赋值，析构删除该�
 | 当前玩家 3C | Motor/Camera 校验宿主 ID 是否为活动玩家，不相同则返回；Motor 消费玩家命令，Camera 分派第一/第三人称与自由模式，Character 协调目标位置与朝向。不能直接视作多 NPC 的通用意图执行架构。[Motor](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/framework/component/motor/motor_component.cpp#L53)、[Camera](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/framework/component/camera/camera_component.cpp#L48)、[Character](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/character/character.cpp#L41) |
 | 通用 AI 结论 | 限定搜索自有 runtime 的 FSM/StateMachine、BT、A*/Pathfinding、NavMesh/Recast/Detour、Perception、EventBus，未建立完整通用系统链路证据。但 Motor 有 idle/rising/falling 局部 JumpState，不能说“完全没有任何状态逻辑”。[JumpState](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/framework/component/motor/motor_component.h#L16)、[局部转换](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/framework/component/motor/motor_component.cpp#L120) |
 
-本工程采用哪些规则、决策与导航能力见 [Gameplay/AI 路线](../plans/gameplay-ai-roadmap.md)。原笔记中的射击/战斗案例不扩张已确认的无战斗训练场范围。
+本工程采用哪些规则、决策与导航能力见 [gameplay-ai-roadmap.md](../plans/gameplay-ai-roadmap.md)。原笔记中的射击/战斗案例不扩张已确认的无战斗训练场范围。
 
 ## 补充核查：粒子链路与音频接入范围（2026-10-03）
 
@@ -123,9 +127,9 @@ PhysicsScene 构造对全局 `JPH::Factory::sInstance` 赋值，析构删除该�
 | GPU 池与模拟 | Kickoff 根据空闲数生成发射/模拟的 dispatch 参数并翻转 Alive 标记；Emit 原子取得空闲槽位，Simulate 回收死亡粒子、写另一个 Alive 列表及紧凑绘制数据。CPU 确实调用 kickoff dispatch 和后续 dispatchIndirect。[Kickoff](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/particle_kickoff.comp#L49)、[Emit](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/particle_emit.comp#L174)、[回收/输出](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/particle_simulate.comp#L144)、[模拟调用](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/particle_pass.cpp#L1685) |
 | 回读与绘制 | simulate 逐 emitter 等待 fence，复制 Counter 到 host buffer，再等待/queueWaitIdle 并 map 读取存活数更新 CPU m_num_particle；draw 使用 cmdDraw(4, count)，不是 drawIndirect。只能称 GPU Compute 模拟＋间接 dispatch，不能称全程无回读或已证明高效。[复制准备](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/particle_pass.cpp#L1711)、[等待/读取](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/particle_pass.cpp#L1796)、[直接绘制](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/particle_pass.cpp#L309)、[Billboard](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/particlebillboard.vert#L31) |
 | 深度碰撞与排序 | 输入为主深度和 GBuffer A 法线。Shader 只在投影 XY 屏幕范围内采样，以源码中的厚度 0.5 判断、速度朝表面时反射并乘 0.4；这些不是本工程选定参数。屏外/隐藏表面不完整，Forward 也不能仅凭调用粒子就宣称法线输入正确。限定 Manager/Pass/Shader 未见排序阶段，原子压紧不等于透明排序；实际 alpha 混合且不写深度。[输入](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/main_camera_pass.cpp#L2717)、[碰撞](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/shader/glsl/particle_simulate.comp#L83)、[混合状态](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/particle_pass.cpp#L1158) |
-| 音频范围 | 所查自有 runtime、Runtime/Engine CMake 和 global context 未发现完整 source/listener/device/playback 接入；NOSOUND 宏命中与声音系统无关。不据此断言全部历史或第三方代码没有音频能力。[Runtime 清单](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/CMakeLists.txt#L43)、[系统初始化](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/global/global_context.cpp#L26) |
+| 音频范围 | 所查自有 runtime、Runtime/Engine CMake 和 global context 未发现完整 source/listener/device/playback 接入；NOSOUND 宏命中与声音系统无关。不据此断言全部历史或第三方代码没有音频能力。[CMakeLists.txt](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/CMakeLists.txt#L43)、[系统初始化](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/global/global_context.cpp#L26) |
 
-据此可参考粒子生命周期和数据流，再单独设计时间、排序、同步与测量；音频需另选后端与明确参考。当前方向、范围和待办见 [粒子/声音路线](../plans/particles-audio-roadmap.md)，没有本工程粒子或声音运行验证。
+据此可参考粒子生命周期和数据流，再单独设计时间、排序、同步与测量；音频需另选后端与明确参考。当前方向、范围和待办见 [particles-audio-roadmap.md](../plans/particles-audio-roadmap.md)，没有本工程粒子或声音运行验证。
 
 ## 补充核查：工具编辑、模式切换与观察边界（2026-10-03）
 
@@ -142,7 +146,7 @@ PhysicsScene 构造对全局 `JPH::Factory::sInstance` 赋值，析构删除该�
 
 工具链笔记的编辑事务、Command、Schema、PIE 与反射作为设计学习入口；旧案例中属性生效的说明需按具体版本和实际消费者复核。原笔记保持不改，本页记录固定 main 的差异，不将课程示意当作源码保证。
 
-我们已确认的有限 Undo、运行隔离与轻量观察分期见 [工具/调试路线](../plans/tools-debug-roadmap.md)，这是本项目设计，不是声称 Piccolo 已具备这些完整能力。[Dear ImGui 官方项目](https://github.com/ocornut/imgui)说明界面工具包的定位，[Khronos glQueryCounter](https://github.com/KhronosGroup/OpenGL-Refpages/blob/main/gl4/glQueryCounter.xml)用于后续 GPU 时间查询机制参考；UI 库尚未选定，初版仅 FPS/帧耗时，没有本工程性能测量结果。
+我们已确认的有限 Undo、运行隔离与轻量观察分期见 [tools-debug-roadmap.md](../plans/tools-debug-roadmap.md)，这是本项目设计，不是声称 Piccolo 已具备这些完整能力。[Dear ImGui 官方项目](https://github.com/ocornut/imgui)说明界面工具包的定位，[Khronos glQueryCounter](https://github.com/KhronosGroup/OpenGL-Refpages/blob/main/gl4/glQueryCounter.xml)用于后续 GPU 时间查询机制参考；UI 库尚未选定，初版仅 FPS/帧耗时，没有本工程性能测量结果。
 
 ## 补充核查：主流程、同步加载与内部线程（2026-10-03）
 
@@ -159,7 +163,7 @@ PhysicsScene 构造对全局 `JPH::Factory::sInstance` 赋值，析构删除该�
 
 本次所查自有主流程未发现接入的通用引擎 Job 调度器或完整数据导向 ECS。Vulkan 队列/Compute 的 GPU 工作、库内 Worker 和异步日志均需单独区分。由此可借鉴数据交接与组件职责，再自行定义本项目的布局与调度实验，不能把课程第20节所有架构机制标为 Piccolo 已完成。
 
-本轮另局部复习第20节的 3.11、4.7–4.8、5.8–5.9、6.3–6.7，区分数据组织、任务执行、执行上下文与测量；有栈机制对应 3.3.6，普通 C# 状态机示例不能冒充有栈 Fiber。外部原理核对采用 [Microsoft TPL 概览](https://learn.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl) 与 [并行编程注意事项](https://learn.microsoft.com/en-us/dotnet/standard/parallel-programming/potential-pitfalls-in-data-and-task-parallelism)：并行仍需处理分块、共享状态与等待，调度开销可能抵消收益。选定路线及尚未定案的具体机制见 [核心架构路线](../plans/core-architecture-roadmap.md)，没有本工程调度或性能结果。
+本轮另局部复习第20节的 3.11、4.7–4.8、5.8–5.9、6.3–6.7，区分数据组织、任务执行、执行上下文与测量；有栈机制对应 3.3.6，普通 C# 状态机示例不能冒充有栈 Fiber。外部原理核对采用 [Microsoft TPL 概览](https://learn.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl) 与 [并行编程注意事项](https://learn.microsoft.com/en-us/dotnet/standard/parallel-programming/potential-pitfalls-in-data-and-task-parallelism)：并行仍需处理分块、共享状态与等待，调度开销可能抵消收益。选定路线及尚未定案的具体机制见 [core-architecture-roadmap.md](../plans/core-architecture-roadmap.md)，没有本工程调度或性能结果。
 
 ## OpenTK 4.9.4：矩阵与 GPU 上传
 
@@ -223,7 +227,7 @@ PhysicsScene 构造对全局 `JPH::Factory::sInstance` 赋值，析构删除该�
 
 GLFW 的窗口销毁会同时销毁上下文；GL 调用需要正确上下文在当前线程上。GC 不负责替应用执行 GL 删除，也不能把 GL 删除放到无上下文保证的终结器线程。`using` 则会在正常离开及托管异常展开时调用 Dispose。[GLFW 当前上下文](https://www.glfw.org/docs/3.4/context_guide.html#context_current)、[GLFW 窗口销毁](https://www.glfw.org/docs/3.4/group__window.html#gacdf43e51376051d2c091662e9fe3d7b2)、[.NET Dispose](https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose)、[C# using](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/statements/using)
 
-## 后续验证建议及未验证事项
+## 开工前的验证建议及当时未验证事项
 
 - 当前 Engine + Sandbox 容器足以承载小规模验证，不必先新增测试项目或测试框架包。可在 Sandbox 规划独立 CPU 自检入口，使用显式断言和失败退出码；现有仅打印环境信息的 `--smoke` 不替代这些检查，也不能只用 Release 中可能不执行的 `Debug.Assert`。
 - 固定步调度用合成时间序列验证小于一步、跨步、多步、长暂停和剩余时间策略；矩阵用手算预期值、非交换变换和近远面测试验证。应调用实际待验证逻辑，而非仅复制其公式。

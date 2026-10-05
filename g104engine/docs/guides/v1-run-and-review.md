@@ -1,6 +1,23 @@
-# 基础综合训练场 V1：运行、验收与学习
+# 基础综合训练场V1：运行、操作与验证
 
-更新：2026-10-04。V1首轮实现、独立评审及反馈修复已落地；用户明确确认下方第一轮验收第1–5项初步体验无问题，**V1首轮人工验收通过（初步、非穷尽）**。后续Bug继续反馈修复，当前进入源码学习与调试练习；既有自动证据见 [独立评审](../reviews/v1-independent-review-2026-10-03.md) 和 [UI修复记录](../reviews/v1-ui-mouse-fix-2026-10-04.md)，学习掌握仍另行自测。
+本页直接说明现有工程怎样运行、保护设计、按问题选择验证并解释结果。它不要求先读历史探针/方案/台账；当前任务与用户验收结论以 [status.md](../status.md) 为准，执行/安装/Git权限见 [agent-workflow.md](../agent-workflow.md)。下面是命令参考，本轮文档改造没有运行任何命令。
+
+<a id="run-and-verify"></a>
+<a id="命令行验证入口"></a>
+## 目录、前提与最短运行方式
+
+本机工程目录是E:\game_study\games104\g104engine，解决方案是g104engine.slnx；启动项目G104.Sandbox，Debug或Release/x64。已锁SDK10.0.401、net10.0、九个Engine直接包及双锁文件；运行所需assets/OpenAL按项目复制到输出。FFmpeg/Python仅参与已完成离线准备，普通运行不需要它们。
+
+已有输出可直接运行DLL；需要构建时只使用已有还原依赖。没有对应SDK/还原产物时先保留错误，按VS处理，不在验证命令中自动restore、升级包或重建工程。构建更新bin/obj，运行的当前目录和应用assets目录不是同一概念。
+
+在PowerShell中：
+
+```powershell
+Set-Location -LiteralPath 'E:\game_study\games104\g104engine'
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll
+```
+
+无参数为可见Edit训练场；Play/F5开始运行，Stop返回当前内存设计。普通无参数运行会读取真实用户保存设计，下方所有自动验证使用隔离根。可选在VS打开现有方案，选择G104.Sandbox与Debug/x64，用F5调试或Ctrl+F5普通运行。
 
 ## 在VS中运行
 
@@ -21,6 +38,7 @@
 
 如果键盘焦点在工具控件，点击画面空白处再操作。玩家初始在场地南侧，朝前走到橙色按钮附近按E，门升起后穿过门洞进入绿色目标区。侧面设有墙滑区、有限坡和四级台阶；NPC使用平面A*巡逻/感知/跟随/搜索/返回，路径可在右侧开启叠加显示。
 
+<a id="design-protection"></a>
 ## 编辑和数据保护
 
 左侧树选择对象，可创建Cube/Group/Light、修改局部位置/旋转/缩放、材质和已声明参数、重挂接及删除。连续拖动合并为一条Undo，Escape恢复原值。删除组覆盖整棵子树；若外部按钮仍引用门，先解除引用才能删除。玩家/NPC为根节点、单位缩放；有子对象的父节点用正统一缩放，角色/移动门下只允许纯显示后代。
@@ -58,49 +76,87 @@ Load saved/Reset seed在未保存状态下提供Save and load、Discard and load
 
 Forward/Deferred在编辑态选择，下一次Play生效；共用场景、材质、骨骼与光源。右侧View可观察Base color、Normals、Roughness、Depth、Shadow，另外有选中骨架/路径叠加、动画状态与事件、声音测试、FPS/帧耗时。Loop test是低音测试信号，用于循环/停止观察，不是成品背景音乐。
 
-## 建议的第一轮用户验收
 
-**本轮结论：通过（初步、非穷尽）。** 2026-10-04用户明确表示本节第1–5项初步验收没问题，可暂记为通过，未穷尽所有分支，后续发现Bug再反馈。不把穷尽分支作为本轮通过的前置条件，也不推定跨设备/所有极端组合或源码学习已完成；下面步骤保留为操作与问题复试依据，不要求重复整轮验收。
+## 按任务选择验证
 
-用户反馈的球/Ramp附近SceneValidationException已专项修复，转身、球区移动、上下坡也已有单独人工确认。六个PBR球是纯材质展示、没有Collider，经过它们是当前设计；Ramp有真实Box碰撞，见 [修复记录](../reviews/v1-contact-exit-fix-2026-10-03.md)。
+先选最相关入口，不能把本表当成每次必须整轮执行。CPU/原生/GL/音频输出与手感/学习掌握各自形成证据。
 
-**UI鼠标修复已人工通过：** 2026-10-04用户明确反馈“验证鼠标点击事件已修复”。[专项记录](../reviews/v1-ui-mouse-fix-2026-10-04.md)保留误清控件激活状态/短点击丢失的修复及双配置回归证据；随后整体第1–5项也获初步验收通过。
+| 目的 | 参数 | 预期执行与边界 |
+| --- | --- | --- |
+| 核对托管入口/架构/三OpenTK程序集 | --smoke | 打印Mode/Framework/OS/Process arch及三个程序集版本，Smoke result: PASS/exit0；没有独立断言，不初始化GLFW/GL，不验证全部九包 |
+| Core/导航/物理/玩法/动画/场景/WAV行为 | --verify | 各模块PASS及Verification complete；含原生Jolt，WAV只解析，不创建GL/音频device |
+| 已有七个具名导航/玩法专项 | --review-baseline | 每项PASS/FAIL汇总，失败exit1；完整verify也覆盖相应行为 |
+| 编辑草稿/事务/Saved基准 | --verify-ui | 真实cimgui独立上下文，11项；不经过生产OpenTK输入，不创建GL |
+| 生产窗口鼠标/文字/焦点等输入 | --verify-ui-input | 隐藏Windows/GL窗口，Win32→GLFW/OpenTK→生产ImGui适配和共享清焦；13项，不读取保存设计或移动桌面鼠标，不直接完成完整Play准备 |
+| BRDF/HDR/透明/UV/共享mesh | --verify-render | 隐藏GL4.3，10项独立公式/实际GPU读回，验证自己准备及清理的资源；不等于所有材质/视角正确 |
+| 场景转向/接触回归 | --verify-contacts | 38种变换/真实种子路线；部分检查创建Jolt，全部汇总后失败exit1 |
+| 球区/Ramp生产隐藏窗口九路 | --exercise-contacts | 默认800帧，显式frames不得少于800；真正Stop/Play/运动/动画/绘制，六球纯显示无Collider，Ramp有Box |
+| 后端播放与清理 | --verify-audio | 真正device/context/buffer及2D/3D source、loop暂停恢复停止清理；正常打印PASS OpenAL actual...，不替代左右/远近听辨 |
+| 集成绘制/PlayStop/编辑保存/生命周期 | --exercise --frames 240 | 隐藏GL与脚本输入，检查完整链及GL错误；可选capture-root产生隔离截图，不替代真实键鼠/效果观察 |
 
-**基础操控与玩法主线操作参考：** 左Shift跑、Space跳、贴墙斜走与四级台阶；右键环绕/滚轮调距，观察镜头遮挡及动作衔接。靠近橙色按钮按E，穿过打开的门进入绿色目标区中心，查看右上角`Runtime / Render debug`面板：`NPC: ... | Path: ...`下一行应显示`Training complete! Stop and Play to repeat.`，上方状态变为`Door: open | Goal: True`。提示是面板普通文字，后续按E交互可能替换该文字；当前Play内`Goal: True`仍保留完成状态，Stop后该运行状态不显示，下次Play重新开始。若仍为`Goal: False`，检查门已打开且角色走入绿色目标中心。开启路径叠加观察NPC的Patrol；从正面无遮挡处靠近触发Follow，再跑远或躲到实体墙后持续保持失视，观察Search→Return→Patrol；再次被看见会恢复Follow，NPC感知与开门/目标无触发依赖。按“操作—实际现象—预期”反馈问题，之后再按下列完整清单分组继续。
+### 可复制命令与输出位置
 
-1. Debug/x64运行：移动/跑跳/墙滑/坡台，观察相机遮挡；用E开门并进入目标，观察NPC路径和反馈。
-2. Stop后切换Deferred再Play，对比相同设计；检查阴影、天空、PBR样例球、纹理探针和调试视图。
-3. Stop后创建/移动Cube，Undo/Redo；重挂Group观察子变换，Play再Stop确认未保存编辑还在。
-4. Save，关闭并重新运行，确认设计恢复；试Load/Reset取消与保留原件流程，查看界面实际保存路径。
-5. 听2D/3D、脚步/跳跃/机关反馈与Loop停止；缩放、最小化/恢复、失焦回切和正常关闭，检查有没有异常。
-
-动画定义在 [character-animation.json](../../assets/config/character-animation.json)：可改Idle/Walk/Run/Jump动作映射、参考速度、过渡/状态秒数和事件标记，重建/重启后生效；错误配置明确拒绝，不制作通用节点编辑器。Clip采样、跨Clip混合和上一/当前局部Pose的显示插值分别实现，身体与骨架共用alpha；向下离地是Fall，实际接地才Land。
-
-不用一次读完所有代码。先按 [实际架构与学习入口](v1-architecture-and-learning.md) 看Engine/Sandbox及帧数据流，再读 [场景/编辑](scene-and-editor.md)、[物理/Gameplay](physics-and-gameplay.md)、[渲染/动画](rendering-and-animation.md)，结合 [learning-map](../learning-map.md) 返回对应笔记大章。最后尝试调参、画出查询/蒙皮/存档流程，定位一次真实问题。
-
-## 命令行验证入口
-
-在g104engine目录使用现有已还原依赖，命令示例：
+命令工作目录均是上面的g104engine。Debug已有依赖下的显式构建为：
 
 ```powershell
 dotnet build g104engine.slnx --no-restore --disable-build-servers -m:1 -c Debug -p:Platform=x64
+```
+
+这条命令禁止还原，不等于重新验证锁定还原；缺失缓存会失败。需要Release时把-c Debug改为-c Release，并使用对应Release输出；不只改运行参数。
+
+```powershell
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --smoke
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify --user-data-root .cache/execution/manual-verify
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --review-baseline --user-data-root .cache/execution/manual-baseline
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-ui --user-data-root .cache/execution/manual-ui
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-ui-input --user-data-root .cache/execution/manual-ui-input
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-render --user-data-root .cache/execution/manual-render
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-contacts --user-data-root .cache/execution/manual-contacts
-dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --exercise-contacts --user-data-root .cache/execution/manual-contact-window
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --exercise-contacts --frames 800 --user-data-root .cache/execution/manual-contact-window
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-audio --user-data-root .cache/execution/manual-audio
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --exercise --frames 240 --user-data-root .cache/execution/manual-graphics --capture-root .cache/execution/manual-captures
 ```
 
-`--smoke`只保留托管环境信息用途；`--verify`包括原生Jolt但不创建GL窗口；`--verify-audio`真的创建音频device/context；`--exercise`用隐藏GL窗口和脚本输入验证真实蒙皮/双管线/工具生命周期，必须显式提供隔离数据根，不代替人工键鼠、试听和手感。Windows受限沙箱可能拒绝File.Replace等原子文件操作；本次在获准环境重跑通过，未修改正确存档语义来绕过。
+每次一个模式，不把不同验证参数堆成一个调用；Program按分支选择，并不会自动把它们全部运行。user-data-root相对当前目录解析为工作区.cache下绝对路径；验证文件在该根或随机子目录（verify使用Checks），不要指向真实用户Scenes。exercise强制显式隔离根，其他命令也按本页传入它。应用资源默认来自相应输出目录assets。
 
-`--verify-ui`调用真实原生cimgui输入检查草稿、拖动事务及Saved基准，不创建GL窗口；`--verify-render`创建隐藏GL4.3窗口，读回HDR/G-buffer并与独立公式比较，也检查覆盖拒绝及资产解释。都使用显式隔离根；Release把路径中的Debug替换为Release即可。`--review-baseline`为本轮七个具名导航/玩法入口，完整`--verify`也包含这些行为。
+结果首先打印到终端；参数不会自动保存统一.log。需要保留证据时，另给本次操作命名并将终端输出存工作区.cache，记录命令/配置/日期/退出码，不覆盖旧批次日志。bin/obj、隔离数据和截图是本机生成物，不随Git同步。exercise-contacts不生成旧240帧截图序列；capture-root参数存在不代表已经产出图片，核对实际文件。
 
-`--verify-ui-input`创建隐藏Windows/GL窗口，定向Win32消息经GLFW/OpenTK、生产ImGui后端和共享清焦策略驱动真实控件，13项覆盖点击/下拉/勾选/拖动/文字/焦点/滚轮及F5输入可用性，不读取保存设计，也不移动桌面鼠标；人工体验独立记录，用户已确认鼠标点击修复，其他体验不从这些自动结果推定通过。
+### 失败处理与结果解释
 
-`--verify-contacts`独立检查38种变换/真实种子运动路线，失败汇总后退出1；`--exercise-contacts`走真实隐藏窗口的6球及Ramp上/下/侧九路，默认800帧，显式frames不能少于800，并强制隔离数据根。后者不输出旧240帧截图序列；实际绘制由每段计数和GL错误检查验证，不把capture-root当作截图已产生。两个配置本批专项和旧240帧均通过；不会自动覆盖你的保存设计。
+- 非零退出码或FAIL：保留首个异常及完整输出、命令、配置、SDK/DLL路径、隔离根和复现步骤；Program顶层异常输出到stderr并exit1。单纯出现PASS字符串不足以抵消其他失败。
+- 构建找不到SDK/包：核对global.json与实际SDK/还原产物，返回VS处理；不删锁文件、改目标框架或省略no-restore掩盖问题。
+- 原生DLL/GL初始化失败：区分x64部署、加载、当前GL4.3 Core和驱动能力，保留版本/vendor/renderer；不静默降级或自动升级驱动。OpenAL不可用的状态不记为播放通过。
+- File.Replace等被受限环境拒绝：保留权限/路径证据，用获授权的可写验证环境核对；不取消正确原子保存语义，也不改用真实用户目录绕过。
+- 隐藏窗口成功只覆盖该输入/相机/帧数。CPU/GPU公式、GL无错误、人工画面/听感、学习解释、性能与跨设备不能相互代替；FPS/双管线图像接近不证明性能优劣。
 
-素材来源及SHA见 [准备清单](../plans/v1-dependencies-and-assets.md) 和 `assets/licenses/asset-manifest.json`；`tools/prepare_assets.py`只负责已核对输入的提取/程序测试资产和离线转换，FFmpeg缓存不进入应用。D5、跨设备/CI、IBL与其他后移专题仍未恢复。
+## 定向人工操作与学习
+
+1. Debug/x64移动/跑跳/墙滑/坡台，用E开门进入目标，观察相机及NPC巡逻→跟随→失视搜索→返回。
+2. Stop后选Deferred再Play，对比同设计，观察阴影/天空/PBR球/纹理及调试视图。
+3. 编辑Cube/Group、Undo/Redo、保world重挂接；Play再Stop确认未保存设计仍在。
+4. Save后关闭/重启，看实际用户保存路径及恢复；Load/Reset用上面临时Cube步骤区分Cancel、Discard、Save and load。
+5. 听2D/3D/脚步/跳跃/机关及Loop停止；观察缩放/最小化恢复/失焦/关闭。按操作—实际—预期反馈，只针对问题复试，不把尚未覆盖的组合先记为通过。
+
+门洞有人拒绝关闭；进入绿色中心后Runtime/Render debug显示Training complete及Goal: True。E的后续反馈可能替换提示文字，Goal锁存至Stop；Stop→Play开启新一轮。六PBR球无Collider，走过显示位置符合设计；Ramp有真实旋转Box碰撞。
+
+动画定义在 [character-animation.json](../../assets/config/character-animation.json)，修改源码目录配置后重建/重启生效，不具备运行热重载。Clip采样、跨Clip混合与局部Pose显示插值分别实现；身体与骨架共用alpha，下落为Fall，实际接地才Land。完整W/Space断点与自测在 [learning-map.md](../learning-map.md#first-input-lesson)，这是可选下一任务，不是运行前提。
+
+<details>
+<summary>可选：2026-10-04首轮人工反馈与已修专项的来源</summary>
+
+## 建议的第一轮用户验收
+
+**本轮结论：通过（初步、非穷尽）。** 2026-10-04用户明确表示当时指南第1–5项（操控玩法、渲染、设计编辑、保存恢复、声音/窗口）初步验收没问题，可暂记为通过，未穷尽所有分支，后续发现Bug再反馈。不把穷尽分支作为本轮通过的前置条件，也不推定跨设备/所有极端组合或源码学习已完成；本页上方的现行操作说明保留为学习与问题复试依据，不要求重复整轮验收。
+
+用户反馈的球/Ramp附近SceneValidationException已专项修复，转身、球区移动、上下坡也已有单独人工确认。六个PBR球是纯材质展示、没有Collider，经过它们是当前设计；Ramp有真实Box碰撞，见 [v1-contact-exit-fix-2026-10-03.md](../reviews/v1-contact-exit-fix-2026-10-03.md)。
+
+**UI鼠标修复已人工通过：** 2026-10-04用户明确反馈“验证鼠标点击事件已修复”。[v1-ui-mouse-fix-2026-10-04.md](../reviews/v1-ui-mouse-fix-2026-10-04.md)保留误清控件激活状态/短点击丢失的修复及双配置回归证据；随后整体第1–5项也获初步验收通过。
+
+**基础操控与玩法主线操作参考：** 左Shift跑、Space跳、贴墙斜走与四级台阶；右键环绕/滚轮调距，观察镜头遮挡及动作衔接。靠近橙色按钮按E，穿过打开的门进入绿色目标区中心，查看右上角`Runtime / Render debug`面板：`NPC: ... | Path: ...`下一行应显示`Training complete! Stop and Play to repeat.`，上方状态变为`Door: open | Goal: True`。提示是面板普通文字，后续按E交互可能替换该文字；当前Play内`Goal: True`仍保留完成状态，Stop后该运行状态不显示，下次Play重新开始。若仍为`Goal: False`，检查门已打开且角色走入绿色目标中心。开启路径叠加观察NPC的Patrol；从正面无遮挡处靠近触发Follow，再跑远或躲到实体墙后持续保持失视，观察Search→Return→Patrol；再次被看见会恢复Follow，NPC感知与开门/目标无触发依赖。后续出现问题按“操作—实际现象—预期”反馈；本页上方的“定向人工操作与学习”清单作后续学习与定向复试参考，不代表其整理后的全部细项已逐项人工验证，首轮通过后无需重新整轮执行。
+
+
+</details>
+
+可选证据：[v1-progress.md](../execution/v1-progress.md)、[v1-independent-review-2026-10-03.md](../reviews/v1-independent-review-2026-10-03.md)、[v1-ui-mouse-fix-2026-10-04.md](../reviews/v1-ui-mouse-fix-2026-10-04.md)、[v1-contact-exit-fix-2026-10-03.md](../reviews/v1-contact-exit-fix-2026-10-03.md)。2026-10-03 GPU10项及接触38项/800帧、2026-10-04 UI13项/旧UI11项/verify/240帧属于不同批次，旧PASS不能代替改动后的验回；本轮文档改造未重跑。
+
+素材许可/SHA与离线工具合同见 [dependencies.md](dependencies.md#assets-and-conversion) 和 [asset-manifest.json](../../assets/licenses/asset-manifest.json)。历史蓝色探针仅用于基础环境，不应覆盖现有Program；其教学原文可选查 [foundation-setup-and-probes.md](../archive/foundation-setup-and-probes.md#foundation-20261002)。

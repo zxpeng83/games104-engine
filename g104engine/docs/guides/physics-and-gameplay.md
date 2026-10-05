@@ -1,6 +1,6 @@
 # V1物理、角色、导航与玩法代码入口
 
-更新：2026-10-03。本页描述已落地实现和实际自检；整体窗口效果、手动体验和其他模块验收由总体验收记录分别说明。
+本页解释Jolt适配、自研角色、受控平面导航及训练场规则。坐标/尺寸、查询、算法和失败条件直接列出；现行任务查 [status.md](../status.md)，操作政策查 [agent-workflow.md](../agent-workflow.md)。历史调查放在页末可选证据中，不要求先读台账。
 
 ## 职责与数据
 
@@ -17,11 +17,12 @@ V1设计参数未开放Skin字段，采用CharacterSettings的默认Skin=0.025m�
 
 SceneGraph持有逻辑姿态。角色控制器提交世界位置，基础in-place动画读取实际Speed/Grounded/VerticalVelocity。显示插值由场景/窗口负责，不回写碰撞世界。角色胶囊只作为查询形状，不注册为可互推的刚体，所以角色彼此不推挤。
 
-正式种子的六个`PBR sample`球只有渲染几何，没有Collider，角色可经过球的显示位置；不能把靠近它们时的异常直接归为球碰撞。右侧`Ramp`则保留旋转Box碰撞，低端朝-Z、高端朝+Z，可从低端上坡，高侧超过角色跨步上限时应阻挡。2026-10-03用户反馈的退出已在不创建PhysicsWorld的纯SceneGraph南向转身中复现：接近180°时旧矩阵分解误拒合法TRS，详见[本次修复记录](../reviews/v1-contact-exit-fix-2026-10-03.md)；本批没有修改Jolt查询边界或角色接触算法。
+正式种子的六个`PBR sample`球只有渲染几何，没有Collider，角色可经过球的显示位置；不能把靠近它们时的异常直接归为球碰撞。右侧`Ramp`则保留旋转Box碰撞，低端朝-Z、高端朝+Z，可从低端上坡，高侧超过角色跨步上限时应阻挡。2026-10-03用户反馈的退出已在不创建PhysicsWorld的纯SceneGraph南向转身中复现：接近180°时旧矩阵分解误拒合法TRS，详见[v1-contact-exit-fix-2026-10-03.md](../reviews/v1-contact-exit-fix-2026-10-03.md)；本批没有修改Jolt查询边界或角色接触算法。
 
+<a id="jolt-matrix"></a>
 ## 固定Jolt版本与矩阵边界
 
-采用既有JoltPhysicsSharp 2.22.0和JoltPhysics.Native 1.1.0。NuGet元数据中的绑定源码提交为`77a5be2dd30d587c1981dfcaf15851f18041b39c`，原生joltc提交为`59f7d63ff7760981b771b6b161346fcc007f4dfd`。本次通过本机DLL反射核对实际公开签名，未新增包或升级SDK。
+采用既有JoltPhysicsSharp2.22.0和JoltPhysics.Native1.1.0。实施时核对的NuGet绑定源码提交为 `77a5be2dd30d587c1981dfcaf15851f18041b39c`，原生joltc为 `59f7d63ff7760981b771b6b161346fcc007f4dfd`，当时通过本机DLL反射核对公开签名。这些签名/反射核对发生在实施阶段；文档改造没有重做反射或应用验证。
 
 绑定的[Matrix4x4Extensions.ToJolt固定源码](https://github.com/amerkoleci/JoltPhysicsSharp/blob/77a5be2dd30d587c1981dfcaf15851f18041b39c/src/JoltPhysicsSharp/Matrix4x4Extensions.cs)内部会转置Matrix4x4；[NarrowPhaseQuery固定源码](https://github.com/amerkoleci/JoltPhysicsSharp/blob/77a5be2dd30d587c1981dfcaf15851f18041b39c/src/JoltPhysicsSharp/NarrowPhaseQuery.cs)的单精度形状查询调用它。该公开参数实际按列向量矩阵使用，不能直接传本项目行向量的Numerics.CreateTranslation结果。
 
@@ -31,6 +32,7 @@ PhysicsWorld.QueryTransform集中执行一次转置后再交给包装层。最�
 
 每个PhysicsWorld拥有自己的PhysicsSystem、Body、Shape、过滤器和JobSystem；全局Foundation以活动世界数计数。新旧场景可同时准备，释放一个世界不会提前关闭另一个世界的Jolt。Dispose明确注销/销毁刚体、释放查询与环境形状、系统/线程池/过滤器，最后在最后一个世界释放时Shutdown。
 
+<a id="character"></a>
 ## 角色算法与公开查询
 
 - `Raycast(origin,direction,maxDistance)`归一化direction，未命中返回null；命中包含ObjectId/Position/Normal/Distance。用于相机遮挡、NPC视线和地面采样。
@@ -44,6 +46,7 @@ PhysicsWorld.QueryTransform集中执行一次转置后再交给包装层。最�
 
 迭代次数、Skin和GroundSnap均有限；这不是任意复杂接触的工业级控制器。未使用Jolt CharacterVirtual/Character的完整控制器代替自研规则。V1没有移动平台携带、推箱、角色推挤或复杂挤压恢复；动态箱仅用于证明后端重力/接触/睡眠/清理能力，不作为训练场推箱玩法。
 
+<a id="npc-navigation"></a>
 ## 导航与NPC
 
 NavigationGrid限定在一个XZ平面。默认范围[-12,12]、PlaneY=0、CellSize=0.65m，可由NPC的`navMinX/navMinZ/navMaxX/navMaxZ/navPlaneY/navCellSize`配置。地面射线检查平面高度和接近水平的法线，胶囊重叠检查半径/高度净空；没有用渲染AABB代替精确角色占用。
@@ -62,6 +65,7 @@ TrainingSimulation的NPC FSM为Patrol→Follow→Search→Return。感知每0.2�
 
 Tick先处理本步交互/物理，执行玩家意图与NPC上一固定步已提交的意图，再由更新后的世界状态生成NPC下一步意图。默认一个NPC，没有群体避让。NpcPath提供实际路径点供窗口绘制，NpcMode/NpcTask/NpcNavigationResult/NpcReason用于区分决策、搜索与碰撞结果。
 
+<a id="interaction-events"></a>
 ## 机关事实与反馈
 
 GameInput拆分Move/Sprint持续状态与Jump/Interact边沿，并接受本帧确定的CameraYaw。输入采集/多补步边沿消费属于窗口/Core；Simulation不重复生成键盘输入。
@@ -70,9 +74,24 @@ GameInput拆分Move/Sprint持续状态与Jump/Interact边沿，并接受本帧�
 
 Events每Tick清空，随后只发布当步发生的事实。声音键为`footstep/jump/land/button/door/complete/denied`，每项含世界位置、颜色及是否产生粒子。表现系统在Tick后消费一次，不在每次Render重发。Goal支持Box触发体或水平radius/triggerRadius；有Door时要求门已经打开，完成状态锁存，完成反馈只产生一次。
 
+<a id="physics-evidence"></a>
 ## 真实验证与限制
 
-本次接近球/坡回归另有[ContactApproachVerification](../../samples/G104.Sandbox/Gameplay/ContactApproachVerification.cs)的`--verify-contacts`纯CPU入口，以及[ContactWindowExercise](../../samples/G104.Sandbox/Tools/ContactWindowExercise.cs)的`--exercise-contacts --user-data-root <独立测试目录>`隐藏窗口入口。后者默认800帧，显式`--frames`不得低于800；与原`--exercise`240帧路线分开。窗口分九段正常Stop/Play，仅在原种子的内存副本中设置玩家起点/初始朝向，保留原NPC及全部几何/Collider，不保存路线设计。六球各70帧南向走/跑穿越，原Ramp上坡120帧、下坡120帧、高侧阻挡140帧；输入经过原InputBuffer、固定步、Simulation、动画、相机、声音与实际OpenGL绘制。断言包含实际越过球心、坡面支撑与高度、侧面阻挡、走跑步数、渲染帧及玩家/NPC每步精确单位缩放。源码与断言已经落地，实际执行结果以本批修复记录的对应新构建日志为准，不能用旧240帧通过替代。
+现有接触/转向回归入口为 [ContactApproachVerification](../../samples/G104.Sandbox/Gameplay/ContactApproachVerification.cs) 的 `--verify-contacts`（不创建GL窗口，真实运动样例会创建Jolt），以及 [ContactWindowExercise](../../samples/G104.Sandbox/Tools/ContactWindowExercise.cs) 的 `--exercise-contacts --user-data-root <独立测试目录>` 隐藏窗口入口。后者默认800帧，显式 `--frames` 不得低于800，与原240帧exercise分开。窗口分九段正常Stop/Play，只在种子内存副本设置玩家起点/朝向，保留NPC及全部几何/Collider、不保存设计。六球各70帧南向走/跑穿越，Ramp上下各120帧、高侧140帧；经过原输入/固定步/Simulation/动画/相机/声音及实际GL。断言含越球心、坡面高度/支撑、高侧阻挡、走跑/渲染计数及精确单位缩放。该转向修复批双配置38项及800帧/原240帧真实结果见 [v1-contact-exit-fix-2026-10-03.md](../reviews/v1-contact-exit-fix-2026-10-03.md)，没有因后续UI修复或本次文档审计重跑。
+
+
+### 开放性与有限范围
+
+角色feet来自实际查询结果，渲染或动画不得覆盖其权威位移。移动门/角色下仅纯显示后代，父组在运行中保持静态；编辑态无独立Jolt世界，下次Play由最新世界数据重建碰撞/导航。导航路径指令、控制器受阻和NPC决策是不同结果，不把一条画线当作角色已经到达。
+
+现有回归按问题选择，不为阅读本页重复全部运行。历史日志、构建配置与人工反馈是各自批次证据，当前接续状态统一查status。
+
+<details>
+<summary>可选：2026-10-03独立评审与早期模块验回的完整过程</summary>
+
+### 2026-10-03独立评审批的历史失败与验回
+
+以下本轮/第二轮/第三轮指当时独立评审批，日志名称与数值保留追溯；不表示2026-10-04文档核查又执行了这些检查。最新UI13项/11项/verify/240帧证据见 [v1-ui-mouse-fix-2026-10-04.md](../reviews/v1-ui-mouse-fix-2026-10-04.md)，用户首轮体验与学习状态可选见 [v1-run-and-review.md](v1-run-and-review.md#run-and-verify)。
 
 2026-10-03本轮可玩性回归先加入检查、保留原实现，由主任务统一构建后分别运行四个入口。`.cache/execution/review-playability-before.log`记录Debug构建0警告0错误与四项真实FAIL：非整除尾格把2.8误当合法目标、设计Yaw=180°的静止NPC没有看见+Z玩家、转向途中提前用目标Yaw看见玩家、radius=0.02m设计校验未拒绝。随后才修改实现。
 
@@ -84,7 +103,7 @@ Events每Tick清空，随后只发布当步发生的事实。声音键为`footst
 
 第三轮最终源码由主任务重新进行有效Debug/Release构建，均0警告0错误；两配置`--review-baseline`七项全部PASS，最新日志为`.cache/execution/review-playability-final-debug.log`、`review-playability-final-release.log`。两配置完整`--verify`全部PASS，日志为`review-verify-debug.log`、`review-verify-release.log`，覆盖Core、导航、物理、玩法、动画、默认场景集成及音频文件解析；两配置又各完成240帧集成exercise，GL错误为none、2jump/110moving，日志为`review-graphics-final-debug.log`、`review-graphics-final-release.log`。这些是容量修复后的新构建结果，前一轮六项PASS没有代替本轮验证。
 
-本轮保持已选单层平面网格A*、有限坡台/Jolt分工、原NPC FSM与感知算法边界；没有加入NavMesh、多层路径、新AI算法、可调Skin或恢复D5。上述证据限本机已有依赖，人工手感与跨设备验收仍分别记录。
+该评审批保持单平面网格A*、有限坡台/Jolt分工、原NPC FSM/感知边界，没有加入NavMesh、多层路径、新AI算法或可调Skin。其证据限本机已有依赖；后来人工首轮体验已初步通过，跨设备D5仍暂缓，学习自测尚未完成。
 
 以下新增public入口均挂入原`--verify`，也可单独调用，避免一个失败遮住后续检查：
 
@@ -98,7 +117,9 @@ Events每Tick清空，随后只发布当步发生的事实。声音键为`footst
 | GameplayVerification.VerifyNpcFacingTransition | 窄视野下，启动巡逻后实际Slerp朝向尚未对准玩家时保持Patrol；之后进入当前视锥再Follow |
 | GameplayVerification.VerifyCharacterRadiusContract | 玩家/NPC的0.02及恰等于默认Skin拒绝；刚超过阈值与默认0.35通过设计校验并实际准备Play |
 
-以下保留V1首轮开发期间的独立模块证据。2026-10-03早期Debug x64 Engine/Sandbox `dotnet build --no-restore`成功；当时修复端点后的构建0错误、1项Rendering中GL.CullFace重载弃用警告（此前一轮0警告），后续首轮整体Debug/Release构建已达到0警告0错误。本模块没有引入新测试框架。以下独立方法经PowerShell加载当时构建DLL和对应Win-x64 Jolt原生DLL执行，均真实通过：
+### 2026-10-03首轮开发期间的历史模块证据
+
+早期Debug x64 Engine/Sandbox `dotnet build --no-restore`成功；当时修复端点后的构建0错误、1项Rendering中GL.CullFace重载弃用警告（此前一轮0警告），后续整体Debug/Release已达到0警告0错误。本模块未引入新测试框架。以下独立方法经PowerShell加载当时DLL与Win-x64 Jolt原生DLL执行，均真实通过：
 
 | 检查入口 | 实际覆盖 |
 | --- | --- |
@@ -108,10 +129,13 @@ Events每Tick清空，随后只发布当步发生的事实。声音键为`footst
 
 另用倾斜30°Box射线核对世界Normal=(0,0.8660254,-0.50000006)、顶面Position.Y≈1.01547，未出现查询矩阵边界的二次转置。
 
-这些是当前Windows x64/既有包的行为证据，不代表其他机器、跨平台逐位确定性、所有复杂网格、人工游玩或音频/图形效果已验收。早期整体`--verify --user-data-root .cache/v1-physics-gameplay-verification`曾在Core序列化File.Replace遇到沙箱拒绝；之后首轮Debug/Release整体自检已由主任务通过，见[实施复查](../reviews/v1-implementation-review-2026-10-03.md)。本轮新回归仍须对应新构建证据，旧首轮PASS不能代替修复后检查。
+这些历史Windows x64/既有包行为结果不证明其他机器、跨平台逐位确定性或所有复杂网格；人工首轮体验后来单独确认。早期整体 `--verify --user-data-root .cache/v1-physics-gameplay-verification` 曾在Core序列化File.Replace被沙箱拒绝，随后首轮Debug/Release整体自检通过，见 [v1-implementation-review-2026-10-03.md](../reviews/v1-implementation-review-2026-10-03.md)。各后续修复也有各自有效新构建结果，旧首轮PASS没有代替修复验回。
+
+
+</details>
 
 ## 课程与参考映射
 
-角色/查询对应第10–11节物理笔记的碰撞检测与角色控制；规则链、3C对应第15节；FSM/感知/A*对应第16节。现有完整索引见[learning-map](../learning-map.md)，保持自研规则、Jolt集成、后移专题的区别。
+角色/查询对应第10–11节物理笔记的碰撞检测与角色控制；规则链、3C对应第15节；FSM/感知/A*对应第16节。现有完整索引见[learning-map.md](../learning-map.md)，保持自研规则、Jolt集成、后移专题的区别。
 
-Piccolo固定参考为`f5053707fed4d3f94d270a436fb0d3a8ae54e3e5`的物理查询/角色输入组织，既有来源核查见[design-reference-checks](../reviews/design-reference-checks-2026-10-03.md)。本项目没有把Piccolo目标重叠式移动当作完整扫掠控制，也没有声称Piccolo提供此FSM/A*闭环。
+Piccolo固定参考为`f5053707fed4d3f94d270a436fb0d3a8ae54e3e5`的物理查询/角色输入组织，既有来源核查见[design-reference-checks-2026-10-03.md](../reviews/design-reference-checks-2026-10-03.md)。本项目没有把Piccolo目标重叠式移动当作完整扫掠控制，也没有声称Piccolo提供此FSM/A*闭环。

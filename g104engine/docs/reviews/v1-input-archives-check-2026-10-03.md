@@ -1,8 +1,12 @@
 # V1 外部原始文件只读核对：2026-10-03
 
+<a id="historical-evidence"></a>
+
+**记录范围与后续（2026-10-04补记）：** 本页是2026-10-03开工前的静态输入核对，以下“尚未部署/转换/导入”“待弹窗开工”和接续步骤均指该轮，哈希、格式与版本差异保留原证据。后续完整V1正式授权已取得，便携FFmpeg校验与PCM16转换、OpenAL部署及实际模型导入/显示已完成；用户2026-10-04确认运行指南第1–5项首轮人工验收初步通过，声音体验亦在该初步范围内，不推定覆盖全部声学/设备组合。部署与运行证据见 [v1-implementation-review-2026-10-03.md](v1-implementation-review-2026-10-03.md) 和 [architecture.md](../architecture.md)，当前接续见 [status.md](../status.md)。
+
 用户已将四个 ZIP 放到 `g104engine/.cache/v1-preparation/`。本次只读取 ZIP 目录和条目的内存流，解析 PE/GLB/音频头及许可文本；没有解压落盘、复制部署、加载 DLL、播放声音、渲染模型、转换素材或安装工具，也没有写引擎/验证程序代码。
 
-以下是输入文件静态证据，不等于 SharpGLTF 导入、GPU 蒙皮、OpenAL 初始化或最终效果验收。完整 ZIP 哈希用于固定本次收到的文件，不冒充官方签名验证。当前范围见 [V1](../plans/basic-training-ground-v1-draft.md)，准备接续见 [清单](../plans/v1-dependencies-and-assets.md)。
+以下是输入文件静态证据，不等于 SharpGLTF 导入、GPU 蒙皮、OpenAL 初始化或最终效果验收。完整 ZIP 哈希用于固定本次收到的文件，不冒充官方签名验证。当前范围见 [v1-baseline.md](../plans/v1-baseline.md)，准备接续见 [dependencies.md](../guides/dependencies.md)。
 
 ## 1. 四份原始 ZIP
 
@@ -95,7 +99,7 @@
 
 只读 Get-Command 在当前 PATH 未找到 ffmpeg/ffprobe；不据此断言机器任何位置都没有转换工具。工具来源/准备和实际转换须另行明确，不自动安装。包内也未确认适合无缝循环的环境声音；循环能力可先用受控测试信号验收，最终听感另确认。
 
-## 5. 当前结论与接续
+## 5. 该轮静态核对结论与当时接续
 
 - 四份原始文件齐全，记录了可重复核对的条目与哈希；继续保留在被忽略的缓存目录。
 - OpenAL Win64 实现库已识别，角色 GLB 与所需同骨架动作已确认存在，满足进入后续部署/导入准备的输入条件。

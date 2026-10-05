@@ -1,12 +1,16 @@
 # V1 首轮实现与本机验证记录
 
+<a id="historical-evidence"></a>
+
 日期：2026-10-03。用户已正式批准完整V1及Sol Ultra/Astra Ultra分工。此记录区分代码交付、助手本机验证和待用户验收；不是Git提交或发布证明。
+
+**记录范围与后续（2026-10-04补记）：** 下文是首轮实现收尾时的证据与限制，当时用户体验尚未验收、HEAD仍cbce581，保持原记录。首轮实现随后保存为b91dfe4，评审及转向修复保存为d2e8d40，UI修复与首轮验收反馈保存为38cb85f。用户2026-10-04已确认运行指南第1–5项首轮人工验收通过（初步、非穷尽），当前转入学习/调试；未测专项、跨设备与学习掌握不由此证明。后续证据见 [v1-independent-review-2026-10-03.md](v1-independent-review-2026-10-03.md)、[v1-contact-exit-fix-2026-10-03.md](v1-contact-exit-fix-2026-10-03.md)、[v1-ui-mouse-fix-2026-10-04.md](v1-ui-mouse-fix-2026-10-04.md)，最新状态见 [status.md](../status.md)。
 
 ## 实际实现范围
 
 Engine含固定时间步/输入、稳定GUID场景/父子TRS/保存、单层模板、有限编辑事务/UndoRedo、资源准备回滚；glTF/PNG导入、自研骨骼采样/混合/跳跃与事件、有限四状态JSON配置、独立上一/当前局部Pose显示插值与128容量UBO；Forward/Deferred、PBR/方向阴影/天空/HDR/Reinhard/FXAA；Jolt后端与自研角色移动、平面A*、CPU粒子、PCM16/OpenAL播放管理及ImGui/OpenTK适配。Sandbox组装训练场、NPC FSM、按钮—门—目标和窗口/相机/调试UI。
 
-具体架构/文件/笔记导航见 [实际指南](../guides/v1-architecture-and-learning.md)，用户运行与检查见 [运行验收指南](../guides/v1-run-and-review.md)。
+具体架构与文件入口见 [architecture.md](../architecture.md)，代码—笔记导航见 [learning-map.md](../learning-map.md)，用户运行与检查见 [v1-run-and-review.md](../guides/v1-run-and-review.md)。
 
 ## 本机证据
 
@@ -32,18 +36,18 @@ Sol Ultra实施并用Astra Ultra做开工前、实码及最终独立复核。评
 
 本机运行另发现并修复：Jolt2.22包装查询矩阵内部转置需要边界适配；已选GLB的未消费UV1不应拒绝；OpenTK4.9.4单字符串ShaderSource使用UTF16长度会截断包含中文注释的UTF8源，改为显式UTF8字节长度；自有测试GLB的tangent手性按UV关系修正。初次失败保留在修复说明，不当作最终失败。
 
-阴影开关同相机图确认重复细斑来自斜面PCF自阴影；PolygonOffset从1.5改为3后减轻，未见明显脚底整块脱影。仍保留弱斜面acne/有限bias取舍，详细见 [渲染指南](../guides/rendering-and-animation.md)。
+阴影开关同相机图确认重复细斑来自斜面PCF自阴影；PolygonOffset从1.5改为3后减轻，未见明显脚底整块脱影。仍保留弱斜面acne/有限bias取舍，详细见 [rendering-and-animation.md](../guides/rendering-and-animation.md)。
 
-## 尚需用户验收与明确限制
+## 首轮实现结束时待用户验收与持续限制
 
-- 用户真实键鼠手感、镜头、走跑跳/脚滑与动画过渡、2D/3D听感及声音用途/音量、编辑体验与面试演示是否满意。
+- 当时待用户验收：真实键鼠手感、镜头、走跑跳/脚滑与动画过渡、2D/3D听感及声音用途/音量、编辑体验和面试展示。2026-10-04运行指南第1–5项对应的首轮体验已初步通过，未逐专项穷尽；面试展示脚本、项目讲解与学习自测仍待后续完成，具体范围见页首后续说明。
 - 单张方向阴影和有限bias，弱斜面细斑仍可能出现；无CSM/点光阴影/IBL。现有flat normal素材不足以证明任意复杂法线图效果。
 - 自研有限坡台控制、静态Box/Capsule后端与受控平面A*；无平台携带/推箱/角色互推、NavMesh/BT或工业级角色/导航保证。
 - glTF仅约定未压缩TRS/skin与材质子集，不含morph/CUBICSPLINE/压缩或全部扩展；英文ImGui有限工具，不是完整商业编辑器。
 - FPS/帧耗时是初期观察，隐藏脚本输入与截图不证明正式性能、全部DPI/失焦/最小化组合或真实人工输入完成验收。
-- D5、CI/跨设备/独立克隆仍暂缓；未提交/推送/发布，也未新增升级NuGet/SDK或系统安装/PATH改动。
+- D5、CI/跨设备/独立克隆仍暂缓；本记录形成时未提交/推送/发布，也未新增升级NuGet/SDK或系统安装/PATH改动。后续Git保存不等于部署发布或D5完成。
 
-开发与恢复状态见 [执行台账](../execution/v1-progress.md)。用户新对话恢复时读取实际工作区即可继续验收/修复，同范围实施授权继续有效。
+开发与恢复状态见 [v1-progress.md](../execution/v1-progress.md)。本记录形成时安排继续验收/修复，当前接续为学习/调试及后续Bug反馈修复；同范围实施授权继续有效。
 
 ## 最后收尾核对
 

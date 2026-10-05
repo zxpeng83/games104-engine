@@ -1,26 +1,29 @@
-# 基础综合训练场 V1：执行台账与中断恢复
+# 基础综合训练场 V1：执行历史与验证证据
 
-更新：2026-10-04。此页记录实际执行状态；设计以 [实施方案](../plans/v1-implementation-draft.md)、[范围表](../plans/basic-training-ground-v1-draft.md) 为准，不另建一套版本规划。
+> 本页保存V1从正式开工到2026-10-04首轮收尾、反馈修复及随后文档校正的记录。下文各阶段的“当前”“下一步”“本轮”均按该阶段理解，不是新任务的必读指令。后续文档重构另记于[document-restructure.md](document-restructure.md)，现实接续看[status.md](../status.md#resume)，通用恢复方法在[agent-workflow.md](../agent-workflow.md#recovery)。这些链接用于按需查阅，不要求返回首页重走入口。
 
-## 当前接续点
 
-**最新完成：V1首轮人工验收通过（初步、非穷尽）。** 2026-10-04用户明确确认运行指南第1–5项初步无问题，允许暂记通过，未穷尽所有分支，后续Bug再反馈。当前进入源码学习与调试练习，不要求重复整轮验收。此前UI修复各13输入/11UI/verify/240帧及Astra有限复核通过，见 [专项记录](../reviews/v1-ui-mouse-fix-2026-10-04.md)；本轮仅更新文档，无新构建或运行。
+更新：2026-10-04。此页记录实际执行状态；设计以 [v1-baseline.md](../plans/v1-baseline.md#design-boundaries)、[v1-baseline.md](../plans/v1-baseline.md#scope) 为准，不另建一套版本规划。
 
-- 工作区：`E:\game_study\games104`；分支`main`；HEAD/main/本地origin/main仍为`4be648ea2923c62ccd561dfc0fc3cc4c771f2265`，接续开始工作区干净。本轮UI源码/验证/人工反馈文档均仅本机未提交，保留此前六份文档更新；实时远端连接失败未核实。
+## 首轮收尾时的接续点（历史）
+
+**最新完成：V1首轮人工验收通过（初步、非穷尽）。** 2026-10-04用户明确确认运行指南第1–5项初步无问题，允许暂记通过，未穷尽所有分支，后续Bug再反馈。当前进入源码学习与调试练习，不要求重复整轮验收。此前UI修复各13输入/11UI/verify/240帧及Astra有限复核通过，见 [v1-ui-mouse-fix-2026-10-04.md](../reviews/v1-ui-mouse-fix-2026-10-04.md)；本轮仅更新文档，无新构建或运行。
+
+- 工作区：`E:\game_study\games104`；分支`main`；HEAD/main/origin/main及实时GitHub main本轮只读核实均为`38cb85f2be6d86804edd3331a54467389b3af604`，UI修复/验收16文件已提交推送，审计开始工作区干净。本轮全面文档更新仅本机未提交，Git写操作仍由用户执行。
 - **代码开工已获明确同意。** 2026-10-03用户答复“同意，按以上完整范围正式开工”（call_gsRE59tQ8TeA5eqCjywBzR1M）。完整C#/GLSL/设计数据/必要复制配置、既有素材/OpenAL、便携FFmpeg校验转换、构建运行修复与文档/快照已授权；模型均Ultra，Git/SDK/NuGet/系统安装/D5边界保持。
-- 实际Engine/Sandbox正式模块、GLSL、设计/模板/动画配置、素材和OpenAL已落地；首轮V1为b91dfe4，独立评审及转向退出修复已保存至d2e8d40。来源及分工见 [独立评审](../reviews/v1-independent-review-2026-10-03.md) 和专项记录。
+- 实际Engine/Sandbox正式模块、GLSL、设计/模板/动画配置、素材和OpenAL已落地；首轮V1为b91dfe4，独立评审及转向退出修复已保存至d2e8d40。来源及分工见 [v1-independent-review-2026-10-03.md](../reviews/v1-independent-review-2026-10-03.md) 和专项记录。
 - 本批修复及最终有限复核已闭环：Debug/Release最终构建0warn0err、完整行为自检全PASS、11项原生UI/10项GPU读回各PASS；空尾格/内点舍入/非零1ULP容量均先失败后修，七个具名玩法/导航入口PASS。
 - root统一完成全新隔离设计各240帧集成，实际Forward→Deferred Play、2jump110move、无GLerror；MAE.0621/max22。全部实现代理结束写入，构建/测试已退出；若中断先核对实际源码与最新review日志，不重复启动写入者。
 - 用户已完成指南1–5项的首轮体验验收，记录初步通过；代码学习/自测尚未完成，极端分支/专项组合未穷尽。四份原输入ZIP/FFmpeg及日志快照为本机忽略缓存，新克隆不会自动获得，已发布运行素材不依赖这些工具。
 
-## 连续执行约定
+## V1采用的连续执行约定（历史）
 
 用户希望批准后尽量连续完成完整 V1，离开期间由助手处理普通实现选择与修复，回来后统一验收、学习代码和架构资料。该连续执行安排已随正式开工弹窗批准。
 
 - 按依赖分批实现、验证和集成；可运行预览用于自查和留证，不自动成为等待用户回复的闸门。跨模块公共契约由主任务统一维护。
 - 保持范围、关键接口和学习要求；不为赶进度默默删功能、替换技术路线，或把未运行内容称为通过。
 - 重大范围/架构/依赖/成本变化、可能丢失用户数据的操作、新权限需求或确实无法推进的阻塞才请求用户处理。仅受阻部分暂停时，可继续不依赖它的已授权工作。
-- 图像、声音、手感和学习材料是否达到用户要求仍需最终人工验收；能完成的自动与运行检查先完成，未能验证的逐项列明。
+- 一般规则：视听/手感与学习自测由用户确认，自动检查只证明覆盖项。当前指南第1–5项首轮体验已初步通过；学习掌握和未穷尽专项另记。
 - 连续任务不保证单个回复完成，不保证断网/额度耗尽/进程关闭后自动继续。本地执行依赖机器、电源和会话可用；新对话恢复依靠已落盘文件及实际工程。
 
 ## 内部工作单元
@@ -35,7 +38,7 @@
 | P3 角色、物理与相机 | 已验证，首轮人工初步通过 | 转身/球区/上下坡单独确认；指南第1项操控/镜头初步通过，极端接触和每个侧挡分支未逐项确认 |
 | P4 Gameplay、AI、粒子与声音 | 已验证，首轮人工初步通过 | FSM/A*/门/目标、粒子/OpenAL已有证据；第1/2/5项初步通过，未证明全部组合 |
 | P5 场景工具 | 已验证，首轮人工初步通过 | 层级/Undo/SaveLoad/PlayStop及UI修复自动证据保留；第3–4项初步通过，非全分支覆盖 |
-| P6 集成、交付与学习资料 | 首轮实现及人工初步验收完成 | 双配置/自检/真实GL/音频/Astra复核与资料已落地；进入源码学习/自测，本地修复和验收文档未Git提交 |
+| P6 集成、交付与学习资料 | 首轮实现及人工初步验收完成 | 双配置/自检/真实GL/音频/Astra复核与资料已落地；进入源码学习/自测；UI修复与验收已保存38cb85f，本轮文档审计另未提交 |
 
 ## 开工后怎样保存进度
 
@@ -51,15 +54,15 @@
 | 字段 | 当前值 |
 | --- | --- |
 | 正式授权及边界 | 2026-10-03明确同意完整范围，均Ultra；不Git写操作/升级SDKNuGet/系统安装/D5 |
-| 正在进行的实现单元/文件责任人 | V1实现及首轮人工初步验收完成；当前无实现写入，主任务维护学习/验收接续，后续按反馈修复 |
+| 正在进行的实现单元/文件责任人 | V1实现及首轮人工初步验收完成；全面文档核对完成：root与三组Sol已结束写入，Astra有限终审闭环；源码保持38cb85f，后续进入学习/反馈修复 |
 | 已改实现文件 | Engine Core/Scene/Editor/Assets/Animation/Rendering/Physics/Navigation/Audio/Effects/Tools；Sandbox窗口/Gameplay/Tools/入口；assets、third_party、必要csproj复制配置；锁文件/SDK未变 |
 | 最近有效验证 | ui-mouse双配置build各0warn0err；新窗口输入各13PASS、旧UI各11PASS、完整verify PASS、各240frames/2jump110move/无GLerror；Astra有限复核无阻塞P1/P2；旧38/800/10GPU为此前证据 |
 | 操作/进程/日志/快照 | ui-mouse-*日志在.cache/execution，命令/失败/边界见专项记录；修改前后快照见下方，覆盖未跟踪验证文件；构建/测试已退出 |
 | 未完成/失败/待人工验证 | 指南1–5初步验收通过；源码学习、自测/讲解和面试展示准备尚未完成。极端输入/专项组合/跨设备未穷尽，PCF/有限子集与D5暂缓保持 |
-| 下一条可执行工作 | 按既有流程由用户保存UI修复与验收节点；学习从Engine/Sandbox分工、启动/帧循环及W/Space输入链开始，再跟E交互，结合笔记/断点练习 |
+| 下一条可执行工作 | 本次46个文档路径待用户按既有流程保存；UI修复已保存38cb85f，学习从Engine/Sandbox分工、启动/帧循环与W/Space输入链进入，再跟E交互/笔记/断点练习 |
 | 恢复时需要用户处理的事项 | 同范围反馈修复无需重复开工；Git由用户按确认流程操作，重大范围/权限变化再讨论 |
 
-## 新对话/意外中断恢复顺序
+## V1当时的恢复规程（历史）
 
 1. 使用**同一个现有本地目录**；先读根 README → AGENTS → status/handoff → 本页，再按任务读取实施方案/准备清单/架构。不要重新讨论已经明确的选型，也不要先创建新克隆来“恢复”。
 2. 只读检查 Git 根、分支、HEAD、status、相关 diff/未跟踪文件及本页当前单元；核对用户改动、资源与已有日志，不能以文档声称完成代替文件事实。
@@ -81,11 +84,13 @@
 
 **用户已确认D53：GPT-6.1 Sol Ultra主实施，GPT-6 Astra Ultra关键评审与独立核查，两者均Ultra，质量优先。** 用户报告已在界面选择Sol Ultra；实施子任务显式采用 `gpt-6.1-sol` / `ultra`，评审/重大疑点核查显式采用 `gpt-6-astra` / `ultra`。按需要调用高质量模型，不为节省自行降档。此前High/额度优先建议为历史，不能继续当作当前要求；模型分工不是项目NuGet依赖锁定。
 
-已采用执行方式：主对话由用户界面选择，助手按任务显式指定子任务模型/Ultra；评审给相关设计/代码/验证记录，先只读返回问题，主任务集成修复与复验，不让多个执行者无协调修改同一文件。当前会话工具支持这一设置，无需修改全局配置；[官方子代理说明](https://learn.chatgpt.com/docs/agent-configuration/subagents)也支持提示指定。只读开工前任务 `v1_preflight_astra` 已按Astra/Ultra完成：未发现需用户再选的重大设计缺口，待最终明确开工同意，证据见节点记录；不能由主模型推断子任务模型，实际不可用时明确记录/报告，不能静默降档或虚称已评审。
+已采用执行方式：主对话由用户界面选择，助手按任务显式指定子任务模型/Ultra；评审给相关设计/代码/验证记录，先只读返回问题，主任务集成修复与复验，不让多个执行者无协调修改同一文件。当前会话工具支持这一设置，无需修改全局配置；[官方子代理说明](https://learn.chatgpt.com/docs/agent-configuration/subagents)也支持提示指定。只读开工前任务 `v1_preflight_astra` 已按Astra/Ultra完成：当时未发现需用户再选的重大设计缺口，随后已于2026-10-03取得完整V1正式开工同意，证据见节点记录；不能由主模型推断子任务模型，实际不可用时明确记录/报告，不能静默降档或虚称已评审。
 
 每个聊天有独立上下文；文件是跨聊天接续依据，见 [项目与聊天](https://learn.chatgpt.com/docs/projects)。需要跨回合持续追踪时，可由用户明确要求使用 Goal，见 [Goals](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex)；当前未创建 Goal，Goal 本身也不保证断网、额度耗尽或进程退出后自动恢复，不代替本台账。
 
 ## 实施历史摘要（当时阶段，不作为当前步骤）
+
+以下各批次保留当时的源码节点、授权等待、失败/通过和“下一步”记录；“当前/未提交/待验收”等相对语句均属于该批日期。最新Git、验收和接续以本页顶部及末尾最新记录为准，不从历史小节恢复旧操作。
 
 - 开工快照：g104engine/.cache/execution/snapshots/20261003-160603-authorized-start；43个文件逐一SHA-256核对通过，包含未提交交接，基线cbce581。
 - 当前正在建立SceneData/RenderContracts公共契约，随后并行核心场景、渲染资产动画、物理玩法；主任务负责窗口/工具UI/音频/素材准备和集成。
@@ -177,7 +182,7 @@
 - 责任：Sol Ultra独占ImGuiController/TrainingWindow生产输入；Astra Ultra只读独立核查与修改复核；root独占UiInputVerificationWindow及入口、唯一串行构建运行与文档。子任务已结束，复核通过范围不超出所读delta和Debug日志。
 - 主因实证：控件按下后ActiveId阻挡IsWindowHovered查询，随后错误SetWindowFocus(null)清ActiveId；基线activeBefore=True/hover=False/capture=True/activeAfter=False，长按按钮与checkbox均FAIL。另实证同次UI采样前down/up被最终状态轮询吞掉。修后依据WantCaptureMouse清焦并逐事件入队，保持失焦/释放/位置顺序、Dispose解绑。
 - 最终命令：两配置`dotnet build g104engine.slnx --no-restore --disable-build-servers -m:1 -c Debug|Release -p:Platform=x64`均0warn0err；对应DLL `--verify-ui-input`各13PASS、`--verify-ui`各11PASS、`--verify`全PASS，`--exercise --frames 240`各2jump/110move无GLerror。所有运行显式使用`.cache/execution/ui-mouse-checks-debug|release`或`ui-mouse-window-debug|release`隔离根；未还原/升级依赖。
-- 日志与验证限制见[专项记录](../reviews/v1-ui-mouse-fix-2026-10-04.md)。保存测试沙箱File.Replace拒绝后获准正常权限重跑通过；滚轮探针改为EndFrame清零前采样后通过。原有失败证据保留，不把测试工具失败称为生产缺陷。
+- 日志与验证限制见[v1-ui-mouse-fix-2026-10-04.md](../reviews/v1-ui-mouse-fix-2026-10-04.md)。保存测试沙箱File.Replace拒绝后获准正常权限重跑通过；滚轮探针改为EndFrame清零前采样后通过。原有失败证据保留，不把测试工具失败称为生产缺陷。
 - 用户随后明确反馈“验证鼠标点击事件已修复”，此问题人工复试通过；接续其余体验/学习，不扩展为声音听感、全部控件逐项或DPI/失焦已通过。新UI源码/验证/文档尚未提交；用户设计、SDK/包/锁文件、Piccolo/原笔记/上层Git及D5边界保持。
 
 - 修后保护快照：`g104engine/.cache/execution/snapshots/20261004-161208-ui-mouse-fixed`，121个源码/配置/Shader/文档文件逐SHA-256核验，包含新验证源码与专项记录；登记后已刷新台账副本和manifest。仅本机，未Git提交。
@@ -188,3 +193,11 @@
 - 状态统一记为“V1首轮人工验收通过（初步、非穷尽）”。这是阶段通过结论，不要求用户补完全部分支后才承认通过，也不代表跨设备/每项极端组合或源码学习已完成。
 - 下一步按既有流程由用户保存UI修复和验收节点，并从程序启动/帧循环、W/Space输入、E交互开始源码学习和VS调试；学习与现有V1反馈修复并行。D5和后移专题不自动恢复。
 - 本轮只维护验收/学习接续文档，保留工作区源代码和未跟踪验证文件，未构建/运行、未Git写操作。此前121文件修后快照保留其当时状态；本次用户验收及指南说明以当前工作区为准，尚未提交。
+
+## 2026-10-04用户已保存与全面文档核对
+
+- 用户已完成上批提交推送：38cb85f2be6d86804edd3331a54467389b3af604，2026-10-04 17:06:43 +08:00，16文件；root只读核实实际提交范围及HEAD/main/origin/main/实时GitHub main一致，审计起始工作区干净。前一条“尚未提交”为提交前历史。
+- 用户本轮要求全面检索更新项目文档。原有48份Markdown已纳入盘点，新增[document-consistency-review-2026-10-04.md](../reviews/document-consistency-review-2026-10-04.md)；3份archive保留原文，受保护原笔记/私有截图/Piccolo不纳入改写。
+- 分工：root维护总入口、计划、学习映射与同步；三组Sol Ultra分别维护plans11份、guides/architecture/setup12份、reviews/decisions13份，Astra Ultra独立核查。当前只修改文档，不构建/运行引擎或执行Git写操作。
+- 已核对V1初步验收/学习未完成、模块当前/未来边界、9个直接NuGet依赖、8个运行WAV及实际SceneData范围；旧实施记录保持原证据，先前16文件提交清单改为历史，不作为本轮文档批次清单。
+- 最终49份Markdown、629条本地链接、15锚点/围栏、Git空白与范围检查通过；45修改＋1新增均为文档，3归档/源码/配置/资产/原笔记无差异，暂存区空。Astra有限终审无剩余有证据阻塞项，所有写入任务结束；本次文档尚未提交，源码基线38cb85f。

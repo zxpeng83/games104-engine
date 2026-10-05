@@ -1,6 +1,10 @@
 # V1 独立验收评审与修复
 
-日期：2026-10-03。用户提出希望使用Astra Ultra进一步review并修正；既有完整V1明确授权覆盖同范围修复。本轮已完成核查、失败复现、修复、双配置回归与最终变更复核，用户体验仍待验收。
+<a id="historical-evidence"></a>
+
+日期：2026-10-03。用户提出希望使用Astra Ultra进一步review并修正；既有完整V1明确授权覆盖同范围修复。本轮已完成核查、失败复现、修复、双配置回归与最终变更复核；本记录形成时用户体验仍待验收。
+
+**后续接续（2026-10-04补记）：** 本批与随后转向修复已保存为d2e8d40；UI修复及首轮验收反馈已保存为38cb85f。用户2026-10-04确认运行指南第1–5项首轮人工验收通过（初步、非穷尽），当前进入学习/调试，后续Bug按既有范围修复。下文“本机未提交”“试听/体验待验收”及下一步均是评审结束时的安排，不改写原失败与未测证据；专项/极端组合、跨设备和学习掌握仍未由首轮反馈证明。最新事实见 [status.md](../status.md)、[v1-ui-mouse-fix-2026-10-04.md](v1-ui-mouse-fix-2026-10-04.md)。
 
 ## 保存基线与分工
 
@@ -52,8 +56,8 @@
 - `captures-review-final-debug/`及`captures-review-final-release/`保留截图；root已看本批落地和贴图探针，未见明显骨骼爆散，贴图可见，已有PCF弱斜面自阴影细斑限制仍保留。
 - Editor/Visual及导航最后double容量的Astra Ultra有限变更复核均闭环，未发现本轮剩余阻塞P1/P2；不等于证明所有输入无缺陷或人工体验已通过。声音实现未改，首轮实际OpenAL证据仍有效，完整窗口回归也正常创建1.25.2后端；试听由用户进行。
 
-## 下一步与恢复
+## 评审结束时的下一步与恢复（历史）
 
-用户按 [运行与验收](../guides/v1-run-and-review.md) 体验操控、镜头、脚滑、NPC/机关、声音和编辑；同范围问题按证据继续修复。架构、参数合同、中文注释及学习对应在 [架构](../architecture.md)、[场景/工具](../guides/scene-and-editor.md)、[物理/Gameplay](../guides/physics-and-gameplay.md)、[渲染/动画](../guides/rendering-and-animation.md) 已同步。
+用户按 [v1-run-and-review.md](../guides/v1-run-and-review.md) 体验操控、镜头、脚滑、NPC/机关、声音和编辑；同范围问题按证据继续修复。架构、参数合同、中文注释及学习对应在 [architecture.md](../architecture.md)、[scene-and-editor.md](../guides/scene-and-editor.md)、[physics-and-gameplay.md](../guides/physics-and-gameplay.md)、[rendering-and-animation.md](../guides/rendering-and-animation.md) 已同步。
 
-本批源码/文档只在本机，用户决定下一次Git保存；助手未暂存、提交、推送或发布。恢复先读 [status](../status.md)、[handoff](../handoff.md) 与 [执行台账](../execution/v1-progress.md)，核对真实Git/文件/日志/快照。D5及所有后移专题保持暂缓，没有安装/升级依赖或修改源资料。
+本批源码/文档只在本机，用户决定下一次Git保存；助手未暂存、提交、推送或发布。恢复先读 [status.md](../status.md) 与 [v1-progress.md](../execution/v1-progress.md)，核对真实Git/文件/日志/快照。D5及所有后移专题保持暂缓，没有安装/升级依赖或修改源资料。

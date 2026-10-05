@@ -1,7 +1,8 @@
 # 场景、时间输入与设计编辑
 
-2026-10-03，基础综合训练场 V1 获准实施后的实际接口说明。正式编译与 `--verify` 证据由执行台账汇总；本页不把编写自检视为已执行通过。
+本页定义场景、输入与有限编辑的实际接口、约束及失败语义。必要概念在本页说明；当前任务/验收查 [status.md](../status.md)，操作政策查 [agent-workflow.md](../agent-workflow.md)，设计来源可选查 [v1-baseline.md](../plans/v1-baseline.md)。
 
+<a id="scene-contracts"></a>
 ## 数据与空间
 
 代码入口位于 `src/G104.Engine/Scene`。`SceneDocument` 是设计数据，`SceneGraph` 为其派生逻辑世界矩阵，不保存 GPU、Jolt、声音句柄或运行进度。GUID 是持久对象身份，`ParentId` 描述场景层级；模型节点与骨骼树由导入/动画模块独立维护。角色 `Transform.Position` 表示 feet，Y-up、右手、米秒、默认前方 -Z。
@@ -10,17 +11,20 @@ CPU 使用 OpenTK 原生行向量，`TransformMath.Compose` 为 S×R×T，场景
 
 `SetWorldPosition/SetWorldRotation`是单字段操作：克隆已存TRS，仅改位置或旋转，不能从自身world矩阵反复分解并重估Scale。根位置直接保存；父级位置乘父world逆矩阵；行矩阵`local×parent`对应四元数`parent×local`，所以局部旋转为`inverse(parentRotation)×desiredWorldRotation`。Position/Rotation更新保留其余字段，Rebuild失败恢复旧TRS。Player/Npc已强制为根，Gameplay转向直接读存储的Quaternion。
 
-通用`SetWorldMatrix`和保持世界重挂接仍需分解。接近180°时四元数w接近0，若矩阵反求选择除以小w的路径，会放大浮点误差，合法TRS也可能在重建时被判为剪切。本实现去行缩放后用double中间值及trace/最大对角元素四分支选择稳定分母；保留原`Tolerance=1e-4`、正缩放、有限值及重建校验，并拒绝行长度提取溢出。它不通过调大容差或吞异常隐藏非法矩阵。用户球/Ramp退出的无物理复现、修复与双配置后验见 [专项记录](../reviews/v1-contact-exit-fix-2026-10-03.md)。
+通用`SetWorldMatrix`和保持世界重挂接仍需分解。接近180°时四元数w接近0，若矩阵反求选择除以小w的路径，会放大浮点误差，合法TRS也可能在重建时被判为剪切。本实现去行缩放后用double中间值及trace/最大对角元素四分支选择稳定分母；保留原`Tolerance=1e-4`、正缩放、有限值及重建校验，并拒绝行长度提取溢出。它不通过调大容差或吞异常隐藏非法矩阵。用户球/Ramp退出的无物理复现、修复与双配置后验见 [v1-contact-exit-fix-2026-10-03.md](../reviews/v1-contact-exit-fix-2026-10-03.md)。
 
 加载与每次结构编辑检查非空且唯一 GUID、有效 ParentId/TargetId、环、128 层上限、枚举、有限 TRS/组件值。所有接收场景子对象的节点要求正统一缩放。玩家/NPC 保持根节点和单位缩放；尺寸由角色参数控制。V1 可编辑 DTO 尚无活动相机或动态刚体组件；动态刚体验证对象由物理模块独立创建，不加入任意可挂接设计对象。
 
 `SceneGraph(SceneDocument)` 保留传入文档，公开 `Document`、`OrderedIds`、`Object(Guid)`、`WorldMatrix(Guid)`、`WorldPosition(Guid)`、`SetWorldPosition`、`SetWorldRotation`、`SetWorldMatrix`、`Rebuild`、`CapturePrevious`、`ResetInterpolation`、`InterpolatedWorldMatrix(Guid,float)` 和 `Subtree(Guid)`。运行时改局部字段之后须 `Rebuild`；结构编辑走命令接口。每模拟步开始 `CapturePrevious`，显示时相同 alpha 插值全部节点的局部 TRS，再递归组合父显示世界。重挂接、Undo/Redo、瞬移/切场景应重置历史，碰撞读取逻辑世界。
 
+<a id="time-and-input"></a>
 ## 时钟与输入
 
 `Core/FixedStepClock` 默认 60 Hz、每显示帧最多五补步、输入时间上限 0.25 秒；超过上限的时间与五步后完整积压步记为丢弃，不足一步余量用于显示 alpha。`Advance(double,Action<float>)` 返回 `FixedStepResult(Steps,Alpha,DroppedSteps,DroppedSeconds)`，另提供累计丢步/丢时统计。暂停、失焦、加载和 Play/Stop 后由主循环调用 `Reset`；统计保留，累计器清零。
 
 `InputBuffer.Push(InputState)` 接收 Move、LookDelta、JumpPressed、InteractPressed、Focused、CaptureKeyboard、CaptureMouse、Sprint。按住态由每步 `Consume` 读取；边沿在零步时保留，在下一有效步只消费一次。`ConsumeLook` 每显示帧调用一次，避免多个补步重复鼠标位移。UI 捕获相应设备时清理该设备旧输入；失焦/上下文切换调用 `Clear`。
+
+UI使用独立的 `ImGuiController(GameWindow window)`；生产窗口以 `new ImGuiController(this)` 绑定。MouseMove/Down/Up/Wheel、FocusedChanged和TextInput按事件顺序送入ImGui，BeginFrame同步键盘按住态并开帧，Dispose解除订阅。失焦先使鼠标位置无效再释放按钮，不能让焦点同批恢复完成旧点击。场景左点击清焦依据 `WantCaptureMouse`，不会误清按下后已激活的控件；角色InputBuffer依然在窗口层按设备捕获标志过滤，两条输入职责不能混写。
 
 ## 文件与模板
 
@@ -30,6 +34,7 @@ CPU 使用 OpenTK 原生行向量，`TransformMath.Compose` 为 S×R×T，场景
 
 `TemplateCatalog.Instantiate(templateId)` 深复制 Defaults，生成新 GUID，并保留 TemplateId。实例存完整有效字段，`TemplateOverrides` 明确记录白名单覆盖：name、transform、material、collider、modelPath、targetId、visible、parameters。父关系独立于模板深度；kind/primitive 不允许覆盖。模板不能引用另一模板、场景父节点或外部目标。V1 不自动传播模板默认值变化，不实现嵌套、变体、Apply/Revert。
 
+<a id="editor-transactions"></a>
 ## 命令与历史
 
 `Editor/SceneEditor` 提供 `Create(templateId,parentId?)`、`Create(SceneObjectData)`、`Delete`、`SetTransform`、`Reparent`、`SetParameter`、`SetMaterial`、`SetCollider`、`SetAsset`、`SetTarget`、`SetName`、`SetVisible`、`SetRenderPipeline`。`SetParameter` 只修改当前设计或模板已经声明的键；运行时字段不可临时加入。`SceneParameterRules` 校验 V1 消费字段的正值/非负约束、角色胶囊高大于直径、坡度/FOV、导航边界和最多 20,000 格等关联条件；未知扩展键仍须有限，不假称已有所有未来组件模式。UI 在模拟循环外的主线程安全点调用；编辑时校验设计并准备渲染资源，下一次 Play 从当前设计重建真实物理世界。编辑预览没有独立碰撞世界。
@@ -44,11 +49,13 @@ Sandbox `Tools/SceneEditorPanel.cs` 的 `Draw(SceneEditor,bool,Guid?,Action<Acti
 
 `CoreSelfChecks.Run()` 无新增测试框架：检查 30/60/144 Hz 时间步、五补步及丢时、输入边沿和 UI 捕获、父平移/旋转/统一缩放、保持世界重挂接、循环/剪切/角色父限制、插值重置、子树外部引用、稳定身份、拖动事务、Redo 分支、100 条上限、dirty、模板隔离与覆盖、JSON 保存重载/原子替换/损坏保留/字段和路径拒绝。文件检查只使用明确创建的随机临时目录，并在验证边界内清理，不访问真实用户 Scenes。
 
-主任务 `--verify` 调用该入口并记录实际结果。GL/音频、编辑后下一次 Play 的物理重建、Play/Stop 保留未保存设计、真实 UI 手感和保存后重建/重启均需各自行为验证，不由纯 CPU 检查代替。
+主任务 `--verify` 调用该入口并记录实际结果。GL/音频、编辑后下一次 Play 的物理重建、Play/Stop 保留未保存设计和真实UI/重启行为采用各自证据；这些不由纯CPU检查代替。CPU、生产窗口输入、运行准备及人工体验分别形成证据；覆盖范围不能相互代替。
 
-Sandbox `--verify-ui` 使用现有 cimgui 的独立上下文，真实鼠标、键盘和字符输入驱动 `SceneEditorPanel.Draw` 后处理相同命令边界；不创建 GL 窗口、不写 imgui.ini、不访问真实用户保存目录。面板可选控件区域观察只用于定位点击，正常窗口不订阅。专项覆盖四种文本在树切换时提交、非法胶囊拖动继续/一次 Undo/Escape、文本 Enter/Escape、收起材质/窗口与工具栏按下释放顺序，以及显式工作区验证目录中的自定义保存→Reset seed→保存重载基准。编写用例不等于验证通过，实际执行结果由执行台账汇总。
+Sandbox `--verify-ui` 使用现有 cimgui 的独立上下文，通过ImGui输入API注入鼠标、键盘和字符，驱动 `SceneEditorPanel.Draw` 后处理相同命令边界；它不经过生产OpenTK窗口事件适配器、不创建GL窗口、不写imgui.ini、不访问真实用户保存目录。面板可选控件区域观察只用于定位点击，正常窗口不订阅。11项覆盖四种文本在树切换时提交、非法胶囊拖动继续/一次Undo/Escape、文本Enter/Escape、收起材质/窗口与工具栏按下释放顺序，以及显式工作区验证目录中的自定义保存→Reset seed→保存重载基准。2026-10-04 UI修复批双配置各11PASS，历史日志由执行台账汇总。
 
-固定参考沿项目 Piccolo f5053707fed4d3f94d270a436fb0d3a8ae54e3e5；此模块的 GUID 设计格式、受控场景图、输入边沿和快照命令为本项目自研，概念与采用边界见 [完整实施方案](../plans/v1-implementation-draft.md) 第 3、4、7、9 节、[核心路线](../plans/core-architecture-roadmap.md) 与 [资产/场景路线](../plans/assets-scene-roadmap.md)。本页不声称逐项照搬 Piccolo。
+`--verify-ui-input` 则在隐藏Windows/GL窗口中经Win32→GLFW/OpenTK→生产ImGuiController与共享清焦方法检查13项输入行为，覆盖按钮、Combo、勾选、拖动、文字、焦点、滚轮和F5输入可用性。它不直接执行完整Play准备，也不读取真实保存设计；命令与覆盖边界见 [v1-run-and-review.md](v1-run-and-review.md#run-and-verify)，历史验回可选查 [v1-ui-mouse-fix-2026-10-04.md](../reviews/v1-ui-mouse-fix-2026-10-04.md)。
+
+固定参考沿项目 Piccolo f5053707fed4d3f94d270a436fb0d3a8ae54e3e5；此模块的 GUID 设计格式、受控场景图、输入边沿和快照命令为本项目自研，概念与采用边界见 [v1-baseline.md](../plans/v1-baseline.md) 的场景/编辑契约、[core-architecture-roadmap.md](../plans/core-architecture-roadmap.md) 与 [assets-scene-roadmap.md](../plans/assets-scene-roadmap.md)。本页不声称逐项照搬 Piccolo。
 
 ## 资源与交付后的错误保护
 
