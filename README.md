@@ -9,6 +9,7 @@ V1具备移动/跳跃、机关/NPC、Forward/Deferred、骨骼动画、声音/�
 
 | 要做什么 | 直接进入的主页面 | 页面内能得到什么 |
 |---|---|---|
+| 理解目录、各份文档用途与易混点 | [documentation-guide.md](g104engine/docs/documentation-guide.md) | 完整文档地图、逐文件说明、成组解释与实际任务阅读路线 |
 | 打开训练场、操作、排错或验证 | [v1-run-and-review.md](g104engine/docs/guides/v1-run-and-review.md#run-and-verify) | 环境前提、操作、命令、隔离数据和结果边界 |
 | 从启动、一帧、W/Space开始学源码 | [learning-map.md](g104engine/docs/learning-map.md#first-input-lesson) | 最少概念、调用链、断点、状态观察与自测 |
 | 查看各模块和课程对应 | [learning-map.md](g104engine/docs/learning-map.md) | 全模块、原笔记、源码、固定参考和实践边界 |
