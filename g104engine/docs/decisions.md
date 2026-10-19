@@ -4,6 +4,8 @@
 选择、实现、行为验证、人工体验和学习掌握分别成立；决定本身不是完成证据。当前操作政策只在 [agent-workflow.md](agent-workflow.md#current-policy) 维护，本页解释当时为何如此选择。
 初次搭建、V1收敛、修复与本次文档改造的时间关系可选查 [development-history.md](development-history.md#timeline)。
 
+2026-10-20版本定位维护：用户确认将“基础综合训练场 V1”统一表述为引擎的初版基础版本，用于学习实践、功能验证和后续扩展，使各文档的版本定位一致。D01、D43及相关历史摘要同步采用此表述，原编号、技术取舍、授权边界和验证日期保留。
+
 <a id="decision-index"></a>
 ## D01–D54：既有决定及承接
 
@@ -12,7 +14,7 @@ D04/D45/D51定义设计与授权，D54记录实际完整V1批准，不使环境/
 
 | 编号 | 已确认决定／后续承接 | 来源与详细内容 |
 |---|---|---|
-| <a id="d01"></a>D01 | 短期 Gameplay/客户端求职，长期独立 3D 引擎；渲染、物理、动画、Gameplay、AI、工具等所有模块均需不同程度工程实践 | [plan.md](plan.md)、[learning-map.md](learning-map.md) |
+| <a id="d01"></a>D01 | 近期重点为 Gameplay/客户端工程实践，长期持续打磨独立 3D 引擎；渲染、物理、动画、Gameplay、AI、工具等所有模块均需不同程度工程实践 | [plan.md](plan.md)、[learning-map.md](learning-map.md) |
 | <a id="d02"></a>D02 | 按掌握程度推进；旧 2–4 周、每周 10–15 小时不是当前总期限；未设新硬期限 | [plan.md](plan.md) |
 | <a id="d03"></a>D03 | 关键原理自研配合成熟库；说明自研、集成及简化边界；以笔记和固定 Piccolo 参考实现自己的引擎 | [plan.md](plan.md)、[design-reference-checks-2026-10-03.md](reviews/design-reference-checks-2026-10-03.md) |
 | <a id="d04"></a>D04 | 助手主要编码，用户学习/运行/调试/验收/讨论；完整V1按D54连续实施，普通内部检查不逐项等待，重大取舍先讨论 | [plan.md](plan.md)、[AGENTS.md](../../AGENTS.md) |
@@ -54,7 +56,7 @@ D04/D45/D51定义设计与授权，D54记录实际完整V1批准，不使环境/
 | <a id="d40"></a>D40 | 先用 .NET 并行库，再自研有限任务调度原型，先用成熟同步原语；Fiber/复杂无锁等后续细化，详细计时按实验需要加入 | [core-architecture-roadmap.md](plans/core-architecture-roadmap.md) |
 | <a id="d41"></a>D41 | Deferred已纳入并实现V1，与Forward共用场景/资产；G-buffer/格式/切换合同见实际指南，其他渲染扩展后移 | [v1-baseline.md](plans/v1-baseline.md)、[rendering-roadmap.md](plans/rendering-roadmap.md) |
 | <a id="d42"></a>D42 | V1有限设计操作Undo/Redo已实现，含拖动事务/草稿提交及真实保存基准；运行状态不纳入撤销 | [v1-baseline.md](plans/v1-baseline.md)、[tools-debug-roadmap.md](plans/tools-debug-roadmap.md) |
-| <a id="d43"></a>D43 | 统一以“基础综合训练场 V1”为主名称，注明“用于面试展示”；旧面试 Demo/面试 V1 指同一版本；M1 后续按 D44 合入，不因名称统一批准其余范围 | [v1-baseline.md](plans/v1-baseline.md)、[plan.md](plan.md) |
+| <a id="d43"></a>D43 | 统一以“基础综合训练场 V1”为主名称，定位为引擎的初版基础版本，用于学习实践、功能验证和后续扩展；M1 后续按 D44 合入，不因名称统一批准其余范围 | [v1-baseline.md](plans/v1-baseline.md)、[plan.md](plan.md) |
 | <a id="d44"></a>D44 | 最小 3D 里程碑正式合入基础综合训练场 V1，必要绘制/变换/资源验证保留为内部工作；旧草案归档，不再独立交付或审批，原参数不自动获批 | [v1-baseline.md](plans/v1-baseline.md#m1-integration-proposal) |
 | <a id="d45"></a>D45 | 开始写代码前必须弹窗展示具体实施范围，得到用户明确同意后再开始；普通范围/选型回答和“推进下一步”不代替开工确认 | [AGENTS.md](../../AGENTS.md)、[v1-baseline.md](plans/v1-baseline.md) |
 | <a id="d46"></a>D46 | V1 渲染含 Forward/Deferred、PBR、基础阴影、天空盒、HDR/色调映射/FXAA；IBL 后移，该次选择时具体参数待实施方案，后续已由V1实施与专题指南落实 | [v1-baseline.md](plans/v1-baseline.md) |
@@ -75,7 +77,7 @@ D04/D45/D51定义设计与授权，D54记录实际完整V1批准，不使环境/
 
 ### 背景
 
-用户熟悉 C#/Unity，希望把 GAMES104 理论转化为独立引擎实践。短期服务 Gameplay 客户端求职，长期持续发展；初版预算有限，同时要求其他引擎模块有明确学习路线。
+用户熟悉 C#/Unity，希望把 GAMES104 理论转化为独立引擎实践。近期侧重 Gameplay 客户端工程实践，长期持续发展；初版预算有限，同时要求其他引擎模块有明确学习路线。
 
 ### 已确认的选择与理由
 

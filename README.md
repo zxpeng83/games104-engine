@@ -1,6 +1,6 @@
 # G104Engine：GAMES104 学习与引擎实践
 
-以 C# 独立实现可解释、可扩展的3D引擎，用“基础综合训练场 V1（用于面试展示）”串联渲染、动画、物理、玩法、AI、粒子、声音和有限编辑工具。
+以 C# 独立实现可解释、可扩展的3D引擎。“基础综合训练场 V1”是引擎的初版基础版本，串联渲染、动画、物理、玩法、AI、粒子、声音和有限编辑工具，用于学习实践、功能验证和后续扩展。
 当前采用 .NET 10、Windows x64、OpenGL 4.3 Core、OpenTK；引擎不依赖 Unity。具体依赖只在 [dependencies.md](g104engine/docs/guides/dependencies.md) 维护。
 V1具备移动/跳跃、机关/NPC、Forward/Deferred、骨骼动画、声音/粒子和设计编辑；最新进展、验收边界及同步情况只查 [status.md](g104engine/docs/status.md#resume)。
 
@@ -26,6 +26,9 @@ Agent进入一次 [AGENTS.md](AGENTS.md) 和当前状态后选择任务正文，
 ## 打开现有工程
 
 在VS打开 `g104engine/g104engine.slnx`，选择Sandbox及Debug/Release x64。不带参数启动进入Edit，Play/F5开始，Stop恢复当前内存设计。完整操作与检查直接看上表运行页面；无需重建工程或重做首次探针。
+
+进入Play后，用WASD移动、左Shift跑步、Space在接地时跳跃；靠近橙色按钮按E切换对应门。右键拖动环绕相机，滚轮调整观察距离。
+若键盘焦点停在工具控件，先点击画面空白处；Stop会保留当前未保存的设计编辑和Undo历史。详细操作见 [v1-run-and-review.md](g104engine/docs/guides/v1-run-and-review.md#run-and-verify)。
 
 `G104.Engine` 提供通用能力，`G104.Sandbox` 负责窗口、训练场规则、工具面板与演示。Shader、种子场景和已部署素材在 `g104engine/assets/`，工程知识在 `g104engine/docs/`。
 若问题属于场景/Undo，直接查 [scene-and-editor.md](g104engine/docs/guides/scene-and-editor.md)；角色/Jolt/NPC查 [physics-and-gameplay.md](g104engine/docs/guides/physics-and-gameplay.md)；glTF/蒙皮/两管线查 [rendering-and-animation.md](g104engine/docs/guides/rendering-and-animation.md)。

@@ -58,7 +58,7 @@
 | 已改实现文件 | Engine Core/Scene/Editor/Assets/Animation/Rendering/Physics/Navigation/Audio/Effects/Tools；Sandbox窗口/Gameplay/Tools/入口；assets、third_party、必要csproj复制配置；锁文件/SDK未变 |
 | 最近有效验证 | ui-mouse双配置build各0warn0err；新窗口输入各13PASS、旧UI各11PASS、完整verify PASS、各240frames/2jump110move/无GLerror；Astra有限复核无阻塞P1/P2；旧38/800/10GPU为此前证据 |
 | 操作/进程/日志/快照 | ui-mouse-*日志在.cache/execution，命令/失败/边界见专项记录；修改前后快照见下方，覆盖未跟踪验证文件；构建/测试已退出 |
-| 未完成/失败/待人工验证 | 指南1–5初步验收通过；源码学习、自测/讲解和面试展示准备尚未完成。极端输入/专项组合/跨设备未穷尽，PCF/有限子集与D5暂缓保持 |
+| 未完成/失败/待人工验证 | 指南1–5初步验收通过；源码学习、自测/讲解和功能演示准备尚未完成。极端输入/专项组合/跨设备未穷尽，PCF/有限子集与D5暂缓保持 |
 | 下一条可执行工作 | 本次46个文档路径待用户按既有流程保存；UI修复已保存38cb85f，学习从Engine/Sandbox分工、启动/帧循环与W/Space输入链进入，再跟E交互/笔记/断点练习 |
 | 恢复时需要用户处理的事项 | 同范围反馈修复无需重复开工；Git由用户按确认流程操作，重大范围/权限变化再讨论 |
 

@@ -2,6 +2,8 @@
 
 日期：2026-10-04。状态：已完成并通过本批文档验收，仅本机未提交。本文件记录本次文档改造，不把原V1测试结果记为本轮运行。
 
+2026-10-20维护说明：下方信息映射中的版本定位按用户确认统一为初版基础版本；原编号、技术边界和各批次证据保留。本页的迁移数量、哈希和验收结果仍对应2026-10-04当批材料，最新状态见 [status.md](../status.md#resume)。
+
 ## 授权、目标与当前单元
 
 用户在本聊天明确发送“PLEASE IMPLEMENT THIS PLAN”，并附完整“精简文件、减少必读跳转”计划；当前已切回可执行模式。此次授权包括工程文档重构、合并撤下14份旧文件、新增8份、快照/哈希及只读验证；不包括Git写操作、安装升级、引擎运行或资料修改。
@@ -242,7 +244,7 @@ Agent预读规则与人类导航分别计量；来源/历史/源码选读不等�
 
 | 项 | 原章节／位置 | 保留的信息 | 新位置 | 处理理由 |
 |---|---|---|---|---|
-| ROOT069 | 原0001全部章节 | 用户语言背景和求职/长期目标；8项技术/仓库选择的原因边界；sln候选→实际slnx；私有截图；环境与Git分工及确认框例外；旧C++双仓方案替代；未来选型触发 | [decisions.md](../decisions.md#legacy-0001)、[agent-workflow.md](../agent-workflow.md) | 完整理由原章节归并，现行操作政策独立 |
+| ROOT069 | 原0001全部章节 | 用户语言背景和近期实践/长期目标；8项技术/仓库选择的原因边界；sln候选→实际slnx；私有截图；环境与Git分工及确认框例外；旧C++双仓方案替代；未来选型触发 | [decisions.md](../decisions.md#legacy-0001)、[agent-workflow.md](../agent-workflow.md) | 完整理由原章节归并，现行操作政策独立 |
 
 </details>
 
@@ -400,7 +402,7 @@ Agent预读规则与人类导航分别计量；来源/历史/源码选读不等�
 |---|---|---|---|---|
 | ROOT011 | 1-25 当前接续与三批修复 | 用户无法穷尽分支仍确认初步通过；球/Ramp与UI具体失败和修复；代理interrupted投递不等于恢复；V1完整连续开工授权；本机与远端区别 | [status.md](../status.md)、[development-history.md](../development-history.md)、[agent-workflow.md](../agent-workflow.md#recovery)、[v1-progress.md](v1-progress.md) | 事实/经验/授权分别归位；原始细节保留对应专项review |
 | ROOT012 | 换聊天说明/107-134 | 同工作区读取未提交文件；不因换聊新克隆/工作树；压缩次数不是强制换聊条件；未落盘/跨设备限制；用户环境与Git职责 | [agent-workflow.md](../agent-workflow.md#recovery)、[AGENTS.md](../../../AGENTS.md)、[status.md](../status.md) | 恢复提示成为短流程；无需复制旧聊天上下文 |
-| ROOT013 | D01 | 短期 Gameplay/客户端求职，长期独立 3D 引擎；渲染、物理、动画、Gameplay、AI、工具等所有模块均需不同程度工程实践 | [decisions.md](../decisions.md#d01) | 原编号与决定语义保留；旧来源改为合并后正文 |
+| ROOT013 | D01 | 近期重点为 Gameplay/客户端工程实践，长期持续打磨独立 3D 引擎；渲染、物理、动画、Gameplay、AI、工具等所有模块均需不同程度工程实践 | [decisions.md](../decisions.md#d01) | 原编号与技术边界保留；版本表述按2026-10-20确认统一 |
 | ROOT014 | D02 | 按掌握程度推进；旧 2–4 周、每周 10–15 小时不是当前总期限；未设新硬期限 | [decisions.md](../decisions.md#d02) | 原编号与决定语义保留；旧来源改为合并后正文 |
 | ROOT015 | D03 | 关键原理自研配合成熟库；说明自研、集成及简化边界；以笔记和固定 Piccolo 参考实现自己的引擎 | [decisions.md](../decisions.md#d03) | 原编号与决定语义保留；旧来源改为合并后正文 |
 | ROOT016 | D04 | 助手主要编码，用户学习/运行/调试/验收/讨论；完整V1按D54连续实施，普通内部检查不逐项等待，重大取舍先讨论 | [decisions.md](../decisions.md#d04) | 原编号与决定语义保留；旧来源改为合并后正文 |
@@ -442,7 +444,7 @@ Agent预读规则与人类导航分别计量；来源/历史/源码选读不等�
 | ROOT052 | D40 | 先用 .NET 并行库，再自研有限任务调度原型，先用成熟同步原语；Fiber/复杂无锁等后续细化，详细计时按实验需要加入 | [decisions.md](../decisions.md#d40) | 原编号与决定语义保留；旧来源改为合并后正文 |
 | ROOT053 | D41 | Deferred已纳入并实现V1，与Forward共用场景/资产；G-buffer/格式/切换合同见实际指南，其他渲染扩展后移 | [decisions.md](../decisions.md#d41) | 原编号与决定语义保留；旧来源改为合并后正文 |
 | ROOT054 | D42 | V1有限设计操作Undo/Redo已实现，含拖动事务/草稿提交及真实保存基准；运行状态不纳入撤销 | [decisions.md](../decisions.md#d42) | 原编号与决定语义保留；旧来源改为合并后正文 |
-| ROOT055 | D43 | 统一以“基础综合训练场 V1”为主名称，注明“用于面试展示”；旧面试 Demo/面试 V1 指同一版本；M1 后续按 D44 合入，不因名称统一批准其余范围 | [decisions.md](../decisions.md#d43) | 原编号与决定语义保留；旧来源改为合并后正文 |
+| ROOT055 | D43 | 统一以“基础综合训练场 V1”为主名称，定位为引擎的初版基础版本，用于学习实践、功能验证和后续扩展；M1 后续按 D44 合入，不因名称统一批准其余范围 | [decisions.md](../decisions.md#d43) | 原编号与技术边界保留；版本表述按2026-10-20确认统一 |
 | ROOT056 | D44 | 最小 3D 里程碑正式合入基础综合训练场 V1，必要绘制/变换/资源验证保留为内部工作；旧草案归档，不再独立交付或审批，原参数不自动获批 | [decisions.md](../decisions.md#d44) | 原编号与决定语义保留；旧来源改为合并后正文 |
 | ROOT057 | D45 | 开始写代码前必须弹窗展示具体实施范围，得到用户明确同意后再开始；普通范围/选型回答和“推进下一步”不代替开工确认 | [decisions.md](../decisions.md#d45) | 原编号与决定语义保留；旧来源改为合并后正文 |
 | ROOT058 | D46 | V1 渲染含 Forward/Deferred、PBR、基础阴影、天空盒、HDR/色调映射/FXAA；IBL 后移，具体算法参数待实施方案 | [decisions.md](../decisions.md#d46) | 原编号与决定语义保留；旧来源改为合并后正文 |
@@ -532,7 +534,7 @@ Agent预读规则与人类导航分别计量；来源/历史/源码选读不等�
 | B075 | L69–76 | 后续层次/未知版本总数/专题开工 | [v1-baseline.md](../plans/v1-baseline.md#version-continuation) | 保留后续分期原则、没有冻结大V2/V3和新授权 |
 | B076 | L77–94 | M1合并时间/当时基线/工作映射/旧候选不生效 | [v1-baseline.md](../plans/v1-baseline.md#m1-integration-proposal) | 保留M1合并与随后正式开工授权的区别，旧原文仍在已有归档 |
 | B077 | L95–109 | 连续开发、自查预览、不逐检查审批、必要准备与范围确认 | [v1-baseline.md](../plans/v1-baseline.md#authorization-history) | 保留用户希望完整版本和内部增量验证的组织选择、正式授权来源 |
-| B078 | L111–117 | 历史基线、求职展示来源、当前未完学习/未来目标 | [v1-baseline.md](../plans/v1-baseline.md#acceptance) | 保留经验和来源适用限制，动态完成/未完成由状态维护 |
+| B078 | L111–117 | 历史基线、功能演示流程、当前未完学习/未来目标 | [v1-baseline.md](../plans/v1-baseline.md#acceptance) | 保留历史基线和学习边界，动态完成/未完成由状态维护 |
 
 </details>
 

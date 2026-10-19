@@ -1,6 +1,6 @@
 # 基础综合训练场 V1：批准范围与设计基线
 
-本页合并V1范围讨论与正式实施方案，作为**V1范围和设计取舍**的权威记录。这里区分用户明确选择、助手按授权定案、后来实施校正和未采用候选；实际进展与最新验证由 [status.md](../status.md) 维护，低级接口、参数和操作合同由专题指南维护。统一名称为“基础综合训练场V1”，用途为“面试展示”；旧“面试Demo/面试V1”指同一版本。
+本页合并V1范围讨论与正式实施方案，作为**V1范围和设计取舍**的权威记录。这里区分用户明确选择、助手按授权定案、后来实施校正和未采用候选；实际进展与最新验证由 [status.md](../status.md) 维护，低级接口、参数和操作合同由专题指南维护。统一名称为“基础综合训练场 V1”，定位为引擎的初版基础版本，用于学习实践、功能验证和后续扩展。
 
 <a id="scope"></a>
 ## 1. 批准范围与排除项
@@ -116,11 +116,11 @@ Undo只覆盖约定设计命令，不能从“有Undo栈”推断任意操作可
 
 验证围绕实际行为：数学/时间/输入、身份/层级/历史/路径、真实Jolt/Gameplay、素材/WAV解析、GPU/原生UI/OpenAL、尺寸/清理/连续重置与准备失败分别留证。`--smoke`只说明环境，`--verify`包含真实原生要求，图形/音频另有专项；现行命令及成功判据在 [v1-run-and-review.md](../guides/v1-run-and-review.md)。V1历史Debug/Release采用既有依赖和`--no-restore`并记录bin/obj，不把本次文档改造当功能重跑。
 
-可选演示约3–5分钟：走跑/跳跃→机关/目标→NPC绕路跟随/搜索→声音粒子→状态观察→重置。时长、关卡流程、录像/展示脚本只是建议，录制/打包上传另按需求。值得解释的三链路为输入→真实运动→动画相机，感知→路径→实际执行/失败，设计/资产→运行事实→重置/释放。已有运行说明、架构与代码笔记映射是材料，求职建议来源不是招聘保证。
+可选演示约3–5分钟：走跑/跳跃→机关/目标→NPC绕路跟随/搜索→声音粒子→状态观察→重置。时长、关卡流程、录像/展示脚本只是建议，录制/打包上传另按需求。值得解释的三链路为输入→真实运动→动画相机，感知→路径→实际执行/失败，设计/资产→运行事实→重置/释放。已有运行说明、架构与代码笔记映射可用于功能演示与源码学习。
 
 <a id="version-continuation"></a>
 ## 7. 后续承接与可选依据
 
 后续保留“V1→能力扩展/对照→进阶专题”层次，不冻结庞大V2/V3、版本总数或期限；各专题先选可见成果、依赖和可验收改动量，保留有教学价值的基线并按成本决定整合/独立实验。网络/GI/GPU几何精细设计后移，不作为V1前置。
 
-可选依据：[plan.md](../plan.md#roadmap)、[design-reference-checks-2026-10-03.md](../reviews/design-reference-checks-2026-10-03.md)、[v1-independent-review-2026-10-03.md](../reviews/v1-independent-review-2026-10-03.md)、[DORA小批次工作](https://dora.dev/capabilities/working-in-small-batches/)、[Ubisoft作品展示建议](https://www.ubisoft.com/en-us/studio/annecy/news/7ikcras2odUQqzwc9oVKMY/starting-your-career-in-the-video-game-industry-8-mistakes-to-avoid-easily-when-applying)。外部来源支持设计理由，不能恢复CI、自动提交/部署或生成新授权。
+可选依据：[plan.md](../plan.md#roadmap)、[design-reference-checks-2026-10-03.md](../reviews/design-reference-checks-2026-10-03.md)、[v1-independent-review-2026-10-03.md](../reviews/v1-independent-review-2026-10-03.md)、[DORA小批次工作](https://dora.dev/capabilities/working-in-small-batches/)。外部来源支持设计理由，不能恢复CI、自动提交/部署或生成新授权。

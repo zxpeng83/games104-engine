@@ -13,7 +13,8 @@
 | [评审／转向修复](#v1-repair)，2026-10-03 | b91dfe4后38文件，30修改＋8新增；人工路线仍待复试 | 用户要求把当前修复保存到GitHub；命令要求暂存范围核对、确认后执行 | d2e8d40，23:00:25 +08；38文件与候选清单一致 |
 | [UI／首轮验收](#ui-acceptance)，2026-10-04 | 4be648e后16文件，13修改＋3新增；用户初步体验已确认 | 用户明确要求本地提交后推送；原记录要求展示范围／身份／验证并获该批确认 | 38cb85f，17:06:43 +08；16文件与候选清单一致 |
 | [文档重构及后续维护](#document-submission-20261005)，2026-10-05 | 38cb85f后56路径，33修改＋14删除＋9新增；全部为Markdown | 用户要求提交并查看14份撤下文档，随后报告“提交了”；本轮不补造提交前确认或推送答复记录 | 3a42c0f，16:57:33 +08；56路径和内容与候选一致，17:02:25 +08实时远端核对一致 |
-| [完整阅读指南及结果补记](#reading-guide-submission-20261009)，2026-10-09 | 3a42c0f后4路径，3修改＋1新增；全部为Markdown | 用户明确要求“我要提交github”，包含本地保存与推送意图；实际暂存清单仍按每批流程确认，由用户执行Git写入 | 准备中，尚未暂存、提交或推送；01:01:51 +08只读查询远端仍为3a42c0f |
+| [完整阅读指南及结果补记](#reading-guide-submission-20261009)，2026-10-09 | 3a42c0f后4路径，3修改＋1新增；全部为Markdown | 用户明确要求“我要提交github”，包含本地保存与推送意图；实际暂存清单仍按每批流程确认，由用户执行Git写入 | 2026-10-20本地复核f4a8b96，提交时间2026-10-09 01:08:02 +08；四路径一致，本轮未查询实时远端 |
+| [V1基础版定位与使用说明](#v1-foundation-submission-20261020)，2026-10-20 | f4a8b96后13路径，均为现有Markdown文档修改 | 用户已批准本轮文档维护；Git写入仍由用户按现行流程办理 | 文档范围、链接/锚点及空白检查通过，尚未暂存、提交或推送；本轮未查询实时远端 |
 
 完整V1实施授权、Git保存意图、暂存清单确认和实际commit/push是不同事实。这里保留原记录能支持的用户要求及确认流程，不补造原文未保存的确认框时间或逐项答复。下文实际结果是用户完成操作后的核查事实，不能用候选清单或计划命令替代。
 
@@ -481,3 +482,60 @@ docs: 增加完整文档阅读指南并补记提交同步结果
 ```
 
 下一步由用户按四条真实路径暂存；助手核对实际index后，按 [agent-workflow.md](../agent-workflow.md#current-policy) 展示范围、验证、说明、身份、仓库/分支和本批推送意图，完成该批明确确认。用户随后按既有流程commit并普通push origin main；实际结果再只读核对，不强制推送或改历史。
+
+### 2026-10-20：本地提交结果复核
+
+以上保留2026-10-09准备时点的记录。2026-10-20助手只读核对本地提交、引用和工作区，确认该批已经本地保存，不再把四份文档列为当前待提交项。
+
+- 实际提交：`f4a8b960a1989bfc68689e3967ccfcdebaccd87d`，父节点`3a42c0fa9249ed2c6083fea3cbb6f3fe3cd4bef0`。
+- 实际提交时间：2026-10-09 01:08:02 +08:00；身份zxpeng83 <2118168362@qq.com>。
+- 实际提交说明：`docs: 增加完整文档阅读指南并补记提交同步结果`。该节点只有此标题，不把上方拟用正文写成实际提交消息。
+- 实际四路径为README.md、documentation-guide.md、status.md、git-submission-history.md，与上表路径一致；3修改＋1新增，无删除，473行插入、12行删除。
+- 本轮开始时HEAD、main、本地origin/main均为完整f4a8b96节点，工作区和暂存区为空。核对使用带`--no-optional-locks`的本地Git只读命令，没有fetch、暂存、提交、推送或配置写入。
+
+本轮未查询实时远端。本地origin/main只是缓存引用，不能据此断言GitHub当前节点或补造该批推送时间、暂存确认及推送答复。10月9日01:01:51 +08的实时查询只证明当时服务器仍为3a42c0f，不证明后来的f4a8b96已上传；引擎运行、人工体验与D5验证没有新增。
+
+<a id="v1-foundation-submission-20261020"></a>
+## 2026-10-20：V1基础版定位与使用说明提交准备
+
+用户已批准本轮文档维护：统一“基础综合训练场 V1”的初版基础版定位，README补首次运行操作提示，并校正提交记录。范围仅为下列13份现有文档，无新增或删除正式文档，正式文档仍为44份；源码、SDK/包/锁文件、配置、资产和第三方文件均不在本批范围内。
+
+### 本批精确白名单与保存基线
+
+```text
+README.md
+g104engine/docs/architecture.md
+g104engine/docs/archive/foundation-documents-2026-10-02.md
+g104engine/docs/decisions.md
+g104engine/docs/development-history.md
+g104engine/docs/execution/document-restructure.md
+g104engine/docs/execution/v1-progress.md
+g104engine/docs/learning-map.md
+g104engine/docs/plan.md
+g104engine/docs/plans/v1-baseline.md
+g104engine/docs/reviews/git-submission-history.md
+g104engine/docs/reviews/v1-implementation-review-2026-10-03.md
+g104engine/docs/status.md
+```
+
+本轮开始时工作区和暂存区为空，HEAD、main、本地origin/main均为`f4a8b960a1989bfc68689e3967ccfcdebaccd87d`，上游origin/main。仓库根为E:\game_study\games104，分支main，远程origin为https://github.com/zxpeng83/games104-engine.git；Git身份为zxpeng83 <2118168362@qq.com>，未重设配置。本轮未查询实时远端，本地origin/main不构成服务器当前状态的证明。
+
+开始前README、AGENTS及docs内43份文档的原字节快照，以及147个已跟踪文件SHA保存在本机 `g104engine/.cache/execution/v1-foundation-docs/20261020-000531/`，不随Git同步。资料、私有截图、Piccolo及上层Git保持保护，缓存不纳入提交；实际暂存必须逐路径核对，不使用宽目录命令扩大白名单。
+
+### 文档验证与执行记录
+
+本轮核对13路径与白名单一致；44份工程Markdown的版本表述检查通过，README操作提示已对照现有运行指南与实际输入代码。变更文档的732处本地链接/章节引用全部有效，原锚点保留，git diff --check通过；其余134个已跟踪文件SHA与开始前一致。HEAD未变、暂存区为空，没有新增待提交文件。检查脚本和结果在上述缓存目录的check_docs.py及checks.json中。原有设计取舍、实现及验证日期、首轮人工初步验收结论与未覆盖限制继续保留；本轮不运行引擎，不新增人工体验或D5验证。
+
+规划和本次状态/历史实施子任务使用GPT-6.1 Sol Ultra；本轮GPT-6 Astra Ultra已独立只读审阅全部13份文档差异，核对操作提示、历史事实和证据边界，未发现新增的实质问题；独立执行的表述检索与diff --check通过。链接数量与保护哈希采用主任务检查结果，未重复执行；结论仅覆盖本次文档修改。
+
+### 拟用说明与下一步
+
+```text
+docs: 明确 V1 基础版定位并完善使用说明
+
+- 统一基础综合训练场 V1 的初版基础版表述，保留设计取舍和验证边界
+- 补充README首次运行与基本操作提示，沿用现有运行指南
+- 校正已完成提交的本地保存记录，列明本批13份文档范围
+```
+
+用户按上述13条真实路径办理暂存、提交及普通推送；助手按现行流程准备并只读核对实际index、提交结果与同步证据。本节仅为提交准备，尚未执行Git暂存、提交或推送，不以维护授权或本地缓存代替实际保存结果。
