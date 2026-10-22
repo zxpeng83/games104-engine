@@ -1,6 +1,72 @@
 # 基础综合训练场V1：运行、操作与验证
 
-本页直接说明现有工程怎样运行、保护设计、按问题选择验证并解释结果。它不要求先读历史探针/方案/台账；当前任务与用户验收结论以 [status.md](../status.md) 为准，执行/安装/Git权限见 [agent-workflow.md](../agent-workflow.md)。下面是命令参考，本轮文档改造没有运行任何命令。
+本页直接说明现有工程怎样运行、保护设计、按问题选择验证并解释结果。它不要求先读历史探针/方案/台账；当前任务与用户验收结论以 [status.md](../status.md) 为准，执行/安装/Git权限见 [agent-workflow.md](../agent-workflow.md)。2026-10-22补齐首次构建与新电脑验收步骤；这些是操作指引，本次文档维护没有构建或运行引擎。
+
+<a id="first-build"></a>
+## 新电脑首次构建：还没有bin/obj时
+
+先按 [reproduction.md](reproduction.md#new-machine-setup) 取得完整工程、安装环境，并完成 [dependencies.md](dependencies.md#first-restore) 的首次锁定还原。此时准确SDK已选中，两个项目的还原已成功；仅安装VS、打开源码文件或看到包版本表，不等于已经还原。没有成功还原时先处理该步，下面的`--no-restore`构建不会下载缺少的包。
+
+1. 在VS打开新电脑实际路径下的`g104engine/g104engine.slnx`，右键解决方案资源管理器中的 **G104.Sandbox → 设为启动项目**。不要启动Engine类库，也不要新建同名项目。
+2. 工具栏选择 **Debug | x64**。配置管理器中的Engine和Sandbox均应映射为x64并勾选“生成”；原方案已有映射，有疑问按 [environment.md](environment.md#222-x64-平台设置) 核对。
+3. 选择 **生成 → 生成解决方案**，在“输出”窗口查看生成结果。应无构建错误；若有警告或失败，保留完整输出，先处理后再运行。
+4. 检查下面的Debug输出。再切换到 **Release | x64** 生成一次，得到对应Release目录；完成后切回Debug供源码调试。不要仅改运行路径而忘记生成Release。
+
+输出相对`g104engine`目录如下；这些由构建产生，不需要手动往bin导入：
+
+| 输出位置 | 应有内容与作用 |
+|---|---|
+| `samples/G104.Sandbox/bin/x64/Debug/net10.0/` | `G104.Sandbox.dll`、`G104.Engine.dll`、`.deps.json`、`.runtimeconfig.json`及托管依赖；启动入口为Sandbox |
+| 上述目录的`assets/` | Shader、模型、贴图、场景、动画配置、8个WAV及素材许可，来自仓库正式assets |
+| 上述目录的`OpenAL32.dll` | 项目内OpenAL Soft实现，位于应用根目录 |
+| 上述目录的`runtimes/win-x64/native/` | 当前NuGet图提供的`cimgui.dll`、`glfw3.dll`、`joltc.dll`、`joltc_double.dll`，保留构建布局 |
+| 上述目录的`licenses/openal-soft/` | 构建复制的OpenAL许可及readme；对应源码归档仍在仓库third_party目录 |
+
+Release把路径中的`Debug`改为`Release`。不要只复制Sandbox单个DLL到别处运行，也不要把NuGet原生库从runtimes目录手动搬出；资源默认按应用输出位置查找。文件缺失时核对还原输出、Sandbox项目复制项及完整仓库，不能用旧电脑bin覆盖掩盖新机构建问题。
+
+如需用命令行检查同一构建，先在 **PowerShell** 进入新电脑实际`g104engine`目录。下面沿用首次克隆到用户`source/games104`的例子；使用其他目录时修改第一行。已在VS生成成功时无需为了准备环境重复执行这组命令。
+
+```powershell
+$engineRoot = Join-Path $env:USERPROFILE 'source\games104\g104engine'
+Set-Location -LiteralPath $engineRoot
+dotnet build g104engine.slnx --no-restore --disable-build-servers -m:1 -c Debug -p:Platform=x64
+if ($LASTEXITCODE -ne 0) { throw 'Debug构建失败，先检查输出。' }
+dotnet build g104engine.slnx --no-restore --disable-build-servers -m:1 -c Release -p:Platform=x64
+if ($LASTEXITCODE -ne 0) { throw 'Release构建失败，先检查输出。' }
+```
+
+<a id="first-machine-checks"></a>
+## 新电脑的首次环境验收
+
+构建完成后在该机检查一次真实运行。下面使用独立用户数据目录，便于把首次验收设计与以后的日常设计分开；它不是必须设置的系统环境变量。先停止VS中正在调试的程序，在 **PowerShell** 中进入上节的`g104engine`目录，再逐条执行：
+
+```powershell
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --smoke
+if ($LASTEXITCODE -ne 0) { throw '入口检查失败。' }
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify --user-data-root .cache/execution/new-computer-verify
+if ($LASTEXITCODE -ne 0) { throw '逻辑或原生物理检查失败。' }
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --verify-audio
+if ($LASTEXITCODE -ne 0) { throw '音频设备或后端检查失败。' }
+dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --user-data-root .cache/execution/new-computer-first-run
+```
+
+| 检查 | 看什么才算这一项完成 |
+|---|---|
+| 托管入口 | `--smoke`退出0，打印的进程架构为X64，框架为.NET 10；它只打印部分信息，不会初始化GLFW、GL、Jolt或音频，不能单独作为全部依赖通过 |
+| 逻辑与Jolt | `--verify`退出0，包含physics、animation、integration、audio等PASS和`Verification complete`；WAV检查只解析文件，不能代替音频设备播放 |
+| 音频后端 | `--verify-audio`退出0并打印`PASS OpenAL actual context...`；此自动检查音量低且时间短，听感仍在可见窗口里确认 |
+| 图形与原生UI | 最后一条打开完整Edit训练场，模型和工具面板可见，控制台输出GPU与GL版本；没有GL上下文/Shader/资源异常。程序会检查GL至少4.3 |
+| 进入运行世界 | 点击Play，确认状态进入PLAY并能WASD移动、Space跳跃，再Stop。只看到Edit窗口不证明Jolt可用；若显示`Command rejected`或没有进入Play，应保留错误继续排查 |
+| 实际声音 | 面板Audio应显示后端信息，不是Unavailable；使用2D/3D声音测试并听脚步或跳跃。音频初始化失败时窗口仍可继续，所以无声不能记为完整通过 |
+| 文件写入 | 在Edit创建并命名一个测试Cube，Save design；关闭窗口后用同一条带`--user-data-root`的命令重开，确认保存的对象仍在。此设计只写到本次隔离目录，默认用户设计未被覆盖 |
+
+然后在VS中以 **Debug | x64** 打开`TrainingWindow.cs`，在`OnUpdateFrame`内的可执行语句设置断点，按VS的F5启动，确认断点被命中、能检查变量并继续。若断点空心或提示源码不匹配，核对启动项目、配置和实际生成输出，按 [environment.md](environment.md#debugging) 处理。断点暂停后的帧耗时不是正常性能数据。
+
+VS无参数启动使用`%LOCALAPPDATA%/G104Engine/TrainingGroundV1`中的日常设计；上面的隔离Cube不会自动出现，这是两套用户数据路径的正常区别。运行窗口内的F5是Play快捷键，VS里的F5是启动/继续调试。
+
+最后以 **Release | x64** 用Ctrl+F5普通运行，确认仍可显示、Play/Stop及播放声音。上述检查通过即可进入当前V1源码学习和开发，不要求为首次准备运行下面所有专项回归。记录新机日期、源码HEAD、SDK/VS、GPU/GL、声音和未通过项；这些步骤只有实际执行后才形成新机验证结果。
+
+若失败，按本页[失败处理与结果解释](#失败处理与结果解释)保留第一处异常；准确SDK/VS见环境页，NuGet/素材缺失见依赖页。不要通过升级全部包、关闭锁定、删除用户设计或更换旧版源码来凑出PASS。
 
 <a id="run-and-verify"></a>
 <a id="命令行验证入口"></a>
@@ -8,7 +74,7 @@
 
 本机工程目录是E:\game_study\games104\g104engine，解决方案是g104engine.slnx；启动项目G104.Sandbox，Debug或Release/x64。已锁SDK10.0.401、net10.0、九个Engine直接包及双锁文件；运行所需assets/OpenAL按项目复制到输出。FFmpeg/Python仅参与已完成离线准备，普通运行不需要它们。
 
-已有输出可直接运行DLL；需要构建时只使用已有还原依赖。没有对应SDK/还原产物时先保留错误，按VS处理，不在验证命令中自动restore、升级包或重建工程。构建更新bin/obj，运行的当前目录和应用assets目录不是同一概念。
+已有输出可直接运行DLL；需要构建时只使用已有还原依赖。新电脑先完成本页[首次构建](#first-build)；没有对应SDK/还原产物时按环境及依赖页处理，不在验证命令中混入自动restore、升级包或重建工程。构建更新bin/obj，运行的当前目录和应用assets目录不是同一概念。下面的E盘路径是原电脑例子，换机须使用实际路径。
 
 在PowerShell中：
 

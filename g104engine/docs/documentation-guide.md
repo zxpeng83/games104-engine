@@ -13,7 +13,7 @@
 - [目录怎样分工](#directory-layout)：先理解工程、文档和课程资料分别放在哪里。
 - [每份文档分别有什么用](#file-roles)：按原文件名查具体用途和阅读时机。
 - [易混点逐组解释](#confusing-documents)：重点看 AGENTS.md、agent-workflow.md，以及状态、计划、指南、历史之间的区别。
-- [用具体任务把文档串起来](#reading-routes)：从源码学习、换聊天、讨论新能力、Git保存和历史排错五个例子理解阅读顺序。
+- [用具体任务把文档串起来](#reading-routes)：从源码学习、换聊天、讨论新能力、Git保存、历史排错和新电脑搭建六个例子理解阅读顺序。
 - [新信息应写在哪里](#where-to-save)：理解维护时怎样避免信息遗漏、重复和过期。
 
 <a id="directory-layout"></a>
@@ -85,14 +85,14 @@ games104/
 
 | 文件 | 主要内容与作用 | 什么时候读 |
 |---|---|---|
-| [v1-run-and-review.md](guides/v1-run-and-review.md) | 运行训练场、键鼠操作、设计保存保护、Load/Reset含义、按问题选择验证命令，以及解释结果的边界。 | 启动、使用、排错，或修改后选择相关检查时。 |
-| [environment.md](guides/environment.md) | 使用现有VS工程，核对x64和Debug/Release，诊断缺失环境与调试设置问题；也保留SAC拦截的历史取舍。 | 工程打不开、配置不对、原生部署/调试受阻，或想理解环境设置时。 |
-| [dependencies.md](guides/dependencies.md) | 精确SDK与包、锁文件、依赖分工、部署、素材来源和离线准备；解释为什么采用这些依赖及怎样受控更新。 | 查某个库的作用、版本、DLL部署或素材来源时。 |
+| [v1-run-and-review.md](guides/v1-run-and-review.md) | 首次还原后的构建与新机验收、训练场操作、设计保存保护、Load/Reset、专项验证命令及结果边界。 | 首次构建、启动、使用、排错，或修改后选择相关检查时。 |
+| [environment.md](guides/environment.md) | 新机系统/硬件要求、Git/VS/准确SDK下载与安装，现有工程x64/调试配置及缺失环境诊断；保留SAC历史取舍。 | 准备新机开发环境，或工程打不开、配置不对、原生部署/调试受阻时。 |
+| [dependencies.md](guides/dependencies.md) | 文件获取方式、首次锁定还原、精确版本、DLL部署、素材下载与可选离线准备；保留选型及受控升级方法。 | 准备NuGet包、区分随仓库素材与原包下载，或查库作用、版本和部署时。 |
 | [scene-and-editor.md](guides/scene-and-editor.md) | 场景身份和空间、时钟与输入、JSON/模板、设计与运行隔离、编辑事务、Undo/Redo、保存基准及失败保护。 | 解释场景或编辑行为，定位保存、输入归属和Undo问题时。 |
 | [physics-and-gameplay.md](guides/physics-and-gameplay.md) | Jolt适配与查询、自研角色移动、导航/NPC、按钮门等玩法、反馈和已知实现边界。 | 跟角色、碰撞、寻路、NPC或机关的当前调用链时。 |
 | [rendering-and-animation.md](guides/rendering-and-animation.md) | glTF导入子集、矩阵/蒙皮、Forward/Deferred、颜色处理、动画求值与事件，以及资源寿命。 | 查当前画面、模型、动画怎样实现，或定位渲染/动画问题时。 |
 | [git-and-publishing.md](guides/git-and-publishing.md) | 每批保存的核查与操作流程、Git Bash/Git GUI说明及精确发布白名单。 | 准备暂存、提交、推送，或判断哪些内容可以公开时。 |
-| [reproduction.md](guides/reproduction.md) | 保留D5恢复后的独立克隆/跨设备复现办法，并解释同机换聊天怎样接续。 | 讨论复现或接续方式时；安排D5实操前先核对当前状态和政策。 |
+| [reproduction.md](guides/reproduction.md) | 新电脑搭建的统一入口：获取现有仓库、按顺序准备环境/还原/素材、首次构建验收；区分存档迁移、同机换聊天与未实测边界。 | 在新电脑从零准备到可以开发时先读；助手代执行具体动作仍核对授权范围。 |
 
 ### plans/：V1基线和模块路线
 
@@ -247,19 +247,19 @@ status.md也不是实时监控程序。它保存最近一次维护时核对到�
 
 ### 6. environment.md、dependencies.md、v1-run-and-review.md和reproduction.md
 
-**运行指南给你现有工程的最短使用路径。** 打开已有方案或启动已有输出，怎样Play/Stop、移动/交互、编辑与保存，出了问题选择哪种检查，都从v1-run-and-review.md进入。
+**运行指南给你首次构建和现有工程的使用路径。** 首次还原后怎样生成输出、在新电脑做必要验收，以及怎样Play/Stop、移动/交互、编辑与保存、按问题选择检查，都从v1-run-and-review.md对应章节进入。没有bin/obj的新机不能跳过还原构建，直接照抄运行DLL命令。
 
-**environment.md处理开发环境与调试配置。** 比如为什么要x64、Debug与Release调试有什么区别、SDK/原生库或VS设置怎样核对。它也保留历史故障供参考，读到旧建工程内容时不能拿Hello World或蓝色探针覆盖现在的训练场。
+**environment.md处理新机安装、硬件条件与调试配置。** 它给出Git、VS及准确SDK的官方入口和安装检查，说明OpenGL能力、声音设备、x64及Debug/Release。它也保留历史故障供参考，读到旧建工程内容时不能拿Hello World或蓝色探针覆盖现在的训练场。
 
-**dependencies.md说明工程依赖什么、这些文件怎样进入并被使用。** 它集中维护精确版本和部署说明：SDK、NuGet锁文件、Jolt/OpenAL及素材等各自负责什么；不是“读到升级步骤就应立即升级”。实际项目和锁文件同时也是程序可读取的版本来源。
+**dependencies.md说明工程依赖什么、文件从哪里来以及怎样准备。** 它区分系统安装、NuGet首次还原、仓库已有文件和可选素材加工，集中维护精确版本、来源与部署。普通新机使用仓库现成素材；想重新提取/转换时才进入原ZIP、Python、FFmpeg分支。首次还原不执行依赖升级流程，项目和锁文件仍是程序可读取的版本来源。
 
-**reproduction.md讨论独立工作区或另一设备怎样复现，并区分同机换聊天。** 复现需要确认已同步哪些内容、缺什么环境、在新位置运行是否得到结果。本机成功不能自动证明新设备成功。
+**reproduction.md是新电脑从零准备的顺序入口，并区分同机换聊天。** 它串起工具安装、源码获取、SDK核对、还原、首次构建与验收，只在需要具体操作时进入上述三页；不用自行拼接历史记录。复现还要确认已同步哪些内容、在新位置运行是否得到结果，本机成功不能自动证明新设备成功。
 
 比如工程能打开，想移动角色，就查运行指南；因为平台或调试设置无法启动，查environment；因为某DLL版本或部署位置不清楚，查dependencies；要准备独立目录或换设备，则查reproduction及当前政策。
 
 同一设备、同一工作区换聊天，可以读取本机已经落盘的文件和未提交内容，通常不需要重新克隆、还原、建工程或创建工作树。“换聊天接续”和“换设备复现”是两件事。
 
-D5是本项目把独立克隆、CI和第二设备验证合在一起使用的阶段标识。它们的实际状态由status.md和agent-workflow.md维护；reproduction.md保留未来恢复后的办法，阅读或更新这份文件不会恢复D5。只恢复其中一项，也不能推断其他项同时恢复。
+D5是本项目把独立克隆、CI和第二设备验证合在一起使用的阶段标识。它们的实际状态由status.md和agent-workflow.md维护；2026-10-22补齐新机搭建文档，不等于已执行换机验证或启用CI。只实际开展其中一项，也不能推断其他项同时开展。
 
 ### 7. Git操作政策、Git指南和提交历史
 
@@ -357,6 +357,15 @@ D5是本项目把独立克隆、CI和第二设备验证合在一起使用的阶�
 5. **只在进一步追问时读其他历史。** 想知道这批怎样与独立评审衔接，查 [v1-progress.md](execution/v1-progress.md)；涉及重要选择时查 [decisions.md](decisions.md)。只有要核对当时原案原话，才需要归档，不必把所有archive都读一遍。
 
 能说清现象、真实根因、修改入口和验证限制，就完成了这次追溯。如果今天再次出现类似异常，先核对当前版本和新复现条件；历史通过不直接证明新一轮通过，也不把旧“待用户复试”当成今天仍未完成。
+
+### 任务六：在另一台新电脑准备到可以写代码
+
+1. **从 [reproduction.md](guides/reproduction.md#new-machine-setup) 的六步清单开始。** 目标是取得并开发现有V1，先确定源码版本和电脑条件，按步骤选择新目录；不需要重建Engine/Sandbox。
+2. **按 [environment.md](guides/environment.md#new-machine-environment) 安装工具。** 核对硬件、Git、VS组件和准确SDK。获取工程后再在方案目录检查SDK选择，避免把旧电脑盘符当作新机要求。
+3. **按 [dependencies.md](guides/dependencies.md#first-restore) 完成首次还原。** 模型、声音和OpenAL正式文件已随仓库提供；需要的是按既有锁文件取得NuGet包。只有要重做素材时才阅读同页可选下载/转换分支。
+4. **按 [v1-run-and-review.md](guides/v1-run-and-review.md#first-build) 构建并验收。** 新机没有bin/obj正常，必须先得到输出；可见窗口、Play、声音、保存及Debug断点要在该机实际检查。
+
+完成标准、存档迁移和失败后的接续点都在上述入口。记录“文档已准备”和“新电脑实际通过”时分别说明，不用旧机历史结果替代本机检查。
 
 <a id="where-to-save"></a>
 ## 新信息应写在哪里

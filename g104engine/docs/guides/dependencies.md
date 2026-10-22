@@ -1,6 +1,20 @@
 # 依赖、版本锁定与素材合同
 
-本页维护精确依赖、部署来源、选型理由及受控升级方法。当前任务/同步状态查 [status.md](../status.md)，安装/还原及变更权限见 [agent-workflow.md](../agent-workflow.md)；这里的操作说明不会自动启动升级。历史准备步骤已完成，按页末日期索引追溯，不需重新添加包。
+本页维护精确依赖、获取与部署步骤、选型理由及受控升级方法。新电脑先看下方获取分类与首次还原；原电脑已完成的准备历史按页末日期索引追溯，不代表新机已经安装环境或还原包。当前任务/同步状态查 [status.md](../status.md)，安装/还原及变更权限见 [agent-workflow.md](../agent-workflow.md)；首次搭建不需要重新添加包，也不执行依赖升级流程。
+
+<a id="acquisition-map"></a>
+## 新电脑要获取哪些东西
+
+首次搭建按 [reproduction.md](reproduction.md#new-machine-setup) 的顺序进行。下面把系统环境、NuGet下载、仓库现成文件与可选的素材重新准备分开；这些是操作说明，本轮没有在新电脑执行安装、还原或运行。
+
+| 获取类别 | 要准备什么 | 获取方式与落点 | 普通首次搭建是否需要 |
+| --- | --- | --- | --- |
+| 系统安装 | Windows x64、适配的VS与.NET开发组件、准确的.NET SDK 10.0.401、显卡驱动；按需使用Git取得仓库 | 官方入口、选择与环境核对见 [environment.md](environment.md#new-machine-environment)；SDK由系统安装，global.json只负责选择 | 需要；已满足的项目不用重复安装 |
+| 首次NuGet还原 | Engine九个直接包及锁文件记录的传递包，包括包内原生文件 | 按[首次还原步骤](#first-restore)，由VS从nuget.org获取到本机包缓存，生成两项目的obj；版本由现有项目与锁文件确定 | 需要；缓存齐全时可以复用 |
+| 随仓库现成提供 | assets下的模型、配置、场景、Shader、贴图、八个WAV及素材许可；third_party下的OpenAL DLL、许可、说明和源码归档 | 保留正式目录；Sandbox构建时按项目配置复制资产和运行文件 | 需要这些文件完整存在；不用再去素材网站重复下载 |
+| 仅可选原包再生成 | Quaternius/Kenney/OpenAL四个输入ZIP、便携FFmpeg，以及执行脚本的Python 3 | 见[可选资源重新准备](#optional-asset-preparation)；ZIP和工具放在被忽略的.cache/v1-preparation | 普通构建运行不需要；确实要重提取、重转码时才准备 |
+
+NuGet包不随Git保存，但现有模型、WAV和OpenAL DLL已作为正式项目文件保存；它们不是靠原电脑的.cache才能运行。Sandbox自动复制全部assets、OpenAL32.dll及其许可，OpenAL从应用根目录加载；NuGet自带的原生库由还原和构建按包配置部署，不需手工搬进应用根。仅复制exe不足以形成完整运行目录，输出检查见 [v1-run-and-review.md](v1-run-and-review.md#first-build)。
 
 <a id="dependency-locks"></a>
 ## 已采用版本与分工
@@ -72,6 +86,21 @@ VS从解决方案目录、dotnet从当前目录向上解析global.json，所以�
 <a id="42-nuget-依赖锁文件第-41-节核验后继续"></a>
 <a id="package-locks"></a>
 ### 4.2 锁文件、还原与严格模式
+
+<a id="first-restore"></a>
+#### 新电脑第一次在VS中还原
+
+前提是已经按 [environment.md](environment.md#new-machine-environment) 准备好固定SDK，并从完整仓库打开g104engine/g104engine.slnx。首次还原会联网下载缺少的NuGet包；“锁定”约束解析结果，不禁止按锁文件下载。
+
+1. 在VS打开“工具 → 选项 → NuGet包管理器 → 程序包源”，检查已启用的nuget.org源。名称可为`nuget.org`，官方V3地址为`https://api.nuget.org/v3/index.json`；已有正确条目就复用，缺少时再添加。源可能还受本机、用户或上层NuGet.Config影响，项目没有提供一份专用NuGet.Config；遇到额外源的凭据/连接错误时，先核对实际配置与日志，不修改项目版本来绕过。
+2. 在“NuGet包管理器 → 常规”中允许NuGet下载缺少的程序包，然后在解决方案资源管理器右键解决方案 →“还原NuGet程序包”。构建时自动还原可以按使用习惯开启，首次搭建先单独完成这次显式还原，方便区分下载错误与编译错误。
+3. 保留两个项目现有的`RestorePackagesWithLockFile=true`和`RestoreLockedMode=true`。不用在“浏览”页重新搜索安装九个包，也不用给Sandbox重复添加Engine的包；项目引用和两份packages.lock.json已经保存了当前要求。这不是下文的升级流程，不关闭严格模式、不删除锁文件。
+4. 查看VS输出中的“程序包管理器”或还原日志。完成标准是解决方案还原成功、两项目依赖节点没有缺包错误、两个obj/project.assets.json已生成，并且项目声明及两份锁文件没有因首次还原而改变。已有包时提示无需还原也正常；构建成功和原生库能加载仍需下一步验证。
+5. 若出现`NU****`、源不可达、凭据错误或锁文件不匹配，保存完整错误，分别核对网络/源、固定SDK以及项目与锁文件是否来自同一完整版本。先解决原因再重试，不通过升级包、手填哈希或复制一份锁文件覆盖另一份来消除错误。还原完成后直接按 [v1-run-and-review.md](v1-run-and-review.md#first-build) 进行Debug/Release构建与运行核对，无需返回上游重新读安装步骤。
+
+官方机制依据：[VS还原说明](https://learn.microsoft.com/en-us/nuget/consume-packages/package-restore#restore-packages-in-visual-studio)、[NuGet服务入口](https://learn.microsoft.com/en-us/nuget/api/service-index)、[配置作用范围](https://learn.microsoft.com/en-us/nuget/consume-packages/configuring-nuget-behavior)。
+
+#### 三类文件怎样配合
 
 | 文件 | 用途 | 谁读取 |
 | --- | --- | --- |
@@ -165,7 +194,7 @@ Sandbox虽无直接OpenTK引用，也经Engine解析运行所需图；运行应�
 当前PcmWave已限定RIFF/WAVE、整数PCM16、1/2声道并从文件读取采样率，逐chunk处理对齐，不假设44字节头；拒绝float/extensible/压缩。3D点声源需mono，2D提示不随场景方向/距离变化。OpenAL只播放PCM、不解码任意文件，原机制参考见 [OpenTK AL API](https://opentk.net/api/OpenTK.Audio.OpenAL.AL.html) 和 [openal-1.1-specification.pdf](https://www.openal.org/documentation/openal-1.1-specification.pdf)，其他格式明确报错。
 
 
-采用素材的作者/来源/许可、选中条目、转换参数与逐项SHA由 [asset-manifest.json](../../assets/licenses/asset-manifest.json) 保存。原始四ZIP是忽略的本机来源缓存，正式采用子集在assets/third_party；不用包宣传页推定免费Standard包含所有动作、PCM编码或相容skin，不扩大 [git-and-publishing.md](git-and-publishing.md)。
+采用素材的作者/来源/许可、选中条目、转换参数与逐项SHA由 [asset-manifest.json](../../assets/licenses/asset-manifest.json) 保存。原始四ZIP是忽略的本机来源缓存，正式采用子集分别在assets和third_party；不用包宣传页推定免费Standard包含所有动作、PCM编码或相容skin，不扩大 [git-and-publishing.md](git-and-publishing.md)。
 
 Quaternius Standard来源：[作者页](https://quaternius.itch.io/universal-animation-library)，采用Unreal-Godot/UAL1_Standard.glb非_RM版本；[作者更新](https://quaternius.itch.io/universal-animation-library/devlog/1555893/added-root-motion-and-other-fixes)区分RM。实际65关节/43LINEAR clips保根姿态，128矩阵UBO不截64，Run默认Jog；GLB无TANGENT/图片/纹理，用自有material-probe/checker/flat normal补贴图证据，未购买额外角色。flat normal不证明复杂法线图全部方向/滤波。
 
@@ -173,7 +202,7 @@ Kenney来源：[Impact Sounds](https://kenney.nl/assets/impact-sounds)、[Interf
 
 ### 便携工具的适用范围
 
-按授权普通细节已采用Gyan release essentials便携Windows FFmpeg9.0.2，仅转换已选声音。原准备来源为 [FFmpeg官方Windows提供方](https://ffmpeg.org/download.html) → [Gyan发行构建](https://www.gyan.dev/ffmpeg/builds/)，实际文件ffmpeg-9.0.2-essentials_build.zip；历史核对见 [版本记录](https://www.gyan.dev/ffmpeg/builds/release-version) 与 [对应SHA-256](https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip.sha256)。版本记录是浮动网页，本轮没有联网重新核其最新值，当前采用版本由已校验文件/台账固定。
+按授权普通细节已采用Gyan release essentials便携Windows FFmpeg9.0.2，仅转换已选声音。原准备来源为 [FFmpeg官方Windows提供方](https://ffmpeg.org/download.html) → [Gyan发行构建](https://www.gyan.dev/ffmpeg/builds/)，实际文件ffmpeg-9.0.2-essentials_build.zip；历史核对见 [版本记录](https://www.gyan.dev/ffmpeg/builds/release-version) 与 [对应SHA-256](https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip.sha256)。2026-10-05文档补充时没有联网重核浮动网页；2026-10-22补新电脑说明时已核对发行页、版本文本9.0.2及SHA文本与原记录一致，未下载ZIP或重新转换。将来仍以固定版本和哈希为准。
 
 已获取ZIP的SHA-256与预期`60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba`一致，正式授权后已运行转换七段声音；工具/日志保留忽略缓存。未系统安装/改PATH，不属于引擎运行依赖或Git发布包；将来如需重获仍固定版本/哈希，不能浮动latest升级。
 
@@ -181,10 +210,69 @@ Kenney来源：[Impact Sounds](https://kenney.nl/assets/impact-sounds)、[Interf
 
 工具只负责已选声音离线转换，未系统安装/改PATH，不是应用运行或Git发布依赖。tools/prepare_assets.py负责已核输入提取、程序测试资产及离线转换；重获原始输入、重转或升级工具需要具体任务，阅读本页不触发执行。解析、输出哈希、原生播放与人工听感分别取证。
 
+<a id="optional-asset-preparation"></a>
+## 可选：重新获取原包、提取与转换资源
+
+**新电脑使用仓库现有资源时跳过本节。** 只有明确要重新准备输入或修复缺失资源时才进入。原始四ZIP和FFmpeg不随Git同步；现有脚本不会下载它们，也不会安装Python或FFmpeg。一般的资源缺失应先检查仓库是否获取完整。
+
+### 下载来源、文件名与校验
+
+下面五个压缩包的目标目录统一为所操作副本的`g104engine/.cache/v1-preparation/`，文件名须与表中一致。四个输入ZIP的SHA来自已核对输入及脚本，FFmpeg的SHA来自发行方文本与已有核对记录。下载后在该副本的g104engine目录用`Get-FileHash -LiteralPath '.\.cache\v1-preparation\文件名' -Algorithm SHA256`逐项比较；`-LiteralPath`避免把Standard文件名的方括号当通配符。校验对象是压缩包本身。
+
+| 官方作者/发行入口 | 选择与下载文件名 | 预期ZIP SHA-256 |
+| --- | --- | --- |
+| [OpenAL Soft官网](https://openal-soft.org/#download)；[固定Windows包](https://openal-soft.org/openal-binaries/openal-soft-1.25.2-bin.zip) | 1.25.2 Windows二进制包，保存为`openal-soft-1.25.2-bin.zip`；采用其中bin/Win64/soft_oal.dll | `67a0c4b800bd860c93c04f38caf8cbe4875f9c84700ac430efc451f70e265434` |
+| [Quaternius作者页](https://quaternius.itch.io/universal-animation-library) | Download Now中的Standard，保存为`Universal Animation Library[Standard].zip`；不选付费Pro/Source或其他代素材包 | `cc73fc4e495b82958207316596317a3f40b9fa38065bde1027937452da537724` |
+| [Kenney Impact Sounds作者页](https://kenney.nl/assets/impact-sounds) | Download；可选择Continue without donating，保存为`kenney_impact-sounds.zip` | `029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8` |
+| [Kenney Interface Sounds作者页](https://kenney.nl/assets/interface-sounds) | Download；可选择Continue without donating，保存为`kenney_interface-sounds.zip` | `f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232` |
+| [FFmpeg官网Windows入口](https://ffmpeg.org/download.html#build-windows) → [Gyan发行页](https://www.gyan.dev/ffmpeg/builds/#release-builds)；[固定ZIP](https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip) | Release essentials 9.0.2 ZIP，保存为`ffmpeg-9.0.2-essentials_build.zip`；不选git master、full/shared或浮动latest代替 | `60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba` |
+
+2026-10-22已联网核对上述作者/发行入口：OpenAL官网列出1.25.2二进制与源码；Quaternius页面列出Standard及CC0、RM/非RM的区分；Kenney页面分别列出130/100个声音及CC0；Gyan发行页和版本文本为9.0.2，SHA文本与表一致。本轮没有下载这些软件/素材ZIP，也没有证明作者当前提供的四个输入ZIP仍与历史输入逐字节相同。作者站可能更新同名文件；若下载文件哈希不同或固定文件不可获取，保留失败信息，使用仓库现有正式资源，待明确升级任务后再处理，不改脚本预期值强行通过。
+
+需要执行脚本时，另从[Python官方Windows入口](https://www.python.org/downloads/windows/)取得Python 3解释器，选择适合Windows x64的正式版本。脚本只使用argparse、hashlib、json、pathlib、wave、zipfile等Python标准库，不需要安装pip包。工程没有锁定或记录原准备时的精确Python版本，本轮也未验证任意新版本解释器；先确认选定的解释器能运行，再执行下列可选流程。若系统没有`py -3`，将命令首项换成已安装python.exe的实际路径；PowerShell中完整路径含空格时，用`& '实际的python.exe完整路径'`调用，再接相同脚本与参数。
+
+### 正式采用哪些文件
+
+| 来源/类型 | 正式落点与处理 |
+| --- | --- |
+| OpenAL Windows包 | 从`openal-soft-1.25.2-bin/bin/Win64/soft_oal.dll`提取，改名为`third_party/openal-soft/1.25.2/OpenAL32.dll`；同目录保留COPYING、LICENSE-pffft和readme.txt |
+| Quaternius Standard | 提取`Unreal-Godot/UAL1_Standard.glb`非_RM版本至`assets/models/UAL1_Standard.glb`，许可与README放入assets/licenses；当前配置是assets/config/character-animation.json |
+| Kenney两个声音包 | 只取下表七段Ogg，经离线FFmpeg转mono/44100Hz/PCM16，保存为assets/audio下对应WAV；不把230段整包复制进运行目录 |
+| 项目自有资源 | material-probe.glb、checker.png、normal.png和loop-test.wav可由脚本生成；training-ground.json场景、角色动画配置及Shader等已有工程文件仍从仓库取得，脚本不会重建它们 |
+
+| 原包条目（不含目录） | assets/audio输出 |
+| --- | --- |
+| Impact Sounds的footstep_concrete_000.ogg、footstep_concrete_001.ogg | step0.wav、step1.wav |
+| Impact Sounds的impactWood_medium_000.ogg、impactMetal_light_000.ogg | door.wav、jump.wav |
+| Interface Sounds的click_001.ogg、confirmation_001.ogg、switch_001.ogg | click.wav、complete.wav、switch.wav |
+| 项目生成的110Hz测试信号 | loop-test.wav；与七段转换声音合计八个WAV |
+
+如果只是修复同版本OpenAL文件，可以在临时提取目录打开已校验ZIP，手工执行上表的Win64 DLL重命名/复制及许可复制，无需运行整个准备脚本。DLL本身的SHA应为`3963b06e319180700be0bcc0d027336664bb3a4975876b4a5442f10746fab5b4`；它与ZIP哈希不同。不要选router/Win64/OpenAL32.dll、Win32文件，也不用把它复制到系统目录或安装系统OpenAL。构建会从正式目录复制DLL到应用根；只改bin无法修复下一次构建的来源。
+
+OpenAL同版本完整源码归档`openal-soft-1.25.2.tar.bz2`也已随仓库保存在third_party/openal-soft/1.25.2。确需重新获取时用[官方固定源码包](https://openal-soft.org/openal-releases/openal-soft-1.25.2.tar.bz2)，校验SHA为`1dbaac44e7579d5bc8847ca8db4b2e8b9fd3961041f35ee20def4958301e1089`；来源与许可说明见 [SOURCE.md](../../third_party/openal-soft/1.25.2/SOURCE.md)。此归档用于保留对应源码，不用解压构建，prepare_assets.py也不会下载或生成它。未来发布应用二进制包时仍需提供对应源码与许可的获取方式。
+
+### 在可写副本中执行完整准备脚本
+
+**脚本会覆盖多项正式资源和asset-manifest.json，且失败时不会自动回滚；必须先制作完整可写副本并保留原文件，再在副本中执行。** 它会依次提取OpenAL DLL/许可和角色GLB/许可，生成两张PNG、材质探针GLB与循环测试WAV，再转换七段声音、更新声音许可并重写manifest；不是只做音频转换。已有character-animation.json只被读取并记入manifest，不会重新生成；场景、Shader、SOURCE.md与OpenAL源码归档也不由脚本生成。
+
+1. 在副本中放好并逐项校验上表五个ZIP。四个输入ZIP保留原压缩形式，脚本自行读取；FFmpeg ZIP另行解压，保留同包文件，整理或选择其实际可执行文件路径。下面示例采用`.cache/v1-preparation/ffmpeg-9.0.2/bin/ffmpeg.exe`；如果保留解压后的默认顶层目录，修改`--ffmpeg`参数指向对应bin/ffmpeg.exe。便携使用，无需系统安装或改PATH。
+2. 打开PowerShell，以下路径示例须替换为你自己的**副本**位置；工作目录必须是该副本的g104engine。先核对路径，再执行：
+
+```powershell
+Set-Location -LiteralPath 'D:\G104Engine-asset-preparation\games104\g104engine'
+py -3 --version
+Get-Item -LiteralPath '.\tools\prepare_assets.py', '.\.cache\v1-preparation\ffmpeg-9.0.2\bin\ffmpeg.exe'
+py -3 .\tools\prepare_assets.py --ffmpeg .\.cache\v1-preparation\ffmpeg-9.0.2\bin\ffmpeg.exe
+```
+
+3. `--ffmpeg`是必填参数，须指向已解压的ffmpeg.exe；仅放ZIP或只把工具加到PATH不能满足这个调用。脚本首先检查四个输入ZIP的SHA，再依次写入文件；它不会校验FFmpeg ZIP或可执行文件版本，因此下载阶段的FFmpeg版本/ZIP哈希核对不能省略。完成下载、解压和解释器准备后，这条脚本调用使用本地文件，不需联网。
+4. 成功应为零退出码并打印包含prepared/root的JSON。随后核对manifest中的路径、许可、转码参数及输出SHA，检查上述八个WAV、两个模型和两张PNG等产物；不能只看prepared数字。manifest里的conversion会记录这次副本的绝对路径，不要求与旧电脑历史命令逐字相同。比较副本与原目录的实际文件差异，确认只接受预期资源变化，再进入已授权的构建、解析与播放验证；转换成功本身不证明引擎已正常运行。
+5. 若出现ZIP缺失、`Input SHA-256 changed`、Python/FFmpeg异常或非零退出码，保留日志与副本，停止接受该批产物。失败可能已留下部分更新文件或旧manifest，不把它当完整结果复制回主工程。根据日志修复输入或工具后，从保留的干净副本重新准备；不要修改预期哈希、忽略异常或覆盖原正式资源来掩盖失败。
+
 ## 可选版本资料与准备历史
 
 - 2026-10-02：SDK/三OpenTK包/锁文件A-B、窗口与smoke、Git基础原文，见 [foundation-setup-and-probes.md](../archive/foundation-setup-and-probes.md#foundation-20261002)。
 - 2026-10-03：六包准备顺序、13包文件/PE/哈希核对、四ZIP与正式部署演变，见 [foundation-setup-and-probes.md](../archive/foundation-setup-and-probes.md#v1-preparation-20261003)；原ZIP静态核对见 [v1-input-archives-check-2026-10-03.md](../reviews/v1-input-archives-check-2026-10-03.md)。
 - [SharpGLTF1.0.7](https://www.nuget.org/packages/SharpGLTF.Core/1.0.7)、[StbImageSharp2.30.16](https://www.nuget.org/packages/StbImageSharp/2.30.16)、[Jolt2.22.0](https://www.nuget.org/packages/JoltPhysicsSharp/2.22.0)、[Native1.1.0](https://www.nuget.org/packages/JoltPhysics.Native/1.1.0)、[ImGui1.91.6.1](https://www.nuget.org/packages/ImGui.NET/1.91.6.1)、[OpenTK OpenAL4.9.4](https://www.nuget.org/packages/OpenTK.Audio.OpenAL/4.9.4)为版本依据；[BACKENDS.md](https://github.com/ocornut/imgui/blob/v1.91.6/docs/BACKENDS.md)说明自研适配职责。
 - [OpenAL Soft1.25.2](https://github.com/kcat/openal-soft/releases/tag/1.25.2)、[官方Windows包](https://openal-soft.org/openal-binaries/openal-soft-1.25.2-bin.zip)、[维护者DLL命名说明](https://openal.org/pipermail/openal/2016-September/000532.html)、[OpenTK AL API](https://opentk.net/api/OpenTK.Audio.OpenAL.AL.html)补充运行实现依据。
-- [NuGet锁模式](https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files#locking-dependencies)、[VS还原安装](https://learn.microsoft.com/en-us/nuget/consume-packages/install-use-packages-visual-studio)是操作机制说明。版本资料的历史核查不等于本轮重新联网、还原或运行。
+- [NuGet锁模式](https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files#locking-dependencies)、[VS还原安装](https://learn.microsoft.com/en-us/nuget/consume-packages/install-use-packages-visual-studio)是操作机制说明。历史核查按原批次理解；2026-10-22的网页/文本核对仅覆盖本页明确注明的范围，不证明当前下载的ZIP字节相同，也不代表本轮重新还原或运行。
