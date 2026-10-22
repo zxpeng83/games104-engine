@@ -9,7 +9,8 @@ V1具备移动/跳跃、机关/NPC、Forward/Deferred、骨骼动画、声音/�
 
 | 要做什么 | 直接进入的主页面 | 页面内能得到什么 |
 |---|---|---|
-| 在新电脑从零准备到可以写代码 | [reproduction.md](g104engine/docs/guides/reproduction.md#new-machine-setup) | 获取现有仓库、工具下载与安装、首次还原、素材检查、构建运行及完成标准 |
+| 在新电脑从空白工程准备到只剩C#实现 | [reproduction.md](g104engine/docs/guides/reproduction.md#new-machine-setup) | 不拉取仓库，创建项目、安装固定包、下载第三方素材并备齐自有Shader/JSON/测试资产，配置复制和检查后再写C# |
+| 可选：取得现有完整仓库继续开发 | [reproduction.md](g104engine/docs/guides/reproduction.md#existing-repository-setup) | 克隆已有源码/配置/素材后安装环境、还原、构建和验证 |
 | 理解目录、各份文档用途与易混点 | [documentation-guide.md](g104engine/docs/documentation-guide.md) | 完整文档地图、逐文件说明、成组解释与实际任务阅读路线 |
 | 打开训练场、操作、排错或验证 | [v1-run-and-review.md](g104engine/docs/guides/v1-run-and-review.md#run-and-verify) | 环境前提、操作、命令、隔离数据和结果边界 |
 | 从启动、一帧、W/Space开始学源码 | [learning-map.md](g104engine/docs/learning-map.md#first-input-lesson) | 最少概念、调用链、断点、状态观察与自测 |
@@ -26,7 +27,7 @@ Agent进入一次 [AGENTS.md](AGENTS.md) 和当前状态后选择任务正文，
 
 ## 打开现有工程
 
-新电脑还没有SDK、包缓存或构建输出时，先按 [reproduction.md](g104engine/docs/guides/reproduction.md#new-machine-setup) 完成首次搭建。正式素材和OpenAL DLL已随仓库提供；普通搭建不需要重新下载原始素材包或运行离线转换脚本。
+希望自己复原引擎时，先按 [reproduction.md](g104engine/docs/guides/reproduction.md#new-machine-setup) 从空白工程准备，Git和完整仓库都不是前置；项目自有非C#文件也在准备阶段按清单逐项取得，之后集中写C#。下面只介绍已经取得完整代码的工程：若选择可选仓库路线，正式素材和OpenAL DLL会随仓库取得，但VS/SDK/驱动仍需安装，NuGet包仍需还原。
 
 在VS打开 `g104engine/g104engine.slnx`，选择Sandbox及Debug/Release x64。不带参数启动进入Edit，Play/F5开始，Stop恢复当前内存设计。完整操作与检查直接看上表运行页面；无需重建工程或重做首次探针。
 

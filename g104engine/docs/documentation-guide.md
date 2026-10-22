@@ -85,14 +85,14 @@ games104/
 
 | 文件 | 主要内容与作用 | 什么时候读 |
 |---|---|---|
-| [v1-run-and-review.md](guides/v1-run-and-review.md) | 首次还原后的构建与新机验收、训练场操作、设计保存保护、Load/Reset、专项验证命令及结果边界。 | 首次构建、启动、使用、排错，或修改后选择相关检查时。 |
-| [environment.md](guides/environment.md) | 新机系统/硬件要求、Git/VS/准确SDK下载与安装，现有工程x64/调试配置及缺失环境诊断；保留SAC历史取舍。 | 准备新机开发环境，或工程打不开、配置不对、原生部署/调试受阻时。 |
-| [dependencies.md](guides/dependencies.md) | 文件获取方式、首次锁定还原、精确版本、DLL部署、素材下载与可选离线准备；保留选型及受控升级方法。 | 准备NuGet包、区分随仓库素材与原包下载，或查库作用、版本和部署时。 |
+| [v1-run-and-review.md](guides/v1-run-and-review.md) | 空白工程构建/模板调试及全部非C#配套清点，代码完成后的训练场操作、保存、Load/Reset和专项验证。 | 确认准备后只剩C#实现，或代码到位后运行、排错和验收时。 |
+| [environment.md](guides/environment.md) | 系统/硬件、VS/准确SDK安装，空白方案与两项目创建、SDK JSON、引用/x64/unsafe及资源复制；Git可选，保留故障历史。 | 从空白文件夹准备开发工程，或核对已有工程的环境/配置时。 |
+| [dependencies.md](guides/dependencies.md) | 安装九包并锁定、第三方下载/提取/转码、自有非C#文件来源及逐文件复制/可选生成；已有配置还原与仓库脚本另列。 | 空白工程准备全部非C#配套，或核对精确版本、已有依赖和升级时。 |
 | [scene-and-editor.md](guides/scene-and-editor.md) | 场景身份和空间、时钟与输入、JSON/模板、设计与运行隔离、编辑事务、Undo/Redo、保存基准及失败保护。 | 解释场景或编辑行为，定位保存、输入归属和Undo问题时。 |
 | [physics-and-gameplay.md](guides/physics-and-gameplay.md) | Jolt适配与查询、自研角色移动、导航/NPC、按钮门等玩法、反馈和已知实现边界。 | 跟角色、碰撞、寻路、NPC或机关的当前调用链时。 |
 | [rendering-and-animation.md](guides/rendering-and-animation.md) | glTF导入子集、矩阵/蒙皮、Forward/Deferred、颜色处理、动画求值与事件，以及资源寿命。 | 查当前画面、模型、动画怎样实现，或定位渲染/动画问题时。 |
 | [git-and-publishing.md](guides/git-and-publishing.md) | 每批保存的核查与操作流程、Git Bash/Git GUI说明及精确发布白名单。 | 准备暂存、提交、推送，或判断哪些内容可以公开时。 |
-| [reproduction.md](guides/reproduction.md) | 新电脑搭建的统一入口：获取现有仓库、按顺序准备环境/还原/素材、首次构建验收；区分存档迁移、同机换聊天与未实测边界。 | 在新电脑从零准备到可以开发时先读；助手代执行具体动作仍核对授权范围。 |
+| [reproduction.md](guides/reproduction.md) | 新电脑空白工程搭建的统一入口，不依赖克隆；明确环境就绪与代码复原的边界，另保留现有仓库复现及存档迁移。 | 在新电脑准备后自己手写或手动复制引擎时先读；直接取得仓库则选同页可选路线。 |
 
 ### plans/：V1基线和模块路线
 
@@ -247,19 +247,19 @@ status.md也不是实时监控程序。它保存最近一次维护时核对到�
 
 ### 6. environment.md、dependencies.md、v1-run-and-review.md和reproduction.md
 
-**运行指南给你首次构建和现有工程的使用路径。** 首次还原后怎样生成输出、在新电脑做必要验收，以及怎样Play/Stop、移动/交互、编辑与保存、按问题选择检查，都从v1-run-and-review.md对应章节进入。没有bin/obj的新机不能跳过还原构建，直接照抄运行DLL命令。
+**运行指南区分前置准备和完整引擎两个阶段。** 先确认工具链、包、全部非C#资源及输出复制完整，再通过模板断点检查，即可集中写C#；Play、模型/声音、保存及`--verify`等检查等C#实现到位再做。没有bin/obj时先还原构建，不能直接运行尚不存在的DLL；模板成功不等于资源已清点或完整V1通过。
 
-**environment.md处理新机安装、硬件条件与调试配置。** 它给出Git、VS及准确SDK的官方入口和安装检查，说明OpenGL能力、声音设备、x64及Debug/Release。它也保留历史故障供参考，读到旧建工程内容时不能拿Hello World或蓝色探针覆盖现在的训练场。
+**environment.md处理安装、空白工程创建和配置。** 它给出VS/准确SDK的官方入口、硬件条件，以及方案、两项目、引用、x64、unsafe与复制配置的建立步骤，Git是可选工具。已有引擎仍可直接打开；不要用新建模板步骤覆盖已有训练场代码。
 
-**dependencies.md说明工程依赖什么、文件从哪里来以及怎样准备。** 它区分系统安装、NuGet首次还原、仓库已有文件和可选素材加工，集中维护精确版本、来源与部署。普通新机使用仓库现成素材；想重新提取/转换时才进入原ZIP、Python、FFmpeg分支。首次还原不执行依赖升级流程，项目和锁文件仍是程序可读取的版本来源。
+**dependencies.md说明库与全部非C#配套怎样从无到有。** 空白工程先安装九包、生成两份锁，再启用严格模式；外部素材使用作者ZIP和便携FFmpeg。自有13个GLSL、两个JSON和四个生成资产也须在准备阶段按清单取得，默认逐文件复制，无需Python。来源说明区分AI助手编写的代码/数据、脚本按规则生成的文件和第三方下载；可选重生成只覆盖脚本能生成的部分。取得已有工程时才复用其锁文件与素材，升级流程仍只在明确升级时使用。
 
-**reproduction.md是新电脑从零准备的顺序入口，并区分同机换聊天。** 它串起工具安装、源码获取、SDK核对、还原、首次构建与验收，只在需要具体操作时进入上述三页；不用自行拼接历史记录。复现还要确认已同步哪些内容、在新位置运行是否得到结果，本机成功不能自动证明新设备成功。
+**reproduction.md是从空白工程准备到只剩C#实现的顺序入口。** 它串起安装、创建项目、加包锁定、第三方素材、自有非C#配套、复制配置和完整准备检查七步；C#代码由用户手写或手动复制。获取完整现有仓库只是同页另一条可选路线，不能混成主线的前置。两种路线的新机实际结果都需另验，本机历史成功不能代替。
 
 比如工程能打开，想移动角色，就查运行指南；因为平台或调试设置无法启动，查environment；因为某DLL版本或部署位置不清楚，查dependencies；要准备独立目录或换设备，则查reproduction及当前政策。
 
 同一设备、同一工作区换聊天，可以读取本机已经落盘的文件和未提交内容，通常不需要重新克隆、还原、建工程或创建工作树。“换聊天接续”和“换设备复现”是两件事。
 
-D5是本项目把独立克隆、CI和第二设备验证合在一起使用的阶段标识。它们的实际状态由status.md和agent-workflow.md维护；2026-10-22补齐新机搭建文档，不等于已执行换机验证或启用CI。只实际开展其中一项，也不能推断其他项同时开展。
+D5是本项目把独立克隆、CI和第二设备验证合在一起使用的阶段标识。它们的实际状态由status.md和agent-workflow.md维护；10月22日文档先写了现有仓库路线，10月23日按用户纠正改为空白工程主线。这些文档修改不等于实际换机验证或启用CI，也不把Git作为空白工程的运行依赖。
 
 ### 7. Git操作政策、Git指南和提交历史
 
@@ -360,12 +360,14 @@ D5是本项目把独立克隆、CI和第二设备验证合在一起使用的阶�
 
 ### 任务六：在另一台新电脑准备到可以写代码
 
-1. **从 [reproduction.md](guides/reproduction.md#new-machine-setup) 的六步清单开始。** 目标是取得并开发现有V1，先确定源码版本和电脑条件，按步骤选择新目录；不需要重建Engine/Sandbox。
-2. **按 [environment.md](guides/environment.md#new-machine-environment) 安装工具。** 核对硬件、Git、VS组件和准确SDK。获取工程后再在方案目录检查SDK选择，避免把旧电脑盘符当作新机要求。
-3. **按 [dependencies.md](guides/dependencies.md#first-restore) 完成首次还原。** 模型、声音和OpenAL正式文件已随仓库提供；需要的是按既有锁文件取得NuGet包。只有要重做素材时才阅读同页可选下载/转换分支。
-4. **按 [v1-run-and-review.md](guides/v1-run-and-review.md#first-build) 构建并验收。** 新机没有bin/obj正常，必须先得到输出；可见窗口、Play、声音、保存及Debug断点要在该机实际检查。
+1. **从 [reproduction.md](guides/reproduction.md#new-machine-setup) 的主路线开始。** 目标是不拉取仓库，在新目录准备好之后自己复原引擎；直接取得现有工程另有可选入口。
+2. **按 [environment.md](guides/environment.md#blank-project) 创建工程。** 安装好VS/SDK后，从空白方案建立Engine和Sandbox，配置SDK选择、引用、x64与unsafe。
+3. **按 [dependencies.md](guides/dependencies.md#blank-project-packages) 安装包并生成锁。** 新项目没有现成锁文件，先允许生成，审查后再严格还原；不要直接套用已有工程的还原步骤。
+4. **按 [dependencies.md](guides/dependencies.md#standalone-assets) 独立准备第三方素材。** 从作者入口下载模型、声音和OpenAL，提取/转换到规定位置，不依赖仓库Python脚本。
+5. **按 [dependencies.md](guides/dependencies.md#project-authored-assets) 取得全部自有配套。** 13个Shader、两个JSON、材质探针、两张PNG和循环测试音在开始写C#前逐项复制或按可选方法准备，保留来源记录；随后按环境页配置输出复制。
+6. **按 [v1-run-and-review.md](guides/v1-run-and-review.md#blank-project-checks) 检查准备完成。** 确认全部源文件与输出齐全，以及模板构建、运行和断点；接下来只实现匹配这些输入/接口的C#。完整功能检查仍等C#实现到位再做。
 
-完成标准、存档迁移和失败后的接续点都在上述入口。记录“文档已准备”和“新电脑实际通过”时分别说明，不用旧机历史结果替代本机检查。
+准备完成、引擎复原完成和新机完整验收是不同结果。文档主入口给出交接边界及失败后的接续点；只有已有个人设计时才需要考虑存档迁移，空白工程无需先复制旧存档。
 
 <a id="where-to-save"></a>
 ## 新信息应写在哪里

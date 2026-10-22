@@ -1,13 +1,141 @@
 # 基础综合训练场V1：运行、操作与验证
 
-本页直接说明现有工程怎样运行、保护设计、按问题选择验证并解释结果。它不要求先读历史探针/方案/台账；当前任务与用户验收结论以 [status.md](../status.md) 为准，执行/安装/Git权限见 [agent-workflow.md](../agent-workflow.md)。2026-10-22补齐首次构建与新电脑验收步骤；这些是操作指引，本次文档维护没有构建或运行引擎。
+本页区分开始写C#前的完整前置检查与代码完成后的训练场运行。自己复原当前V1时，先把环境、包、第三方素材和全部项目自有非C#配套准备好，完成下节检查后只剩C#实现；Play、`--verify`等入口要等相应代码完成后才使用。当前进度以 [status.md](../status.md) 为准，执行/安装/Git职责见 [agent-workflow.md](../agent-workflow.md)。这些是操作指引，本次文档维护没有创建、构建或运行任何工程。
+
+<a id="blank-project-checks"></a>
+## 空白工程：怎样确认已经可以开始写代码
+
+主流程见 [reproduction.md](reproduction.md#new-machine-setup)。先完成 [environment.md](environment.md#blank-project) 的两个项目、引用、平台和SDK配置，再按 [dependencies.md](dependencies.md#blank-project-packages) 安装准确包、生成并锁定两份依赖清单，并完成同页的第三方及全部自有非C#配套准备。此时保留VS生成的Console模板Program即可，不需要先实现引擎功能。
+
+全部非C#文件齐备后，按 [environment.md](environment.md#resource-copy) 加入输出复制项，再做下面的构建、调试和文件检查。只建好项目或只下载第三方ZIP，还没有完成本节的最终前置准备；OpenAL源文件尚未放好时不要提前添加它的显式Content项。
+
+在VS里将Sandbox设为启动项目，分别以Debug/x64和Release/x64生成解决方案。也可以在 **PowerShell** 中使用下面的项目入口命令，兼容方案实际保存为`.sln`或`.slnx`；第一行是本指引统一的新工程目录示例，改成你的实际目录即可：
+
+```powershell
+& {
+    $engineRoot = Join-Path $env:USERPROFILE 'source\G104Rebuild\g104engine'
+    Set-Location -LiteralPath $engineRoot -ErrorAction Stop
+    dotnet --version
+    if ($LASTEXITCODE -ne 0) { throw '准确SDK不可用，先完成环境检查。' }
+    dotnet build .\samples\G104.Sandbox\G104.Sandbox.csproj --no-restore -c Debug -p:Platform=x64
+    if ($LASTEXITCODE -ne 0) { throw 'Debug构建失败，先查看SDK、还原和项目配置。' }
+    dotnet build .\samples\G104.Sandbox\G104.Sandbox.csproj --no-restore -c Release -p:Platform=x64
+    if ($LASTEXITCODE -ne 0) { throw 'Release构建失败，先处理生成错误。' }
+    dotnet .\samples\G104.Sandbox\bin\x64\Debug\net10.0\G104.Sandbox.dll
+    if ($LASTEXITCODE -ne 0) { throw '模板入口运行失败。' }
+}
+```
+
+整段放在同一个脚本块中，目录不存在或任一步失败就停止，避免在错误目录继续构建/运行。执行前两项目必须已成功还原；`--no-restore`不会补下载缺包。模板程序输出Hello World或你保留的模板文字并退出，是这个阶段的正常结果，不应该期待出现训练场窗口。然后在模板Program的可执行语句上设置断点，在VS中用Debug/x64按F5，确认能命中、观察变量并继续。
+
+| 开始写代码前检查 | 怎样判断已经完成 |
+|---|---|
+| 工具与配置 | 方案根目录`dotnet --version`为10.0.401；两项目net10.0/x64，Sandbox引用Engine，Engine允许unsafe |
+| 依赖清单 | 九个直接包位于Engine；两项目有各自的packages.lock.json，严格模式下再还原成功；理解独立生成的传递图需要审查，不把它自动等同原仓库旧锁 |
+| 构建与调试 | 两配置都能构建，模板入口能正常退出，Debug能命中断点 |
+| 第三方输入 | 独立下载的OpenAL DLL及许可/对应源码、UAL1_Standard.glb及许可、七个mono/44100Hz/PCM16声音文件在依赖页规定的位置；保留来源与实际转换记录 |
+| 自有非C#配套 | 19个自有运行文件齐全：13个Shader（3个vert、8个frag、2个glsl）、场景/动画2个JSON、material-probe.glb、2个PNG及loop-test.wav；它们均已逐文件复制或按依赖页准备，不留到写C#时补做 |
+| 输出复制 | 在Sandbox相应bin/x64配置输出中找到assets和根目录OpenAL32.dll；NuGet原生文件保留runtimes/win-x64/native布局。复制配置由工程完成，不靠手搬bin |
+| 完整齐套检查 | 源assets共有27个运行文件（19个自有＋UAL模型＋7个WAV），并保留许可/来源记录；Debug、Release输出都能找到同一套运行文件和应复制的许可 |
+
+生成完成后，可在 **PowerShell** 执行下面的只读清点。源目录是工程根下的`assets`，构建输出资源是`samples/G104.Sandbox/bin/x64/Debug/net10.0/assets`及对应Release目录；这些路径都相对于`g104engine`。源`assets`不能误放到`src/G104.Engine/assets`或`samples/G104.Sandbox/assets`。
+
+```powershell
+& {
+    $engineRoot = Join-Path $env:USERPROFILE 'source\G104Rebuild\g104engine'
+    Set-Location -LiteralPath $engineRoot -ErrorAction Stop
+    $authoredFiles = @(
+        'shaders/mesh.vert', 'shaders/fullscreen.vert', 'shaders/particle.vert',
+        'shaders/deferred.frag', 'shaders/forward.frag', 'shaders/fxaa.frag',
+        'shaders/gbuffer.frag', 'shaders/particle.frag', 'shaders/shadow.frag',
+        'shaders/sky.frag', 'shaders/tonemap.frag',
+        'shaders/lighting.glsl', 'shaders/material.glsl',
+        'scenes/training-ground.json', 'config/character-animation.json',
+        'models/material-probe.glb', 'tests/checker.png', 'tests/normal.png',
+        'audio/loop-test.wav'
+    )
+    $externalFiles = @(
+        'models/UAL1_Standard.glb',
+        'audio/step0.wav', 'audio/step1.wav', 'audio/door.wav', 'audio/jump.wav',
+        'audio/click.wav', 'audio/complete.wav', 'audio/switch.wav'
+    )
+    $assetRecords = @(
+        'licenses/asset-manifest.json',
+        'licenses/quaternius-0-License.txt', 'licenses/quaternius-1-README.txt',
+        'licenses/kenney_impact-sounds-License.txt',
+        'licenses/kenney_interface-sounds-License.txt'
+    )
+    $assetRoots = @(
+        'assets',
+        'samples/G104.Sandbox/bin/x64/Debug/net10.0/assets',
+        'samples/G104.Sandbox/bin/x64/Release/net10.0/assets'
+    )
+    $requiredFiles = @()
+    foreach ($assetRoot in $assetRoots) {
+        foreach ($relativeFile in ($authoredFiles + $externalFiles + $assetRecords)) {
+            $requiredFiles += Join-Path $assetRoot $relativeFile
+        }
+    }
+    $openAlRoot = 'third_party/openal-soft/1.25.2'
+    foreach ($file in @('OpenAL32.dll', 'COPYING', 'LICENSE-pffft', 'readme.txt',
+                        'SOURCE.md', 'openal-soft-1.25.2.tar.bz2')) {
+        $requiredFiles += Join-Path $openAlRoot $file
+    }
+    foreach ($configuration in @('Debug', 'Release')) {
+        $outputRoot = 'samples/G104.Sandbox/bin/x64/' + $configuration + '/net10.0'
+        $requiredFiles += Join-Path $outputRoot 'OpenAL32.dll'
+        foreach ($file in @('COPYING', 'LICENSE-pffft', 'readme.txt')) {
+            $requiredFiles += Join-Path (Join-Path $outputRoot 'licenses/openal-soft') $file
+        }
+    }
+    $missing = @($requiredFiles | Where-Object {
+        -not (Test-Path -LiteralPath $_ -PathType Leaf)
+    })
+    if ($missing.Count -gt 0) {
+        $missing | ForEach-Object { Write-Output ('Missing: ' + $_) }
+        throw '文件未齐，请按缺失路径补齐来源目录或输出复制。'
+    }
+    $empty = @($requiredFiles | Where-Object {
+        (Get-Item -LiteralPath $_ -ErrorAction Stop).Length -eq 0
+    })
+    if ($empty.Count -gt 0) {
+        $empty | ForEach-Object { Write-Output ('Empty: ' + $_) }
+        throw '发现空文件，不能作为已准备好的资源。'
+    }
+    foreach ($assetRoot in $assetRoots) {
+        foreach ($jsonFile in @('scenes/training-ground.json',
+                                'config/character-animation.json',
+                                'licenses/asset-manifest.json')) {
+            Get-Content -Raw -LiteralPath (Join-Path $assetRoot $jsonFile) -ErrorAction Stop |
+                ConvertFrom-Json -ErrorAction Stop | Out-Null
+        }
+    }
+    Write-Output '文件齐全且非空：19个自有＋8个外部运行资源、许可/来源及两配置输出；JSON语法可解析。'
+}
+```
+
+这段只读取文件和JSON，不生成资源、不运行引擎；报Missing或Empty时先按列出的路径补齐，再重新清点。可以逐项手工检查同一份清单。通过只证明文件存在、非空、JSON语法可解析，不证明场景/动画语义正确、GLSL已编译、模型可加载或音频已经播放。
+
+原样传送的文件可以比较复制前后SHA-256以确认传送一致；自行用FFmpeg重新转码的七个WAV，不要求与旧电脑manifest中的输出SHA相同，应保留实际输入/转换记录并按依赖页核对PCM16、mono、44100Hz，代码完成后再验证播放。不能用旧SHA是否一致代替格式或听感检查。
+
+达到这些标准后，全部非C#前置已就绪，可以直接开始写C#代码。模板构建不能证明OpenGL、Jolt、ImGui或OpenAL真实初始化通过；它也不会加载模型或播放WAV。硬件图形能力在环境准备阶段检查支持条件，实际GL上下文要在窗口代码接入后验证。
+
+### 编写或复制代码后，逐步增加验收
+
+你可以自己编写各模块，也可以手动复制已有实现。复制完整Sandbox入口前，处理模板Program，避免重复顶层入口/类型；代码用到的引擎类和命名空间要完整到位。上面已准备当前V1需要的全部非C#配套；只有主动改变文件名、配置合同或Shader接口时，才需要相应适配资源。某个类尚未完成引起的编译错误属于C#实现阶段，不需要因此升级全部包。
+
+- 只完成窗口时，验证窗口/输入和实际OpenGL版本；接入ImGui后再看面板。
+- 接入物理、模型/动画、音频后，分别验证其初始化、文件读取与释放。
+- 已复原或手动复制当前完整V1时，再使用下方完整工程的构建、Play、声音、保存及专项检查；若你自写了不同入口，应使用你自己的测试办法。
+
+`--smoke`、`--verify`、`--verify-audio`和Play按钮都是本工程Program/窗口代码实现的功能，不是.NET、VS或NuGet安装后自动提供的功能。没有这些代码时不要把相应参数当作环境检查命令。
 
 <a id="first-build"></a>
-## 新电脑首次构建：还没有bin/obj时
+## C#代码完成后的首次构建
 
-先按 [reproduction.md](reproduction.md#new-machine-setup) 取得完整工程、安装环境，并完成 [dependencies.md](dependencies.md#first-restore) 的首次锁定还原。此时准确SDK已选中，两个项目的还原已成功；仅安装VS、打开源码文件或看到包版本表，不等于已经还原。没有成功还原时先处理该步，下面的`--no-restore`构建不会下载缺少的包。
+自建路线先在上面的[前置检查](#blank-project-checks)完成全部非C#配套，再自行写完或手动复制完整V1的C#代码，随后使用本节；选择 [reproduction.md](reproduction.md#existing-repository-setup) 获取完整仓库时，也先核对其配置与文件。准确SDK须已选中，两个项目均成功还原：新建项目按 [dependencies.md](dependencies.md#blank-project-packages) 生成并锁定依赖，已有成套项目/锁文件按 [dependencies.md](dependencies.md#first-restore) 的已有锁还原步骤处理。只有源码或包版本表不等于已有还原产物，`--no-restore`不会下载缺少的包。
 
-1. 在VS打开新电脑实际路径下的`g104engine/g104engine.slnx`，右键解决方案资源管理器中的 **G104.Sandbox → 设为启动项目**。不要启动Engine类库，也不要新建同名项目。
+1. 在VS打开实际方案：现有仓库为`g104engine/g104engine.slnx`，自己新建的方案也可以是`.sln`。右键解决方案资源管理器中的 **G104.Sandbox → 设为启动项目**。不要启动Engine类库，也不要重复新建同名项目。
 2. 工具栏选择 **Debug | x64**。配置管理器中的Engine和Sandbox均应映射为x64并勾选“生成”；原方案已有映射，有疑问按 [environment.md](environment.md#222-x64-平台设置) 核对。
 3. 选择 **生成 → 生成解决方案**，在“输出”窗口查看生成结果。应无构建错误；若有警告或失败，保留完整输出，先处理后再运行。
 4. 检查下面的Debug输出。再切换到 **Release | x64** 生成一次，得到对应Release目录；完成后切回Debug供源码调试。不要仅改运行路径而忘记生成Release。
@@ -17,28 +145,30 @@
 | 输出位置 | 应有内容与作用 |
 |---|---|
 | `samples/G104.Sandbox/bin/x64/Debug/net10.0/` | `G104.Sandbox.dll`、`G104.Engine.dll`、`.deps.json`、`.runtimeconfig.json`及托管依赖；启动入口为Sandbox |
-| 上述目录的`assets/` | Shader、模型、贴图、场景、动画配置、8个WAV及素材许可，来自仓库正式assets |
+| 上述目录的`assets/` | 完整27个运行资源及许可/来源记录，来自工程根目录已准备好的assets（独立导入或可选仓库路线） |
 | 上述目录的`OpenAL32.dll` | 项目内OpenAL Soft实现，位于应用根目录 |
 | 上述目录的`runtimes/win-x64/native/` | 当前NuGet图提供的`cimgui.dll`、`glfw3.dll`、`joltc.dll`、`joltc_double.dll`，保留构建布局 |
-| 上述目录的`licenses/openal-soft/` | 构建复制的OpenAL许可及readme；对应源码归档仍在仓库third_party目录 |
+| 上述目录的`licenses/openal-soft/` | 构建复制的OpenAL许可及readme；对应源码归档仍在工程根目录的third_party内 |
 
-Release把路径中的`Debug`改为`Release`。不要只复制Sandbox单个DLL到别处运行，也不要把NuGet原生库从runtimes目录手动搬出；资源默认按应用输出位置查找。文件缺失时核对还原输出、Sandbox项目复制项及完整仓库，不能用旧电脑bin覆盖掩盖新机构建问题。
+Release把路径中的`Debug`改为`Release`。不要只复制Sandbox单个DLL到别处运行，也不要把NuGet原生库从runtimes目录手动搬出；资源默认按应用输出位置查找。文件缺失时核对源资源目录、还原输出及Sandbox项目复制项，不能用旧电脑bin覆盖掩盖新机构建问题。
 
-如需用命令行检查同一构建，先在 **PowerShell** 进入新电脑实际`g104engine`目录。下面沿用首次克隆到用户`source/games104`的例子；使用其他目录时修改第一行。已在VS生成成功时无需为了准备环境重复执行这组命令。
+如需用命令行检查同一构建，先在 **PowerShell** 进入实际`g104engine`目录。下面沿用独立学习工程`source/G104Rebuild/g104engine`；可选克隆路线或其他目录须替换第一行。用Sandbox项目为入口会同时构建其Engine引用，兼容两种方案格式；已在VS生成成功时无需重复执行这组命令。
 
 ```powershell
-$engineRoot = Join-Path $env:USERPROFILE 'source\games104\g104engine'
-Set-Location -LiteralPath $engineRoot
-dotnet build g104engine.slnx --no-restore --disable-build-servers -m:1 -c Debug -p:Platform=x64
-if ($LASTEXITCODE -ne 0) { throw 'Debug构建失败，先检查输出。' }
-dotnet build g104engine.slnx --no-restore --disable-build-servers -m:1 -c Release -p:Platform=x64
-if ($LASTEXITCODE -ne 0) { throw 'Release构建失败，先检查输出。' }
+& {
+    $engineRoot = Join-Path $env:USERPROFILE 'source\G104Rebuild\g104engine'
+    Set-Location -LiteralPath $engineRoot -ErrorAction Stop
+    dotnet build samples/G104.Sandbox/G104.Sandbox.csproj --no-restore --disable-build-servers -m:1 -c Debug -p:Platform=x64
+    if ($LASTEXITCODE -ne 0) { throw 'Debug构建失败，先检查输出。' }
+    dotnet build samples/G104.Sandbox/G104.Sandbox.csproj --no-restore --disable-build-servers -m:1 -c Release -p:Platform=x64
+    if ($LASTEXITCODE -ne 0) { throw 'Release构建失败，先检查输出。' }
+}
 ```
 
 <a id="first-machine-checks"></a>
-## 新电脑的首次环境验收
+## 完整V1在新电脑的首次功能验收
 
-构建完成后在该机检查一次真实运行。下面使用独立用户数据目录，便于把首次验收设计与以后的日常设计分开；它不是必须设置的系统环境变量。先停止VS中正在调试的程序，在 **PowerShell** 中进入上节的`g104engine`目录，再逐条执行：
+**前提是当前V1代码及全部运行资源已经到位并构建成功，包括下列参数对应的Program分支。** 这不是开始编写引擎前的要求。下面使用独立用户数据目录，便于把首次验收设计与以后的日常设计分开；它不是必须设置的系统环境变量。先停止VS中正在调试的程序，在 **PowerShell** 中进入上节的实际`g104engine`目录，再逐条执行：
 
 ```powershell
 dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --smoke
@@ -64,7 +194,7 @@ dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll --user-data-r
 
 VS无参数启动使用`%LOCALAPPDATA%/G104Engine/TrainingGroundV1`中的日常设计；上面的隔离Cube不会自动出现，这是两套用户数据路径的正常区别。运行窗口内的F5是Play快捷键，VS里的F5是启动/继续调试。
 
-最后以 **Release | x64** 用Ctrl+F5普通运行，确认仍可显示、Play/Stop及播放声音。上述检查通过即可进入当前V1源码学习和开发，不要求为首次准备运行下面所有专项回归。记录新机日期、源码HEAD、SDK/VS、GPU/GL、声音和未通过项；这些步骤只有实际执行后才形成新机验证结果。
+最后以 **Release | x64** 用Ctrl+F5普通运行，确认仍可显示、Play/Stop及播放声音。上述检查通过即可记录完整V1在该机运行通过，不要求跑完下面所有专项回归。记录新机日期、源码版本或手工复制来源（有Git时记录HEAD）、SDK/VS、GPU/GL、声音和未通过项；这些步骤只有实际执行后才形成新机验证结果。全部非C#前置在本页第一节确认后就可以开始写C#，不必等到完整代码后的功能验收。
 
 若失败，按本页[失败处理与结果解释](#失败处理与结果解释)保留第一处异常；准确SDK/VS见环境页，NuGet/素材缺失见依赖页。不要通过升级全部包、关闭锁定、删除用户设计或更换旧版源码来凑出PASS。
 
