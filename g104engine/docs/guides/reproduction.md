@@ -8,17 +8,19 @@
 <a id="new-machine-setup"></a>
 ## 主路线：不拉取仓库，从空白工程开始
 
-下面按顺序进行，每一步只进入所指章节即可；不必先阅读历史搭建记录。
+下面按顺序进行，每一步进入表中列出的具体章节，完成该步操作后回到本表继续下一步；不必先阅读历史搭建记录。
 
-| 步骤 | 操作入口 | 完成后应得到什么 |
-|---|---|---|
-| 1. 安装环境 | [environment.md](environment.md#new-machine-environment) | Windows x64、兼容的VS及.NET桌面组件、准确SDK；显卡/驱动具备OpenGL 4.3 Core能力，声音输出可用 |
-| 2. 建立空白工程 | [environment.md](environment.md#blank-project) | 方案、Engine类库、Sandbox控制台、global.json、项目引用、x64与unsafe配置；目前仍是模板代码 |
-| 3. 首次安装依赖并生成锁文件 | [dependencies.md](dependencies.md#blank-project-packages) | Engine九个准确版本的直接包；Sandbox通过Engine引用获得依赖；两项目生成锁文件后再启用严格还原 |
-| 4. 下载并整理第三方输入 | [dependencies.md](dependencies.md#standalone-assets) | 官方OpenAL DLL及许可、角色GLB及许可、七个转换好的WAV；不依赖仓库的Python脚本 |
-| 5. 准备项目自有非C#文件 | [dependencies.md](dependencies.md#project-authored-assets) | 13个GLSL文件、2个JSON和4个测试资产全部按原相对路径准备好；默认逐文件传送现成文件，不必先学习或运行生成脚本 |
-| 6. 设置构建输出复制 | [environment.md](environment.md#resource-copy) | 构建自动复制完整assets、OpenAL DLL和许可；不用每次手工把文件放进bin |
-| 7. 检查只剩C#实现 | [v1-run-and-review.md](v1-run-and-review.md#blank-project-checks) | 新项目可构建/调试，源目录与输出非C#配套完整；开始后无需再补Shader/JSON/测试素材，只需实现与其约定匹配的C#代码 |
+各文档按主题组织，因此同一文档会在多个步骤中出现，每次链接定位到该步骤需要的章节。“具体章节（锚点）”列写明章节标题和链接中的 `#...` 定位标识；例如 `environment.md#blank-project` 表示进入该文档的“从空白文件夹创建方案和项目”一节，也可按明文标题在文档中查找。
+
+| 步骤 | 操作入口 | 具体章节（锚点） | 完成后应得到什么 |
+|---|---|---|---|
+| 1. 安装环境 | [environment.md](environment.md#new-machine-environment) | 新电脑：准备系统、工具和驱动<br>`#new-machine-environment` | Windows x64、兼容的VS及.NET桌面组件、准确SDK；显卡/驱动具备OpenGL 4.3 Core能力，声音输出可用 |
+| 2. 建立空白工程 | [environment.md](environment.md#blank-project) | 从空白文件夹创建方案和项目<br>`#blank-project` | 方案、Engine类库、Sandbox控制台、global.json、项目引用、x64与unsafe配置；目前仍是模板代码 |
+| 3. 首次安装依赖并生成锁文件 | [dependencies.md](dependencies.md#blank-project-packages) | 从空白工程安装NuGet包并建立锁定<br>`#blank-project-packages` | Engine九个准确版本的直接包；Sandbox通过Engine引用获得依赖；两项目生成锁文件后再启用严格还原 |
+| 4. 下载并整理第三方输入 | [dependencies.md](dependencies.md#standalone-assets) | 从空白工程独立下载、提取和转换外部素材<br>`#standalone-assets` | 官方OpenAL DLL及许可、角色GLB及许可、七个转换好的WAV；不依赖仓库的Python脚本 |
+| 5. 准备项目自有非C#文件 | [dependencies.md](dependencies.md#project-authored-assets) | 开写C#前必做：取得19个项目自有运行资源<br>`#project-authored-assets` | 13个GLSL文件、2个JSON和4个测试资产全部按原相对路径准备好；默认逐文件传送现成文件，不必先学习或运行生成脚本 |
+| 6. 设置构建输出复制 | [environment.md](environment.md#resource-copy) | 素材与OpenAL准备好后：配置构建复制<br>`#resource-copy` | 构建自动复制完整assets、OpenAL DLL和许可；不用每次手工把文件放进bin |
+| 7. 检查只剩C#实现 | [v1-run-and-review.md](v1-run-and-review.md#blank-project-checks) | 空白工程：怎样确认已经可以开始写代码<br>`#blank-project-checks` | 新项目可构建/调试，源目录与输出非C#配套完整；开始后无需再补Shader/JSON/测试素材，只需实现与其约定匹配的C#代码 |
 
 **这条路线的“准备完成”要求全部非C#配套已落位，但不要求先有训练场、Play或`--verify`。** 这些入口属于以后实现的C#代码。空白阶段能验证工具链、包、文件和输出路径及模板调试；真实GL上下文、物理世界、动画和音频播放要等对应代码存在后再验证。
 

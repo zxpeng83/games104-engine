@@ -3,42 +3,45 @@
 本页维护精确依赖、获取与部署步骤、选型理由及受控升级方法。新电脑的主线是从空白C#工程开始：先把环境、包、外部素材和全部项目自有非C#资源准备齐，再只写C#复原当前V1，不以clone仓库为前提。原工程准备历史按页末日期索引追溯；当前任务/同步状态查 [status.md](../status.md)，操作分工见 [agent-workflow.md](../agent-workflow.md)。
 
 <a id="acquisition-map"></a>
+
 ## 新电脑要获取哪些东西
 
 首次搭建按 [reproduction.md](reproduction.md#new-machine-setup) 的顺序进行。下面主线不假定新电脑已有项目配置、锁文件、assets或准备脚本；右列单独说明已经取得原工程文件时的可选路径。本文是搭建说明，本轮没有在新电脑执行安装、还原、转换或运行。
 
-| 获取类别 | 从空白工程开始的主线 | 已有原工程文件时的可选路径 |
-| --- | --- | --- |
-| 系统与工程 | 按 [environment.md](environment.md#new-machine-environment) 安装环境，再按 [environment.md](environment.md#blank-project)的空白工程步骤创建两个net10.0项目与SDK选择文件 | 已有项目仍先核对系统环境和准确SDK |
-| NuGet依赖 | 按[空白工程装包](#blank-project-packages)给Engine安装九个固定版本包，Sandbox添加项目引用；首次生成并审查两份锁文件后再启用严格模式 | 已有csproj及对应锁文件时按[首次还原](#first-restore)，保留严格模式，无需重新安装九包 |
-| 外部模型、声音与音频DLL | 按[独立素材准备](#standalone-assets)从作者网站下载原包，手动提取GLB/OpenAL并用便携FFmpeg转换七段声音 | 已有完整assets和third_party时直接保留正式资源，不必重复下载或转换 |
-| 项目自有文件 | 开写C#前，按[自有资源清单](#project-authored-assets)逐文件复制13个Shader、两个JSON、材质探针、两PNG及循环测试WAV，共19个运行资源；同时保留来源记录 | 原工程中现成文件可以逐项核对复用，不能只取exe或七个WAV |
-| 可选自动准备工具 | 主线不用Python或prepare_assets.py；只有另外取得完整脚本、明确要重生成资源时才走[脚本路线](#optional-asset-preparation) | 已有脚本也仅用于离线准备，不是每次构建或运行前置 |
+| 获取类别                | 从空白工程开始的主线                                                                                                                                                  | 已有原工程文件时的可选路径                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 系统与工程              | 按 [environment.md](environment.md#new-machine-environment) 安装环境，再按 [environment.md](environment.md#blank-project)的空白工程步骤创建两个net10.0项目与SDK选择文件 | 已有项目仍先核对系统环境和准确SDK                                                   |
+| NuGet依赖               | 按[空白工程装包](#blank-project-packages)给Engine安装九个固定版本包，Sandbox添加项目引用；首次生成并审查两份锁文件后再启用严格模式                                     | 已有csproj及对应锁文件时按[首次还原](#first-restore)，保留严格模式，无需重新安装九包 |
+| 外部模型、声音与音频DLL | 按[独立素材准备](#standalone-assets)从作者网站下载原包，手动提取GLB/OpenAL并用便携FFmpeg转换七段声音                                                                   | 已有完整assets和third_party时直接保留正式资源，不必重复下载或转换                   |
+| 项目自有文件            | 开写C#前，按[自有资源清单](#project-authored-assets)逐文件复制13个Shader、两个JSON、材质探针、两PNG及循环测试WAV，共19个运行资源；同时保留来源记录                     | 原工程中现成文件可以逐项核对复用，不能只取exe或七个WAV                              |
+| 可选自动准备工具        | 主线不用Python或prepare_assets.py；只有另外取得完整脚本、明确要重生成资源时才走[脚本路线](#optional-asset-preparation)                                                 | 已有脚本也仅用于离线准备，不是每次构建或运行前置                                    |
 
 本页链接到的原工程csproj、锁文件、资源与源码是参考文件，不代表新电脑已经具备这些文件。可以在原电脑逐文件打开、通过普通文件传输手动带到新电脑，无需clone。新建Sandbox还要按 [environment.md](environment.md#resource-copy)添加资源复制配置；加好配置后构建才会复制assets、OpenAL32.dll及其许可。NuGet自带的原生库由还原和构建按包布局部署，不手工搬进应用根。已经取得整个原工程的人可选 [reproduction.md](reproduction.md#existing-repository-setup)。
 
 <a id="dependency-locks"></a>
+
 ## 已采用版本与分工
 
 以下是原工程已经采用并验证的配置，供空白工程选版本时对照。global.json选择SDK10.0.401、rollForward=disable、allowPrerelease=false；两项目目标net10.0、Windows x64，RestorePackagesWithLockFile和RestoreLockedMode均为true。Sandbox只引用Engine，不重复装直接包。原工程九个直接包及两份各13解析包的精确依赖图以项目/锁文件为机器可读来源；新建项目还没有锁文件时，先按下方空白工程步骤生成并审查，不直接套用两个true的最终状态。
 
-| Engine直接包 | 版本 | 作用/边界 |
-| --- | --- | --- |
-| OpenTK.Graphics | 4.9.4 | GL绑定，不是显卡驱动 |
-| OpenTK.Windowing.Desktop | 4.9.4 | GLFW桌面窗口/输入 |
-| OpenTK.Mathematics | 4.9.4 | 数学类型，项目解释矩阵边界 |
-| OpenTK.Audio.OpenAL | 4.9.4 | netcoreapp3.1托管绑定，不解码Ogg；Core/Mathematics要求>=4.9.4且<4.10 |
-| ImGui.NET | 1.91.6.1 | net8/net6/netstandard2.0及win-x64 cimgui；自研OpenTK输入/渲染后端和场景命令 |
-| JoltPhysicsSharp | 2.22.0 | net9/net10托管包装，依赖Native>=1.1.0 |
-| JoltPhysics.Native | 1.1.0 | 显式锁win-x64 joltc，真实初始化与查询另验证 |
-| SharpGLTF.Core | 1.0.7 | 含net10目标且该目标无额外依赖；只用Core，不加Toolkit/Runtime |
-| StbImageSharp | 2.30.16 | net8/netstandard2.0 C#图片解码，无独立解码DLL |
+| Engine直接包             | 版本     | 作用/边界                                                                   |
+| ------------------------ | -------- | --------------------------------------------------------------------------- |
+| OpenTK.Graphics          | 4.9.4    | GL绑定，不是显卡驱动                                                        |
+| OpenTK.Windowing.Desktop | 4.9.4    | GLFW桌面窗口/输入                                                           |
+| OpenTK.Mathematics       | 4.9.4    | 数学类型，项目解释矩阵边界                                                  |
+| OpenTK.Audio.OpenAL      | 4.9.4    | netcoreapp3.1托管绑定，不解码Ogg；Core/Mathematics要求>=4.9.4且<4.10        |
+| ImGui.NET                | 1.91.6.1 | net8/net6/netstandard2.0及win-x64 cimgui；自研OpenTK输入/渲染后端和场景命令 |
+| JoltPhysicsSharp         | 2.22.0   | net9/net10托管包装，依赖Native>=1.1.0                                       |
+| JoltPhysics.Native       | 1.1.0    | 显式锁win-x64 joltc，真实初始化与查询另验证                                 |
+| SharpGLTF.Core           | 1.0.7    | 含net10目标且该目标无额外依赖；只用Core，不加Toolkit/Runtime                |
+| StbImageSharp            | 2.30.16  | net8/netstandard2.0 C#图片解码，无独立解码DLL                               |
 
-上述六个后续新增包的公开许可资料为MIT（StbImageSharp为MIT或Unlicense），接口资料按固定版本使用，不混入ImGui1.92 API。依赖出处：[Engine项目](../../src/G104.Engine/G104.Engine.csproj)、[Sandbox项目](../../samples/G104.Sandbox/G104.Sandbox.csproj)、[Engine锁文件](../../src/G104.Engine/packages.lock.json)、[Sandbox锁文件](../../samples/G104.Sandbox/packages.lock.json)、[global.json](../../global.json)。
+上述六个后续新增包（上面表格后6个包）的公开许可资料为MIT（StbImageSharp为MIT或Unlicense），接口资料按固定版本使用，不混入ImGui1.92 API。依赖出处：[Engine项目](../../src/G104.Engine/G104.Engine.csproj)、[Sandbox项目](../../samples/G104.Sandbox/G104.Sandbox.csproj)、[Engine锁文件](../../src/G104.Engine/packages.lock.json)、[Sandbox锁文件](../../samples/G104.Sandbox/packages.lock.json)、[global.json](../../global.json)。
 
 OpenAL Soft1.25.2独立于NuGet包，LGPL-2.0-or-later；采用官方包bin/Win64/soft_oal.dll改名OpenAL32.dll，部署到third_party后由Sandbox复制应用根并由AudioSystem显式加载。router/Win64/OpenAL32.dll未采用，64位文件名含32不代表32位。许可/readme与同版本完整源码归档及SHA见 [SOURCE.md](../../third_party/openal-soft/1.25.2/SOURCE.md)。PE资源1.25.1与嵌入ALSOFT1.25.2是已核输入的元数据差异，实际后端曾报告1.25.2，不据它自动重下。
 
 <a id="openal-deployment"></a>
+
 ### OpenAL Soft为什么单独部署DLL
 
 2026-10-05补充说明：解释当前获取与部署方式及其取舍，不新增依赖或改变已采用版本。
@@ -70,21 +73,23 @@ Jolt提供精确ray/sweep/overlap和刚体，角色去穿透/墙滑/接地/跳�
 SharpGLTF仅读取格式，默认节点/采样/混合/蒙皮由项目求值；StbImageSharp仅解码，颜色空间、GPU上传/释放仍由引擎负责。ImGui.NET提供原生控件，不能替代编辑事务/Undo。OpenTK音频绑定＋OpenAL Soft播放PCM，不再引入运行时Ogg解码库；用已选声音离线转换缩小运行依赖。
 
 <a id="41-固定-sdk版本选择"></a>
+
 ### 4.1 固定SDK：含义与生效范围
 
 SDK是编译/构建/还原工具，net10.0是API目标，运行时执行已编译程序，IDE用于编辑/调试，NuGet包提供库。global.json只选择SDK，不下载它、不锁运行时补丁/VS/包，也不改变其他目录项目默认值。
 
-| 字段 | 值 | 效果/取舍 |
-| --- | --- | --- |
-| sdk.version | 10.0.401 | 选择完整验证版本 |
-| sdk.rollForward | disable | 缺准确版本报错，即使更高版本已安装也不自动采用 |
-| sdk.allowPrerelease | false | 不选择预览SDK |
+| 字段                | 值       | 效果/取舍                                      |
+| ------------------- | -------- | ---------------------------------------------- |
+| sdk.version         | 10.0.401 | 选择完整验证版本                               |
+| sdk.rollForward     | disable  | 缺准确版本报错，即使更高版本已安装也不自动采用 |
+| sdk.allowPrerelease | false    | 不选择预览SDK                                  |
 
 VS从解决方案目录、dotnet从当前目录向上解析global.json，所以命令从g104engine或其子目录执行；仅在上层传方案路径不保证采用此文件。它放在slnx旁，不需C#加载、项目资源项或复制到输出。将来升级需先确认目标SDK并同步配置/环境记录，不能浮动latest。依据：[global.json](https://learn.microsoft.com/en-us/dotnet/core/tools/global-json)。
 
 确认选择时结合dotnet --version、dotnet --info里的实际global.json路径及MSBuild NETCoreSdkVersion/MSBuildSDKsPath，而非只看机器恰好默认同版。2026-10-02创建及验证原文属于 [foundation-setup-and-probes.md](../archive/foundation-setup-and-probes.md#foundation-20261002)。
 
 <a id="blank-project-packages"></a>
+
 ## 从空白工程安装NuGet包并建立锁定
 
 前提是已按 [environment.md](environment.md#blank-project)创建G104.Engine类库与G104.Sandbox控制台项目，目标均为net10.0，准确SDK与x64配置已准备好。此时新电脑没有两份packages.lock.json，以下步骤负责首次声明依赖并生成它们，不是对原工程升级包。
@@ -113,9 +118,11 @@ VS从解决方案目录、dotnet从当前目录向上解析global.json，所以�
 
 <a id="42-nuget-依赖锁文件第-41-节核验后继续"></a>
 <a id="package-locks"></a>
+
 ### 4.2 锁文件、还原与严格模式
 
 <a id="first-restore"></a>
+
 #### 已有项目声明与锁文件：第一次在VS中还原
 
 这是已经取得原工程csproj、对应两份锁文件与项目引用时的可选路径；完整文件可以由仓库获取或成套手动复制。空白工程还没有依赖声明/锁文件时先走[装包步骤](#blank-project-packages)。这里的前提是固定SDK已准备好，并打开对应方案（原工程为g104engine.slnx，自建方案也可为.sln）；首次还原会联网下载缺少的NuGet包，“锁定”约束解析结果，不禁止按锁文件下载。
@@ -130,11 +137,11 @@ VS从解决方案目录、dotnet从当前目录向上解析global.json，所以�
 
 #### 三类文件怎样配合
 
-| 文件 | 用途 | 谁读取 |
-| --- | --- | --- |
-| `global.json` | 选择 SDK 构建工具版本，如 `10.0.401` | .NET/VS 的 SDK 解析器 |
-| `.csproj` 的 `PackageReference` | 声明项目直接依赖的包及版本要求，如 OpenTK.Graphics `4.9.4` | NuGet 还原过程 |
-| `packages.lock.json` | 保存还原得到的完整包依赖结果，包括实际版本、直接/间接关系及包内容哈希 | 后续 NuGet 还原与锁定校验 |
+| 文件                                | 用途                                                                  | 谁读取                    |
+| ----------------------------------- | --------------------------------------------------------------------- | ------------------------- |
+| `global.json`                     | 选择 SDK 构建工具版本，如 `10.0.401`                                | .NET/VS 的 SDK 解析器     |
+| `.csproj` 的 `PackageReference` | 声明项目直接依赖的包及版本要求，如 OpenTK.Graphics `4.9.4`          | NuGet 还原过程            |
+| `packages.lock.json`              | 保存还原得到的完整包依赖结果，包括实际版本、直接/间接关系及包内容哈希 | 后续 NuGet 还原与锁定校验 |
 
 最初虽只手动安装三个OpenTK组件，它们还引入OpenTK.Core、Windowing.Common、Windowing.GraphicsLibraryFramework `4.9.4` 和OpenTK.redist.glfw `3.4.0.44` 等“传递依赖”。当前九个直接包的完整图仍由两项目锁文件记录，最初三包的教学例子不是当前完整依赖清单。
 
@@ -146,17 +153,16 @@ VS从解决方案目录、dotnet从当前目录向上解析global.json，所以�
 
 “还原 NuGet 程序包”是根据项目依赖要求准备构建所需的包：有本地缓存时可以复用，缺少时从配置的包源获取，并产生供构建使用的 `obj/project.assets.json`。启用锁文件后，还原过程会同时生成或使用 `packages.lock.json`。它不是把源码恢复到旧版本，也不需要先卸载已经安装的三个包。
 
-
 Sandbox虽无直接OpenTK引用，也经Engine解析运行所需图；运行应用整体结果看Sandbox锁文件。Engine锁文件方便本项目单独核对，不能强制未来所有类库消费者使用相同图。以后独立类库发布再评估策略。两份锁文件分别对应各自项目，不能互相覆盖；从原电脑成套转移时也须各回各项目目录，不用一份冒充两份。
 
 #### 学习说明：两个 true 为什么不冲突
 
 它们不是互相覆盖的“更新方向”，而是功能开关与约束条件：
 
-| 属性 | 正确含义 | 不代表什么 |
-| --- | --- | --- |
-| `RestorePackagesWithLockFile=true` | 启用锁文件机制；在非严格模式下可生成或随依赖要求变化更新清单 | 不是每次都强制覆盖已有锁文件，也不是扫描本机 DLL 后反向填写依赖 |
-| `RestoreLockedMode=true` | 还原必须遵守已确认的清单；项目依赖声明与清单不一致时报错 | 不是根据本机已安装的库更新锁文件，也不会自动把 `.csproj` 改成锁文件中的要求 |
+| 属性                                 | 正确含义                                                     | 不代表什么                                                                    |
+| ------------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `RestorePackagesWithLockFile=true` | 启用锁文件机制；在非严格模式下可生成或随依赖要求变化更新清单 | 不是每次都强制覆盖已有锁文件，也不是扫描本机 DLL 后反向填写依赖               |
+| `RestoreLockedMode=true`           | 还原必须遵守已确认的清单；项目依赖声明与清单不一致时报错     | 不是根据本机已安装的库更新锁文件，也不会自动把 `.csproj` 改成锁文件中的要求 |
 
 **同时启用表示：使用锁文件，并禁止还原过程擅自改写依赖清单。** 先核对 `.csproj` 的要求与锁文件是否一致；一致时按清单准备依赖，缓存缺少的包可以下载，已经齐全时无需重复下载；不一致时失败，不靠自动修改项目声明或锁文件来“调和”。实际获取包与允许改写清单是两件事。
 
@@ -167,6 +173,7 @@ Sandbox虽无直接OpenTK引用，也经Engine解析运行所需图；运行应�
 还原成功、锁文件一致、构建成功、原生加载、行为正确与用户体验分别成立。obj/project.assets.json供构建消费、bin/obj是缓存；packages.lock.json是需审查和提交的文本，不含DLL，不是游戏运行配置，不证明依赖安全审计。dotnet build --no-restore禁止该次还原，不等于测试锁定还原。首次A/B步骤的原文与当时证据可选查基础历史。
 
 <a id="dependency-upgrade"></a>
+
 ### 4.3 已明确决定升级后的受控操作
 
 `packages.lock.json` 是NuGet根据项目声明计算出的结果，**不手工修改**。此节仅供未来已明确决定升级时使用，是否启动升级按具体任务和协作流程决定。用户决定新的直接依赖版本并修改项目，NuGet重新计算直接/传递依赖和内容哈希；以下以OpenTK组件为例，现有四个OpenTK直接引用的兼容关系应一起核对：
@@ -211,16 +218,15 @@ Sandbox虽无直接OpenTK引用，也经Engine解析运行所需图；运行应�
 
 <a id="assets-and-conversion"></a>
 
-| 用途 | 当前采用/部署 | 已知输入与验证边界 |
-| --- | --- | --- |
-| 角色与动作 | assets/models/UAL1_Standard.glb，Quaternius Standard非_RM、CC0；许可/README已保存 | 1skin/65joints/43LINEAR clips/四正权重；128容量UBO完整处理65骨骼，保留根/实例校正；Run默认Jog_Fwd_Loop，配置可换Sprint，实际采样/混合已有证据 |
-| 场景与材质 | 项目自有primitive/28对象seed，material-probe.glb及checker.png/flat normal.png | 实际引用/UV/覆盖拒绝已有证据；flat normal探针不证明任意复杂法线图全部正确；未搬Piccolo素材 |
-| 天空盒 | renderer创建项目自有固定cubemap背景 | V1仅背景，无IBL/预计算环境照明；外部六面图片更换不是已实施步骤 |
-| 短音效 | 两包230个Ogg仅选七段，经便携FFmpeg9.0.2转mono/44100Hz/PCM16：step0、step1、door、jump、click、complete、switch | 原包编码/声道保留历史；正式七个WAV逐chunk/哈希/实际OpenAL有历史验证，人工听辨另取证；没有运行时Ogg库或系统安装 |
-| 循环声/测试音 | 自有110Hz loop-test.wav，与七个转换文件共八个WAV | loop pause/resume/stop/cleanup已有证据；测试信号不当成最终环境声品质 |
+| 用途          | 当前采用/部署                                                                                                  | 已知输入与验证边界                                                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 角色与动作    | assets/models/UAL1_Standard.glb，Quaternius Standard非_RM、CC0；许可/README已保存                              | 1skin/65joints/43LINEAR clips/四正权重；128容量UBO完整处理65骨骼，保留根/实例校正；Run默认Jog_Fwd_Loop，配置可换Sprint，实际采样/混合已有证据 |
+| 场景与材质    | 项目自有primitive/28对象seed，material-probe.glb及checker.png/flat normal.png                                  | 实际引用/UV/覆盖拒绝已有证据；flat normal探针不证明任意复杂法线图全部正确；未搬Piccolo素材                                                    |
+| 天空盒        | renderer创建项目自有固定cubemap背景                                                                            | V1仅背景，无IBL/预计算环境照明；外部六面图片更换不是已实施步骤                                                                                |
+| 短音效        | 两包230个Ogg仅选七段，经便携FFmpeg9.0.2转mono/44100Hz/PCM16：step0、step1、door、jump、click、complete、switch | 原包编码/声道保留历史；正式七个WAV逐chunk/哈希/实际OpenAL有历史验证，人工听辨另取证；没有运行时Ogg库或系统安装                                |
+| 循环声/测试音 | 自有110Hz loop-test.wav，与七个转换文件共八个WAV                                                               | loop pause/resume/stop/cleanup已有证据；测试信号不当成最终环境声品质                                                                          |
 
 当前PcmWave已限定RIFF/WAVE、整数PCM16、1/2声道并从文件读取采样率，逐chunk处理对齐，不假设44字节头；拒绝float/extensible/压缩。3D点声源需mono，2D提示不随场景方向/距离变化。OpenAL只播放PCM、不解码任意文件，原机制参考见 [OpenTK AL API](https://opentk.net/api/OpenTK.Audio.OpenAL.AL.html) 和 [openal-1.1-specification.pdf](https://www.openal.org/documentation/openal-1.1-specification.pdf)，其他格式明确报错。
-
 
 采用素材的作者/来源/许可、选中条目、转换参数与逐项SHA由 [asset-manifest.json](../../assets/licenses/asset-manifest.json) 保存。原始四ZIP是忽略的本机来源缓存，正式采用子集分别在assets和third_party；不用包宣传页推定免费Standard包含所有动作、PCM编码或相容skin，不扩大 [git-and-publishing.md](git-and-publishing.md)。
 
@@ -239,6 +245,7 @@ Kenney来源：[Impact Sounds](https://kenney.nl/assets/impact-sounds)、[Interf
 工具只负责已选声音离线转换，未系统安装/改PATH，不是应用运行或Git发布依赖。tools/prepare_assets.py负责已核输入提取、程序测试资产及离线转换；重获原始输入、重转或升级工具需要具体任务，阅读本页不触发执行。解析、输出哈希、原生播放与人工听感分别取证。
 
 <a id="standalone-assets"></a>
+
 ## 从空白工程独立下载、提取和转换外部素材
 
 这是非C#前置中的外部素材部分：从你新建的g104engine目录开始，按下表下载五个ZIP、核对哈希，再手动解压和复制，用便携FFmpeg转换七段声音。该子步骤不依赖原工程assets、Python或tools/prepare_assets.py；GLB是已导出的模型文件，取得它不需要Blender。接着必须完成[项目自有资源](#project-authored-assets)的19个运行文件及来源记录，配置复制并做前置检查，才能转到只写C#阶段；仅做完外部下载还不齐全。
@@ -247,12 +254,12 @@ Kenney来源：[Impact Sounds](https://kenney.nl/assets/impact-sounds)、[Interf
 
 在新项目下创建`.cache/v1-preparation`，五个ZIP均保存到这里，文件名与表中一致。此处是下载/解压缓存，正式运行文件稍后另放assets或third_party。输入ZIP的SHA来自原已核对输入，FFmpeg的SHA另经发行方文本核对；校验对象是压缩包本身，不是解压后的目录。
 
-| 官方作者/发行入口 | 选择与下载文件名 | 预期ZIP SHA-256 |
-| --- | --- | --- |
-| [OpenAL Soft官网](https://openal-soft.org/#download)；[固定Windows包](https://openal-soft.org/openal-binaries/openal-soft-1.25.2-bin.zip) | 1.25.2 Windows二进制包，保存为`openal-soft-1.25.2-bin.zip`；采用其中bin/Win64/soft_oal.dll | `67a0c4b800bd860c93c04f38caf8cbe4875f9c84700ac430efc451f70e265434` |
-| [Quaternius作者页](https://quaternius.itch.io/universal-animation-library) | Download Now中的Standard，保存为`Universal Animation Library[Standard].zip`；不选付费Pro/Source或其他代素材包 | `cc73fc4e495b82958207316596317a3f40b9fa38065bde1027937452da537724` |
-| [Kenney Impact Sounds作者页](https://kenney.nl/assets/impact-sounds) | Download；可选择Continue without donating，保存为`kenney_impact-sounds.zip` | `029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8` |
-| [Kenney Interface Sounds作者页](https://kenney.nl/assets/interface-sounds) | Download；可选择Continue without donating，保存为`kenney_interface-sounds.zip` | `f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232` |
+| 官方作者/发行入口                                                                                                                                                                                                                  | 选择与下载文件名                                                                                                       | 预期ZIP SHA-256                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [OpenAL Soft官网](https://openal-soft.org/#download)；[固定Windows包](https://openal-soft.org/openal-binaries/openal-soft-1.25.2-bin.zip)                                                                                            | 1.25.2 Windows二进制包，保存为`openal-soft-1.25.2-bin.zip`；采用其中bin/Win64/soft_oal.dll                           | `67a0c4b800bd860c93c04f38caf8cbe4875f9c84700ac430efc451f70e265434` |
+| [Quaternius作者页](https://quaternius.itch.io/universal-animation-library)                                                                                                                                                          | Download Now中的Standard，保存为`Universal Animation Library[Standard].zip`；不选付费Pro/Source或其他代素材包        | `cc73fc4e495b82958207316596317a3f40b9fa38065bde1027937452da537724` |
+| [Kenney Impact Sounds作者页](https://kenney.nl/assets/impact-sounds)                                                                                                                                                                | Download；可选择Continue without donating，保存为`kenney_impact-sounds.zip`                                          | `029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8` |
+| [Kenney Interface Sounds作者页](https://kenney.nl/assets/interface-sounds)                                                                                                                                                          | Download；可选择Continue without donating，保存为`kenney_interface-sounds.zip`                                       | `f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232` |
 | [FFmpeg官网Windows入口](https://ffmpeg.org/download.html#build-windows) → [Gyan发行页](https://www.gyan.dev/ffmpeg/builds/#release-builds)；[固定ZIP](https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip) | Release essentials 9.0.2 ZIP，保存为`ffmpeg-9.0.2-essentials_build.zip`；不选git master、full/shared或浮动latest代替 | `60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba` |
 
 2026-10-22已联网核对上述作者/发行入口：OpenAL官网列出1.25.2二进制与源码；Quaternius页面列出Standard及CC0、RM/非RM的区分；Kenney页面分别列出130/100个声音及CC0；Gyan发行页和版本文本为9.0.2，SHA文本与表一致。该批未下载软件/素材ZIP，也没有证明作者当前提供的四个输入ZIP仍与历史输入逐字节相同；2026-10-23补空白工程步骤时沿用这项有日期的来源核对。若同名文件哈希改变或固定文件不可获取，保留下载记录并停止采用；也可从原电脑手动带来已核输入或正式资源，不需要clone。不能为完成搭建而自行把预期哈希改成新下载值。
@@ -271,29 +278,31 @@ Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[S
 
 在新项目中创建assets/models、assets/audio、assets/licenses和third_party/openal-soft/1.25.2。按下表从**解压后的原包**取文件；新项目此时还没有这些正式文件，不能把原工程“已保存”的历史当成下载完成。
 
-| 来源/类型 | 正式落点与处理 |
-| --- | --- |
-| OpenAL Windows包 | 复制`openal-soft-1.25.2-bin/bin/Win64/soft_oal.dll`，在新项目改名为`third_party/openal-soft/1.25.2/OpenAL32.dll`；将包根目录的COPYING、LICENSE-pffft和readme.txt一并复制到同一正式目录 |
+| 来源/类型           | 正式落点与处理                                                                                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenAL Windows包    | 复制`openal-soft-1.25.2-bin/bin/Win64/soft_oal.dll`，在新项目改名为`third_party/openal-soft/1.25.2/OpenAL32.dll`；将包根目录的COPYING、LICENSE-pffft和readme.txt一并复制到同一正式目录     |
 | Quaternius Standard | 复制`Unreal-Godot/UAL1_Standard.glb`非_RM版本至`assets/models/UAL1_Standard.glb`；将原包License.txt和README.txt分别保存为assets/licenses/quaternius-0-License.txt及quaternius-1-README.txt |
-| Kenney两个声音包 | 各自License.txt分别复制为assets/licenses/kenney_impact-sounds-License.txt及kenney_interface-sounds-License.txt；声音按下方七项提取转码，不把230段整包放入运行assets |
+| Kenney两个声音包    | 各自License.txt分别复制为assets/licenses/kenney_impact-sounds-License.txt及kenney_interface-sounds-License.txt；声音按下方七项提取转码，不把230段整包放入运行assets                            |
 
 复制后的OpenAL32.dll SHA应为`3963b06e319180700be0bcc0d027336664bb3a4975876b4a5442f10746fab5b4`，与输入ZIP哈希不同。采用的是Win64的soft_oal.dll；不选router/Win64/OpenAL32.dll或Win32文件，不往系统目录复制，不安装系统OpenAL。前置阶段按 [environment.md](environment.md#resource-copy)给新Sandbox添加复制配置；全部非C#前置完成后再写AudioSystem等C#加载/播放代码，放好DLL本身不等于已有音频功能。
 
-另外下载[官方固定源码归档](https://openal-soft.org/openal-releases/openal-soft-1.25.2.tar.bz2)，保留压缩形式，放入`third_party/openal-soft/1.25.2/openal-soft-1.25.2.tar.bz2`；SHA为`1dbaac44e7579d5bc8847ca8db4b2e8b9fd3961041f35ee20def4958301e1089`。它用于保留同版本对应源码，不需要解压编译。新项目同目录还应建立SOURCE.md，记录版本、官方来源、包内Win64路径、ZIP/DLL/源码归档分别的SHA和许可文件名；可直接逐文件手动复制本工程的 [SOURCE.md](../../third_party/openal-soft/1.25.2/SOURCE.md)作为这份来源说明，无需clone。未来分发库二进制仍需提供对应源码与许可获取方式。
+另外下载[官方固定源码归档](https://openal-soft.org/openal-releases/openal-soft-1.25.2.tar.bz2)，保留压缩形式，放入`third_party/openal-soft/1.25.2/openal-soft-1.25.2.tar.bz2`；SHA为`1dbaac44e7579d5bc8847ca8db4b2e8b9fd3961041f35ee20def4958301e1089`。它用于保留同版本对应源码，不需要解压编译来运行，只是保存一下对应源码记录一下以便后序有需要看源码。新项目同目录还应建立SOURCE.md，记录版本、官方来源、包内Win64路径、ZIP/DLL/源码归档分别的SHA和许可文件名；可直接逐文件手动复制本工程的 [SOURCE.md](../../third_party/openal-soft/1.25.2/SOURCE.md)作为这份来源说明，无需clone。未来分发库二进制仍需提供对应源码与许可获取方式。
 
 ### 手动提取七段Ogg并离线转码
 
+使用解压放在v1-preparation的ffmpeg工具将7段ogg转码成wav格式供后续给工程运行时使用。
+
 在`.cache/v1-preparation/selected-audio`创建一个只放所选输入的目录。分别在两包的解压目录中按下列**完整文件名**搜索，确认来自正确声音包，然后将七个原始Ogg复制到selected-audio；不要先重命名输入。普通资源管理器搜索即可完成，不依赖prepare_assets.py。
 
-| 原包与条目（不含目录） | assets/audio输出 |
-| --- | --- |
-| Impact Sounds：footstep_concrete_000.ogg | step0.wav |
-| Impact Sounds：footstep_concrete_001.ogg | step1.wav |
-| Impact Sounds：impactWood_medium_000.ogg | door.wav |
-| Impact Sounds：impactMetal_light_000.ogg | jump.wav |
-| Interface Sounds：click_001.ogg | click.wav |
-| Interface Sounds：confirmation_001.ogg | complete.wav |
-| Interface Sounds：switch_001.ogg | switch.wav |
+| 原包与条目（不含目录）                   | assets/audio输出 |
+| ---------------------------------------- | ---------------- |
+| Impact Sounds：footstep_concrete_000.ogg | step0.wav        |
+| Impact Sounds：footstep_concrete_001.ogg | step1.wav        |
+| Impact Sounds：impactWood_medium_000.ogg | door.wav         |
+| Impact Sounds：impactMetal_light_000.ogg | jump.wav         |
+| Interface Sounds：click_001.ogg          | click.wav        |
+| Interface Sounds：confirmation_001.ogg   | complete.wav     |
+| Interface Sounds：switch_001.ogg         | switch.wav       |
 
 以下整段仅在你**新建项目**上执行。它先检查工具、七项输入与输出是否存在，再只创建缺少的输出目录；七个目标WAV须尚不存在。`&`调用已解析的FFmpeg绝对路径；`-n`遇到已有输出会退出，防止覆盖资源。这段命令没有在本轮文档维护中执行：
 
@@ -346,28 +355,29 @@ Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[S
 2026-10-23按FFmpeg 9.0.2官方参数源码 [ffmpeg.texi](https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/doc/ffmpeg.texi)核对了`-n`、`-ac`和`-ar`，并按PCM编解码定义 [pcm.c](https://github.com/FFmpeg/FFmpeg/blob/n9.0.2/libavcodec/pcm.c)核对pcm_s16le；官方HTML文档本轮读取超时，改查同版本官方源码。这里的命令经过静态核对，未重新转码或实测声音。
 
 <a id="project-authored-assets"></a>
+
 ### 开写C#前必做：取得19个项目自有运行资源
 
 外部原包不能提供下面这套项目自有文件。当前目标是在开始写C#前把它们全部准备好，默认办法是从原电脑逐文件复制现成资源；这是纯文件传输，不增加Python前置。它们的来源分为文本编写与程序生成：
 
-| 文件类别 | 直接来源与制作方式 | 在新电脑的默认准备方式 |
-| --- | --- | --- |
-| 13个GLSL文本文件（.vert/.frag/.glsl） | AI助手在获授权的V1项目实施中编写，采用或简化标准渲染算法并适配本工程接口；不把所用算法称为全部原创 | 从原工程复制下表列出的完整文件，两个include片段也要齐全 |
-| 两个JSON | AI助手按授权编写的training-ground.json种子场景数据及character-animation.json动画配置，不属于Quaternius/Kenney下载内容 | 原样复制完整JSON及其相对路径，不用示例片段代替 |
+| 文件类别                                                   | 直接来源与制作方式                                                                                                                                                                                                         | 在新电脑的默认准备方式                                               |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 13个GLSL文本文件（.vert/.frag/.glsl）                      | AI助手在获授权的V1项目实施中编写，采用或简化标准渲染算法并适配本工程接口；不把所用算法称为全部原创                                                                                                                         | 从原工程复制下表列出的完整文件，两个include片段也要齐全              |
+| 两个JSON                                                   | AI助手按授权编写的training-ground.json种子场景数据及character-animation.json动画配置，不属于Quaternius/Kenney下载内容                                                                                                      | 原样复制完整JSON及其相对路径，不用示例片段代替                       |
 | material-probe.glb、checker.png、normal.png、loop-test.wav | [prepare_assets.py](../../tools/prepare_assets.py)的make_test_assets函数程序生成：带材质/UV/切线的几何GLB、两张64×64程序图案/flat normal PNG、110Hz正弦循环测试WAV；这是确定的几何/像素/采样计算，不是文生图或音乐生成服务 | 直接以二进制文件传输这四个现成文件；选择重新生成时才另走可选脚本流程 |
 
 以下表格共**19个运行文件**：13个Shader＋两个JSON＋一个材质探针GLB＋两张PNG＋一个循环测试WAV。链接指向当前参考工程文件，供在原电脑取文件使用，不表示新电脑已经有它们。
 
-| 新项目中需要补齐的相对路径 | 原工程参考文件与作用 |
-| --- | --- |
-| assets/shaders下的三个顶点Shader | [mesh.vert](../../assets/shaders/mesh.vert)、[fullscreen.vert](../../assets/shaders/fullscreen.vert)、[particle.vert](../../assets/shaders/particle.vert) |
-| assets/shaders下的八个片段Shader | [forward.frag](../../assets/shaders/forward.frag)、[gbuffer.frag](../../assets/shaders/gbuffer.frag)、[shadow.frag](../../assets/shaders/shadow.frag)、[deferred.frag](../../assets/shaders/deferred.frag)、[sky.frag](../../assets/shaders/sky.frag)、[tonemap.frag](../../assets/shaders/tonemap.frag)、[fxaa.frag](../../assets/shaders/fxaa.frag)、[particle.frag](../../assets/shaders/particle.frag) |
-| assets/shaders下的两个共享片段 | [lighting.glsl](../../assets/shaders/lighting.glsl)、[material.glsl](../../assets/shaders/material.glsl)；与上述文件合计13个Shader文件，include依赖也要复制 |
-| assets/scenes/training-ground.json | [training-ground.json](../../assets/scenes/training-ground.json)，原28对象种子场景 |
-| assets/config/character-animation.json | [character-animation.json](../../assets/config/character-animation.json)，原动作映射与参数 |
-| assets/models/material-probe.glb | [material-probe.glb](../../assets/models/material-probe.glb)，自有材质测试模型，引用下列两张PNG |
-| assets/tests/checker.png、assets/tests/normal.png | [checker.png](../../assets/tests/checker.png)、[normal.png](../../assets/tests/normal.png)，测试颜色贴图与flat normal |
-| assets/audio/loop-test.wav | [loop-test.wav](../../assets/audio/loop-test.wav)，自有110Hz循环测试音；加上七个转换声音才是原工程的八个WAV |
+| 新项目中需要补齐的相对路径                        | 原工程参考文件与作用                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| assets/shaders下的三个顶点Shader                  | [mesh.vert](../../assets/shaders/mesh.vert)、[fullscreen.vert](../../assets/shaders/fullscreen.vert)、[particle.vert](../../assets/shaders/particle.vert)                                                                                                                                                                                                                                             |
+| assets/shaders下的八个片段Shader                  | [forward.frag](../../assets/shaders/forward.frag)、[gbuffer.frag](../../assets/shaders/gbuffer.frag)、[shadow.frag](../../assets/shaders/shadow.frag)、[deferred.frag](../../assets/shaders/deferred.frag)、[sky.frag](../../assets/shaders/sky.frag)、[tonemap.frag](../../assets/shaders/tonemap.frag)、[fxaa.frag](../../assets/shaders/fxaa.frag)、[particle.frag](../../assets/shaders/particle.frag) |
+| assets/shaders下的两个共享片段                    | [lighting.glsl](../../assets/shaders/lighting.glsl)、[material.glsl](../../assets/shaders/material.glsl)；与上述文件合计13个Shader文件，include依赖也要复制                                                                                                                                                                                                                                          |
+| assets/scenes/training-ground.json                | [training-ground.json](../../assets/scenes/training-ground.json)，原28对象种子场景                                                                                                                                                                                                                                                                                                                  |
+| assets/config/character-animation.json            | [character-animation.json](../../assets/config/character-animation.json)，原动作映射与参数                                                                                                                                                                                                                                                                                                          |
+| assets/models/material-probe.glb                  | [material-probe.glb](../../assets/models/material-probe.glb)，自有材质测试模型，引用下列两张PNG                                                                                                                                                                                                                                                                                                     |
+| assets/tests/checker.png、assets/tests/normal.png | [checker.png](../../assets/tests/checker.png)、[normal.png](../../assets/tests/normal.png)，测试颜色贴图与flat normal                                                                                                                                                                                                                                                                                |
+| assets/audio/loop-test.wav                        | [loop-test.wav](../../assets/audio/loop-test.wav)，自有110Hz循环测试音；加上七个转换声音才是原工程的八个WAV                                                                                                                                                                                                                                                                                         |
 
 默认按以下步骤逐文件取得，不复制C#代码、bin/obj或整个工作区：
 
@@ -377,7 +387,7 @@ Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[S
 4. 如需从项目网页取单个文件，先确认网页对应的是要复原的参考版本，再使用该文件的Raw/原始文件或单文件下载功能；文本保存完整原始内容，二进制必须下载真实文件。这里不承诺某个未核对的远程单文件URL始终可用；无法确认版本或下载内容时，从原电脑传送上述真实文件。无需clone，也不以下载整个仓库为前提。
 5. 在原电脑和新电脑逐项核对这19个文件的相对路径、大小及SHA；默认原样复制应与来源文件一致。再按 [environment.md](environment.md#resource-copy)完成复制配置，并进入 [v1-run-and-review.md](v1-run-and-review.md#blank-project-checks)的只读文件/数据检查。若发现缺文件或引用断开，仍属于前置未完成，先补齐再转入只写C#阶段。
 
-来源记录单独准备，不计入19个运行文件：**默认另将原工程的完整 [asset-manifest.json](../../assets/licenses/asset-manifest.json) 原样复制到新工程`assets/licenses/asset-manifest.json`**，作为原批次来源、许可、SHA及转换历史记录。Quaternius的许可/README和Kenney两份许可（共四个文本文件）按上面的外部提取步骤放到同一licenses目录，OpenAL许可、SOURCE.md及源码归档也须齐全。前置清点会检查这五份资产记录/许可文件及其输出副本，所以不能只传送19个运行文件。原manifest的旧转换绝对路径与SHA不证明新电脑已经转码或取得同样文件；新准备文件的实际输入/输出SHA、来源与转换命令另行保存为本次准备记录，不覆盖原历史或仅复制旧清单就声称通过。
+来源记录单独准备，不计入19个运行文件（assets/licenses目录里的文件都是记录性质的，不参与功能；可以手写、复制、使用工具生成）：**默认另将原工程的完整 [asset-manifest.json](../../assets/licenses/asset-manifest.json) 原样复制到新工程`assets/licenses/asset-manifest.json`**，作为原批次来源、许可、SHA及转换历史记录。Quaternius的许可/README和Kenney两份许可（共四个文本文件）按上面的外部提取步骤放到同一licenses目录，OpenAL许可、SOURCE.md及源码归档也须齐全。前置清点会检查这五份资产记录/许可文件及其输出副本，所以不能只传送19个运行文件。原manifest的旧转换绝对路径与SHA不证明新电脑已经转码或取得同样文件；新准备文件的实际输入/输出SHA、来源与转换命令另行保存为本次准备记录，不覆盖原历史或仅复制旧清单就声称通过。
 
 这19个自有运行文件，加外部角色GLB和七个Kenney WAV，构成当前V1的27个assets运行文件，音频合计八个WAV；OpenAL32.dll和对应许可/源码等按前文另行准备。环境、包、这套非C#文件及来源记录、输出复制和前置检查都完成后，才可将下一阶段称为“只写C#复原当前V1”。前置文件检查不等于图形/声音功能已实现，现成V1的`--verify`等命令仍要等对应C#代码存在后使用。
 
@@ -386,6 +396,7 @@ Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[S
 也可以把自行编写GLSL/JSON作为学习替代；这仍是**前置阶段**的工作，须在宣布只写C#前完成，并核对文件格式、Shader接口、include及资源引用合同。与原文件有差异时记录实际采用内容和差异，后续由C#运行验证行为；不能把尚待补写的Shader或JSON留到只写C#阶段。主流程接续见 [reproduction.md](reproduction.md#new-machine-setup)。
 
 <a id="optional-asset-preparation"></a>
+
 ## 可选：另行取得准备脚本后自动生成部分资源
 
 主线采用外部提取/转码加19个自有文件逐项复制，纯复制自有文件无需Python。若选择重新生成，自有19个文件中脚本能生成的只有make_test_assets负责的**四个测试文件**：material-probe.glb、checker.png、normal.png和loop-test.wav；13个Shader及两个JSON仍须在前置阶段取得或写齐。只有另外从原电脑**手动取得完整** [prepare_assets.py](../../tools/prepare_assets.py)，按`g104engine/tools/prepare_assets.py`放入独立可写副本，并为旧完整流程准备输入副本后，才走下面保留的生成路线。脚本不是下载器，安装NuGet包不会带来它；整份脚本入口还会提取/转换外部文件，不是只写这四项。

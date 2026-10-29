@@ -3,23 +3,24 @@
 新电脑从空白文件夹开始：先安装下面的环境，再按本页创建方案和两个C#项目，配置包，并备齐第三方素材及项目自有Shader/JSON/测试资产，最后配置构建复制；全部非C#配套准备好以后由你手写或手动复制C#引擎代码。完整顺序从 [reproduction.md](reproduction.md#new-machine-setup) 进入。已经有完整工程时，才使用本页“打开现有工程”。精确SDK、包和素材在 [dependencies.md](dependencies.md#dependency-locks)，初始准备检查在 [v1-run-and-review.md](v1-run-and-review.md#blank-project-checks)，协作职责见 [agent-workflow.md](../agent-workflow.md)。
 
 <a id="new-machine-environment"></a>
+
 ## 新电脑：准备系统、工具和驱动
 
 这条路线面向当前V1的Windows x64开发环境。先在Windows“设置 → 系统 → 系统信息”确认64位操作系统和基于x64的处理器；新机采用仍在微软支持期内的Windows 11 x64。下面使用的VS2026支持Windows 11，其他系统是否符合要求查 [VS2026系统要求](https://learn.microsoft.com/en-us/visualstudio/releases/2026/vs-system-requirements)。本项目尚未完成第二设备验证，ARM64、Linux、macOS不在当前复现路线内。
 
 ### 1. 确认显卡、声音和下载条件
 
-| 要准备什么 | 去哪里、怎样确认 |
-| --- | --- |
-| OpenGL 4.3 Core显卡与驱动 | 在“设备管理器 → 显示适配器”确认显卡型号。缺少合适驱动时，按型号从电脑厂商支持页，或 [NVIDIA驱动](https://www.nvidia.com/en-us/drivers/)、[AMD驱动](https://www.amd.com/en/support/download/drivers.html)、[Intel驱动](https://www.intel.com/content/www/us/en/download-center/home.html) 获取对应Windows驱动。显卡硬件和当前驱动必须能创建OpenGL 4.3 Core上下文；首次运行还要检查控制台打印的GPU/GL版本。OpenTK包不能提供驱动，单装名为“OpenGL”的SDK也不能补足不支持的硬件。 |
-| 声音输出 | 要听声音，连接扬声器或耳机，在“设置 → 系统 → 声音”选择可用输出并测试。音频设备初始化失败时普通窗口仍会继续，声音状态显示Unavailable；声音验收和`--verify-audio`需要可用设备。OpenAL实现随工程部署，获取方式见 [dependencies.md](dependencies.md#openal-deployment)。 |
-| 网络与安装权限 | 浏览器须能访问下面的官方下载页、NuGet包源及素材作者下载页。安装VS和系统级.NET SDK需要管理员权限；安装位置可按磁盘空间选择，工程不要求放在E盘。 |
+| 要准备什么                | 去哪里、怎样确认                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenGL 4.3 Core显卡与驱动 | 在“设备管理器 → 显示适配器”确认显卡型号；OpenGL一般由显卡驱动提供，查看显卡型号以及驱动后到官网或网上查询改显卡型号以及驱动是否提供OpenGL 4.3 Core。缺少合适驱动时，按型号从电脑厂商支持页，或 [NVIDIA驱动](https://www.nvidia.com/en-us/drivers/)、[AMD驱动](https://www.amd.com/en/support/download/drivers.html)、[Intel驱动](https://www.intel.com/content/www/us/en/download-center/home.html) 获取对应Windows驱动。显卡硬件和当前驱动必须能创建OpenGL 4.3 Core上下文；首次运行还要检查控制台打印的GPU/GL版本。OpenTK包不能提供驱动，单装名为“OpenGL”的SDK也不能补足不支持的硬件。 |
+| 声音输出                  | 要听声音，连接扬声器或耳机，在“设置 → 系统 → 声音”选择可用输出并测试。音频设备初始化失败时普通窗口仍会继续，声音状态显示Unavailable；声音验收和`--verify-audio`需要可用设备。OpenAL实现随工程部署，获取方式见 [dependencies.md](dependencies.md#openal-deployment)。                                                                                                                                                                                                                                                                                                                 |
+| 网络与安装权限            | 浏览器须能访问下面的官方下载页、NuGet包源及素材作者下载页。安装VS和系统级.NET SDK需要管理员权限；安装位置可按磁盘空间选择，工程不要求放在E盘。                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 不需要为新机预先关闭SAC、Defender、SmartScreen或防火墙；发生实际拦截时按本页“SAC拦截”保留错误并诊断。
 
-### 2. 安装Visual Studio
+### 2. 安装Visual Studio（可参考 操作流程 目录里的操作截图）
 
-1. 从 [Visual Studio官方下载页](https://visualstudio.microsoft.com/downloads/) 选择 **Visual Studio 2026 Community → Free download**，使用Stable稳定通道；个人学习可用Community，其他用途按其许可选版本。目标框架使用`net10.0`，微软 [.NET SDK与VS兼容表](https://learn.microsoft.com/en-us/dotnet/core/porting/versioning-sdk-msbuild-vs) 列明.NET10/10.0.4xx的支持关系。VS2022的旧安装选择仅保留为历史，不作为这条新机路线。
+1. 从 [Visual Studio官方下载页](https://visualstudio.microsoft.com/downloads/) 选择 **Visual Studio 2026 Community → Free download**，使用Stable稳定通道；个人学习可用Community，其他用途按其许可选版本。当前项目确定的目标框架是`net10.0`，微软 [.NET SDK与VS兼容表](https://learn.microsoft.com/en-us/dotnet/core/porting/versioning-sdk-msbuild-vs) 列明.NET10/10.0.4xx的支持关系；对此建议vs2026，vs2022不建议搭配net10.0。VS2022的旧安装选择仅保留为历史，不作为这条新机路线。
 2. 运行Visual Studio Installer，在“工作负载”勾选 **“.NET桌面开发”**。保留它的必需组件；在右侧安装详细信息中确认 **“.NET SDK”**，并保留 **“NuGet包管理器”**。已有VS2026时，在Installer对应实例选择“修改”进入同一界面。图形化步骤见 [VS官方安装](https://learn.microsoft.com/en-us/visualstudio/install/install-visual-studio?view=visualstudio)，组件对应见 [组件清单](https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-community?view=visualstudio)。
 3. 完成安装后启动VS，在“帮助 → 关于Microsoft Visual Studio”确认版本，随后按本页“从空白文件夹创建方案和项目”操作。当前依赖采用预编译原生库，普通C#开发不需要额外勾选“使用C++的桌面开发”、Unity、CMake或游戏引擎工作负载。
 
@@ -27,12 +28,14 @@ Git是可选的源码版本管理工具，不是创建或运行这套C#工程的
 
 2026-10-22核查时官网Stable为VS2026 18.11.1；这是官方下载入口当日提供的版本，不是项目新增的实测结果。Community当前只支持Stable最新版本，见 [VS发布历史](https://learn.microsoft.com/en-us/visualstudio/releases/2026/release-history)；不要求找到历史18.10.3安装包。VS随带的SDK可能已经更新，下一步仍须单独核对本项目的精确SDK。
 
-### 3. 安装准确的.NET SDK 10.0.401 x64
+### 3. 核对.NET SDK 10.0.401 x64，缺少时补装
 
-1. 打开微软 [.NET10下载页](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)，找到 **SDK 10.0.401 → Windows → Installers → x64**；也可直接进入 [.NET SDK10.0.401 Windows x64安装入口](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/sdk-10.0.401-windows-x64-installer)。确认页面版本和文件名为`dotnet-sdk-10.0.401-win-x64.exe`，下载并运行安装程序。
+**先检查，缺少再补装。** VS的“.NET桌面开发”会安装.NET SDK，但具体版本需核对：先在VS终端用`dotnet --list-sdks`检查版本、`dotnet --info`核对x64架构，已有`10.0.401 x64`就无需重复下载安装。2026-10-02本机记录已确认VS的SDK组件与该版本存在，没有另行官网下载SDK的执行记录，见 [foundation-documents-2026-10-02.md](../archive/foundation-documents-2026-10-02.md) 的“D1 安装核验通过”。
+
+1. **仅在缺少准确SDK时**，打开微软 [.NET10下载页](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)，找到 **SDK 10.0.401 → Windows → Installers → x64**；也可直接进入 [.NET SDK10.0.401 Windows x64安装入口](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/sdk-10.0.401-windows-x64-installer)。确认页面版本和文件名为`dotnet-sdk-10.0.401-win-x64.exe`，下载并运行安装程序。
 2. 选择 **SDK**，不要只下载Runtime/Desktop Runtime，不选x86、Arm64、预览版或页面最上方其他SDK。SDK已经包含运行时；准确版本由工程`global.json`指定，`rollForward=disable`不会接受只有10.0.402等其他SDK的机器。可以并存其他SDK，不需要为此卸载它们。
 3. 安装后重新打开VS及终端。默认x64 SDK通常位于`C:\Program Files\dotnet\sdk\10.0.401\`；该路径用于理解和诊断，工程中没有要求手工填写这个绝对路径。安装器路线无需为项目另建环境变量或手动设置`DOTNET_ROOT`。
-4. 在VS通过“视图 → 终端”打开PowerShell，先检查已安装的SDK：
+4. 补装后，在VS通过“视图 → 终端”打开PowerShell，再次检查已安装的SDK：
 
 ```powershell
 dotnet --list-sdks
@@ -42,10 +45,11 @@ dotnet --list-sdks
 
 2026-10-22官网仍列出该准确版本和x64安装入口；本次只核查网页，没有下载或安装文件，也没有在新设备验证。将来若该版本入口失效，先核查官方下载记录，不用“最新SDK”替换锁定版本。
 
-安装完成后继续下面的空白工程步骤，无需先获取仓库。上面的软件下载入口沿用2026-10-22核查日期；本次2026-10-23补充的是新建工程和资源复制方法。
+确认所需SDK已安装后继续下面的空白工程步骤，无需先获取仓库。上面的软件下载入口沿用2026-10-22核查日期；本次2026-10-23补充的是新建工程和资源复制方法。
 
 <a id="blank-project"></a>
-## 从空白文件夹创建方案和项目
+
+## 从空白文件夹创建方案和项目（可参考 操作流程 目录里的操作截图）
 
 下面只建立工程配置，不提供引擎实现。统一示例根目录为`%USERPROFILE%\source\G104Rebuild\g104engine`；`%USERPROFILE%`代表你的Windows用户目录，在VS位置框中填写展开后的实际完整路径。可以换成自己的可写目录，后面的`src`、`samples`、`assets`、`third_party`都直接放在这个根目录下。
 
@@ -65,6 +69,8 @@ dotnet --list-sdks
 }
 ```
 
+`global.json`用于告诉VS和`dotnet`用哪一版.NET SDK构建工程。这里`version`固定为已验证的`10.0.401`，`rollForward=disable`禁止自动换用其他版本，`allowPrerelease=false`排除预览版；这样可避免更新VS或换电脑后无意改变构建工具。放在方案根目录，让Engine和Sandbox共用这份SDK选择规则。
+
 4. 在VS终端将当前目录切到实际的`g104engine`根目录，再执行：
 
 ```powershell
@@ -78,10 +84,10 @@ dotnet --info
 
 在磁盘的`g104engine`根目录下准备`src`和`samples`两个实际文件夹。VS中的“解决方案文件夹”只是逻辑分组，不能代替磁盘位置。
 
-| 在同一个方案中添加 | VS模板与名称 | “位置”填写父目录 | 创建后的文件必须位于 |
-| --- | --- | --- | --- |
-| Engine | 右键方案 → 添加 → 新建项目；选C# **类库 / Class Library**，名称`G104.Engine`，框架 **.NET 10.0** | `%USERPROFILE%\source\G104Rebuild\g104engine\src`的实际路径 | `src/G104.Engine/G104.Engine.csproj` |
-| Sandbox | 再右键同一个方案 → 添加 → 新建项目；选C# **控制台应用 / Console App**，名称`G104.Sandbox`，框架 **.NET 10.0** | `%USERPROFILE%\source\G104Rebuild\g104engine\samples`的实际路径 | `samples/G104.Sandbox/G104.Sandbox.csproj` |
+| 在同一个方案中添加 | VS模板与名称                                                                                                                  | “位置”填写父目录                                                | 创建后的文件必须位于                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------- |
+| Engine             | 右键方案 → 添加 → 新建项目；选C# **类库 / Class Library**，名称`G104.Engine`，框架 **.NET 10.0**              | `%USERPROFILE%\source\G104Rebuild\g104engine\src`的实际路径     | `src/G104.Engine/G104.Engine.csproj`       |
+| Sandbox            | 再右键同一个方案 → 添加 → 新建项目；选C# **控制台应用 / Console App**，名称`G104.Sandbox`，框架 **.NET 10.0** | `%USERPROFILE%\source\G104Rebuild\g104engine\samples`的实际路径 | `samples/G104.Sandbox/G104.Sandbox.csproj` |
 
 两个模板都选择现代.NET版本，名称中带 **“.NET Framework”** 的模板不适用。不要在“位置”中再填一遍`G104.Engine`或`G104.Sandbox`，VS会按项目名建立这一层目录。官方示例见 [.NET类库与项目引用](https://learn.microsoft.com/en-us/dotnet/core/tutorials/create-class-library?pivots=vs) 和 [C#控制台项目](https://learn.microsoft.com/en-us/visualstudio/get-started/csharp/tutorial-console?view=visualstudio)。
 
@@ -101,7 +107,7 @@ g104engine/
 
 ### 3. 设置SDK项目属性、项目引用和x64
 
-右键各项目 →“编辑项目文件”，两份文件的根元素应为`<Project Sdk="Microsoft.NET.Sdk">`。在各自现有的`PropertyGroup`中核对下面的同名属性；这是需要保留的配置片段，不是让你用它覆盖整个`.csproj`。后面加入的包和项目引用都要保留。
+右键各项目 →“编辑项目文件”，两份文件的根元素应为`<Project Sdk="Microsoft.NET.Sdk">`。在各自现有的`PropertyGroup`中核对下面的同名属性（这些属性都是可以在vs中可视化操作的）；这是需要保留的配置片段，不是让你用它覆盖整个`.csproj`。后面加入的包和项目引用都要保留。
 
 `G104.Engine.csproj`的属性：
 
@@ -151,7 +157,10 @@ Engine的`AllowUnsafeBlocks=true`允许当前引擎使用指针等unsafe接口�
 现在按 [dependencies.md](dependencies.md#blank-project-packages) 安装固定版本NuGet包并生成首次锁文件；锁模式的首次开启顺序由那一节统一说明。再按 [dependencies.md](dependencies.md#standalone-assets) 下载并整理第三方素材、OpenAL及许可，随后按 [dependencies.md](dependencies.md#project-authored-assets) 取得19个自有非C#运行文件及来源记录。两组文件都齐全后继续下面的复制配置，不能把Shader/JSON或循环测试音留到“只写C#”之后再补。
 
 <a id="resource-copy"></a>
+
 ## 素材与OpenAL准备好后：配置构建复制
+
+这段XML是本项目的MSBuild构建配置，**不是Unity自动生成的**。从空白C#工程搭建时，需要你**手动复制到下面指定的`.csproj`中**；普通C#项目模板不会生成这些项目专用规则。它的作用是在构建时，把已准备好的素材、OpenAL音频库和许可文件复制到程序输出目录的对应位置，供程序运行和随包分发使用。**规则手动配置一次，后续复制由构建工具自动执行**；它不会下载或生成这些文件。现有工程已包含同样规则，不必重复添加。
 
 下面配置加入 **`samples/G104.Sandbox/G104.Sandbox.csproj`**，放在`<Project>`与`</Project>`之间。所有`..\..\`都相对于该`.csproj`所在目录，正好回到`g104engine`根；不要按方案文件或终端的当前目录解释它。
 
@@ -182,20 +191,22 @@ Engine的`AllowUnsafeBlocks=true`允许当前引擎使用指针等unsafe接口�
 到这里按 [v1-run-and-review.md](v1-run-and-review.md#blank-project-checks) 检查工程、包、全部非C#文件和两配置的输出复制结果，再集中写入或手动复制C#代码。模板控制台通过只证明准备中的基础环节，不等于完整V1已经运行；全部文件必须另按清单核对。
 
 <a id="existing-project"></a>
+
 ## 打开现有工程
 
 在VS打开仓库中的`g104engine/g104engine.slnx`（当前机器示例为`E:\game_study\games104\g104engine\g104engine.slnx`），将G104.Sandbox设为启动项目，选Debug或Release/x64。新机可使用自己的目录和盘符，保持仓库相对结构。方案内已有Engine/Sandbox项目及Sandbox→Engine引用；无参数是完整训练场Edit窗口。不要重复新建解决方案、同名项目、NuGet引用，不用Hello World/旧蓝色探针覆盖现有Program。
 
-| 项目 | 含义及核对位置 |
-| --- | --- |
-| SDK与目标框架 | global.json选构建SDK；两个csproj是net10.0。Runtime不等于SDK，文件本身不安装工具 |
-| .slnx | 实际XML方案格式，由VS/dotnet sln支持；不只改后缀成.sln |
-| 平台 | 方案x64和两个项目Debug/Release平台映射、实际PlatformTarget需同时正确 |
-| 包与原生后端 | 双锁文件/还原产物与输出的x64 Jolt/cimgui/OpenAL各层分别核对 |
-| 应用资产 | 模型/Shader/动画JSON/WAV及许可按Sandbox复制到输出assets；无需运行时FFmpeg/Python |
-| 项目Git根 | games104而非g104engine；工程调试不自动创建、关联或发布仓库 |
+| 项目          | 含义及核对位置                                                                   |
+| ------------- | -------------------------------------------------------------------------------- |
+| SDK与目标框架 | global.json选构建SDK；两个csproj是net10.0。Runtime不等于SDK，文件本身不安装工具  |
+| .slnx         | 实际XML方案格式，由VS/dotnet sln支持；不只改后缀成.sln                           |
+| 平台          | 方案x64和两个项目Debug/Release平台映射、实际PlatformTarget需同时正确             |
+| 包与原生后端  | 双锁文件/还原产物与输出的x64 Jolt/cimgui/OpenAL各层分别核对                      |
+| 应用资产      | 模型/Shader/动画JSON/WAV及许可按Sandbox复制到输出assets；无需运行时FFmpeg/Python |
+| 项目Git根     | games104而非g104engine；工程调试不自动创建、关联或发布仓库                       |
 
 <a id="222-x64-平台设置"></a>
+
 ## x64平台设置与核对
 
 空白新工程在此创建x64平台；现有工程的映射已经建立，只在发现缺失时调整。不要按旧截图重复新建平台。
@@ -213,6 +224,7 @@ Engine的`AllowUnsafeBlocks=true`允许当前引擎使用指针等unsafe接口�
 Any CPU并不强制32位，x64也不使代码自动更快；该设置明确原生依赖目标。C#平台配置不要求C++工具链。区分方案标签、项目映射和MSBuild求值后的PlatformTarget；只看到一个下拉框不够，运行时ProcessArchitecture用于另行核对。
 
 <a id="debugging"></a>
+
 ## Debug与Release调试
 
 - 日常源码学习用Debug/x64、F5，在Program/TrainingWindow.OnUpdateFrame逐个断点观察。断点暂停会改变真实delta，恢复后的丢时/补步不能直接作为正常性能结果。
@@ -223,6 +235,7 @@ Any CPU并不强制32位，x64也不使代码自动更快；该设置明确原�
 2026-10-02用户反馈重新勾选仅我的代码、Debug断点通过，属于历史实际反馈，不代表本轮读过VS设置。依据：[Just My Code](https://learn.microsoft.com/en-us/visualstudio/debugger/just-my-code?view=visualstudio)、[优化与调试](https://learn.microsoft.com/en-us/visualstudio/debugger/jit-optimization-and-debugging?view=visualstudio)。
 
 <a id="missing-environment"></a>
+
 ## 将来确有环境缺失时
 
 新电脑的完整准备顺序从本页环境安装和空白工程步骤继续；这里用于已有环境的故障定位。环境安装和NuGet操作由用户在VS等安装界面完成；旧三OpenTK包流程不是今天完整包清单。先区分缺SDK、缺还原资产、缺x64原生DLL、错误启动项目和驱动上下文失败，再选择动作。没有问题证据时不升级驱动/工具或重新创建已有工程。
@@ -235,6 +248,7 @@ Any CPU并不强制32位，x64也不使代码自动更快；该设置明确原�
 
 <a id="223-本机-sac-拦截的处理说明仅供了解未执行关闭"></a>
 <a id="sac-diagnosis"></a>
+
 ## SAC拦截：历史取舍与诊断
 
 2026-10-02模板Release及后来Debug曾报0x800711C7，CodeIntegrity3033/3077、3099和状态值1定位为Smart App Control；用户自行在安全中心关闭后两配置恢复运行，助手当时只读核对VerifiedAndReputablePolicyState=0。用户明确选择本机开发阶段暂保持SAC关闭，这不是引擎依赖、其他设备必做或助手可自动更改的设置。
