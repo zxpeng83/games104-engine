@@ -51,7 +51,7 @@ dotnet --list-sdks
 
 ## 从空白文件夹创建方案和项目（可参考 操作流程 目录里的操作截图）
 
-下面只建立工程配置，不提供引擎实现。统一示例根目录为`%USERPROFILE%\source\G104Rebuild\g104engine`；`%USERPROFILE%`代表你的Windows用户目录，在VS位置框中填写展开后的实际完整路径。可以换成自己的可写目录，后面的`src`、`samples`、`assets`、`third_party`都直接放在这个根目录下。
+下面只建立工程配置，不提供引擎实现。统一示例根目录为`%USERPROFILE%\source\G104Rebuild\g104engine`（这个目录是示例来从0到1搭建另一个工程的，相当于当前工程的 `E:\game_studygames104\g104engine目录`）；`%USERPROFILE%`代表你的Windows用户目录，在VS位置框中填写展开后的实际完整路径。可以换成自己的可写目录，后面的`src`、`samples`、`assets`、`third_party`都直接放在这个根目录下。
 
 ### 1. 创建空白方案并选择准确SDK
 
