@@ -107,7 +107,7 @@ Undo只覆盖约定设计命令，不能从“有Undo栈”推断任意操作可
 
 准备节点cbce581在正式开工前由用户提交推送。完整V1按一次版本任务连续实施，内部增量编写/集成/验证、角色基础和功能闭环自查预览，不把每个检查变成审批或三个发布版本；预览不强制停工。来源在 [v1-start-checkpoint-2026-10-03.md](../reviews/v1-start-checkpoint-2026-10-03.md) 和 [v1-progress.md](../execution/v1-progress.md)。
 
-同范围恢复/修复授权持续有效，不因换聊天重问；新专题/重大范围、方案、成本或体验取舍先讨论。该授权不扩展为系统安装/PATH、SDK/NuGet升级或Git写操作/发布。现行政策由 [agent-workflow.md](../agent-workflow.md) 维护，D5独立克隆/CI/第二设备仍整体暂缓，不能由V1完成或专题计划恢复。
+同范围恢复/修复授权持续有效，不因换聊天重问；新专题/重大范围、方案、成本或体验取舍先讨论。该授权不扩展为系统安装/PATH、SDK/NuGet升级或Git写操作/发布。现行政策由 [agent-workflow.md](../agent-workflow.md) 维护；D5独立克隆/CI/第二设备的分项进度见 [status.md](../status.md#second-device-user-result)，V1完成或专题计划不自动启动尚未获准的事项。
 
 <a id="acceptance"></a>
 ## 6. 成果、验收与学习的口径

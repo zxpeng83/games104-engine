@@ -24,6 +24,8 @@
 
 **这条路线的“准备完成”要求全部非C#配套已落位，但不要求先有训练场、Play或`--verify`。** 这些入口属于以后实现的C#代码。空白阶段能验证工具链、包、文件和输出路径及模板调试；真实GL上下文、物理世界、动画和音频播放要等对应代码存在后再验证。
 
+七步完成后，选择复用现有实现时继续下面的[复制C#源码并运行](#copy-csharp-and-run)；选择自己编写时仍按模块逐步实现。
+
 ### 新电脑的目录由你创建
 
 建议在当前用户的`source/G104Rebuild/g104engine`建立独立学习目录；这是新工程示例，不要把它指向本机现有源码并覆盖。按环境页用VS创建，确认最后是以下相对结构：
@@ -65,10 +67,30 @@ G104Rebuild/
 
 后续只写了窗口，就验证窗口；接入物理或音频后再验证相应后端。手工复制完整V1时，代码、项目配置和资源相互匹配后，可使用 [v1-run-and-review.md](v1-run-and-review.md#first-machine-checks) 的完整验收。该页原`--verify`等参数不是.NET或OpenTK自带命令，只有复制或自行实现这些入口才可使用。
 
+<a id="copy-csharp-and-run"></a>
+### 前置完成后：复制现有C#实现并运行
+
+如果已经完成上面七步，且项目配置、依赖与全部非C#资源符合当前V1要求，接下来只需补齐C#源码。选择复用现有实现时，按以下步骤操作；不必再次复制整个工程或覆盖已经配置好的项目文件。
+
+1. 从原工程下列两个目录中复制全部`.cs`源码，包括所有子目录，并保持相对于各项目的目录层级。**排除`bin`和`obj`**，其中的自动生成`.cs`不属于要传送的源码。
+
+| 原工程中的源码目录 | 新工程中的对应目标目录 |
+|---|---|
+| `src/G104.Engine/` | `src/G104.Engine/` |
+| `samples/G104.Sandbox/` | `samples/G104.Sandbox/` |
+
+两边路径均相对于各自的`g104engine`根目录；不要把项目目录再嵌套一层。Sandbox的Gameplay、Tools等子目录也要完整复制，不能只复制Program.cs和窗口文件。
+
+2. 用复制的Sandbox `Program.cs`替换新工程的模板入口；同名模板类型也只保留一份。旧源码备份放到项目目录之外，不能仅改名为`Program_backup.cs`后留在项目中，否则仍可能参与编译。
+3. 保留新工程已经配好的`.csproj`、方案、`global.json`和经审查锁定的`packages.lock.json`，以及已准备的`assets`和`third_party`。本步骤只补齐源码；不复制旧机的`.vs`、`bin`、`obj`或缓存，也不需要重新下载/转码素材。
+4. 在VS打开新工程的方案，设置**G104.Sandbox为启动项目**，选择**Debug/x64**，重新生成并运行。进一步检查Release配置、Play/Stop、声音、保存重开及专项验证时，按 [v1-run-and-review.md](v1-run-and-review.md#first-machine-checks) 逐项操作并记录结果。
+
+2026-11-03用户反馈：已在另一台电脑完成从0到1的前置搭建，随后复制上述两个目录中的C#文件，执行成功。此次作为“第二设备基本运行成功”的用户反馈记录；具体证据范围及尚未逐项确认的检查见 [status.md](../status.md#second-device-user-result)。
+
 <a id="existing-repository-setup"></a>
 ## 可选路线：取得完整现有仓库继续开发
 
-只有选择直接取得已有工程时才使用下面的六步；主路线不依赖它。克隆会带来源码、工程配置、锁文件、正式素材和OpenAL DLL，但不会安装VS/SDK/驱动，也不包含NuGet缓存或构建输出。本节保留2026-10-22整理的现有仓库复现方法，独立安装与验证结果仍未在第二设备确认。
+只有选择直接取得已有工程时才使用下面的六步；主路线不依赖它。克隆会带来源码、工程配置、锁文件、正式素材和OpenAL DLL，但不会安装VS/SDK/驱动，也不包含NuGet缓存或构建输出。本节保留2026-10-22整理的现有仓库复现方法，这条克隆路线的安装与验证结果仍未在第二设备确认；用户已反馈成功的空白搭建加源码复制路线见上节。
 
 | 步骤 | 你要完成什么 | 完成后应得到什么 |
 |---|---|---|
@@ -131,14 +153,19 @@ games104/                              仓库根目录，名称可以自定
 
 ### 4. 在正确目录核对SDK，然后还原
 
-打开 **PowerShell**，进入你实际取得的`g104engine`目录。沿用上面的克隆位置时：
+打开 **PowerShell**，进入你实际取得的`g104engine`目录。沿用上面的克隆位置时，整段执行下面的脚本；若目录不存在或SDK检查失败，就停止，不在旧工作目录继续检查：
 
 ```powershell
-$engineRoot = Join-Path $env:USERPROFILE 'source\games104\g104engine'
-Set-Location -LiteralPath $engineRoot
-Get-Content -LiteralPath '.\global.json'
-dotnet --version
-dotnet --info
+& {
+    # 若仓库在其他位置，将引号内的完整内容替换为实际绝对路径。
+    $engineRoot = "$env:USERPROFILE\source\games104\g104engine"
+    Set-Location -LiteralPath $engineRoot -ErrorAction Stop
+    Get-Content -LiteralPath '.\global.json' -ErrorAction Stop
+    dotnet --version
+    if ($LASTEXITCODE -ne 0) { throw 'SDK版本检查失败，先核对global.json与已安装SDK。' }
+    dotnet --info
+    if ($LASTEXITCODE -ne 0) { throw 'SDK信息检查失败，先查看错误。' }
+}
 ```
 
 `dotnet --version`应与`global.json`中的准确版本一致；`--info`应能定位这个文件，并显示x64 SDK信息。准确版本缺失或选错dotnet时，先按 [environment.md](environment.md#new-machine-environment) 修正，不通过删除global.json、修改net10.0或放宽rollForward绕过。

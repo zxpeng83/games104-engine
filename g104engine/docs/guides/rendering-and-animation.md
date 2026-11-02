@@ -182,4 +182,4 @@ FXAA开关与镜像对照的专项视觉截图仍未收集；相关实现/修复
 
 </details>
 
-glTF格式/蒙皮/插值依据 [Khronos glTF2.0规范](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html)。课程渲染/动画章节见 [learning-map.md](../learning-map.md)；Piccolo固定参考仍为 `f5053707fed4d3f94d270a436fb0d3a8ae54e3e5`，本实现没有照搬其render graph/资源布局。IBL、IK、重定向、根运动、GPU粒子等后续专题尚未实施，D5独立克隆/CI/第二设备仍整体暂缓。
+glTF格式/蒙皮/插值依据 [Khronos glTF2.0规范](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html)。课程渲染/动画章节见 [learning-map.md](../learning-map.md)；Piccolo固定参考仍为 `f5053707fed4d3f94d270a436fb0d3a8ae54e3e5`，本实现没有照搬其render graph/资源布局。IBL、IK、重定向、根运动、GPU粒子等后续专题尚未实施，D5独立克隆/CI/第二设备的分项进度见 [status.md](../status.md#second-device-user-result)。

@@ -233,7 +233,7 @@
 | 实际证据 | 命令、平台、样例、日志/截图；CPU/原生/GL/听感/用户自测分开 |
 | 接续 | 真实缺口、下一步和长期目标，不写计划等于已完成 |
 
-调用关系变化时更新 [architecture.md](architecture.md) 和具体指南；当前执行/接续事实归 [v1-progress.md](execution/v1-progress.md) 与 [status.md](status.md)。新对话按任务读取实际模块和相关笔记，不默认通读十份笔记。D5独立克隆、CI、第二设备仍暂缓，本机PASS不代替它们。
+调用关系变化时更新 [architecture.md](architecture.md) 和具体指南；当前执行/接续事实归 [v1-progress.md](execution/v1-progress.md) 与 [status.md](status.md)。新对话按任务读取实际模块和相关笔记，不默认通读十份笔记。D5独立克隆、CI、第二设备的分项进度见 [status.md](status.md#second-device-user-result)，本机PASS不代替它们。
 
 [render]: ../../资料/笔记博客汇总/第04-07节_渲染部分总结/AI梳理2/GAMES104_第4-7节_渲染部分知识体系总结.md
 [animation]: ../../资料/笔记博客汇总/第08-09节_动画部分总结/GAMES104第08-09节_游戏动画系统完整梳理.md

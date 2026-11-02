@@ -6,7 +6,7 @@
 
 ## 新电脑：准备系统、工具和驱动
 
-这条路线面向当前V1的Windows x64开发环境。先在Windows“设置 → 系统 → 系统信息”确认64位操作系统和基于x64的处理器；新机采用仍在微软支持期内的Windows 11 x64。下面使用的VS2026支持Windows 11，其他系统是否符合要求查 [VS2026系统要求](https://learn.microsoft.com/en-us/visualstudio/releases/2026/vs-system-requirements)。本项目尚未完成第二设备验证，ARM64、Linux、macOS不在当前复现路线内。
+这条路线面向当前V1的Windows x64开发环境。先在Windows“设置 → 系统 → 系统信息”确认64位操作系统和基于x64的处理器；新机采用仍在微软支持期内的Windows 11 x64。下面使用的VS2026支持Windows 11，其他系统是否符合要求查 [VS2026系统要求](https://learn.microsoft.com/en-us/visualstudio/releases/2026/vs-system-requirements)。第二设备已有用户基本运行成功反馈，具体范围见 [status.md](../status.md#second-device-user-result)；ARM64、Linux、macOS不在当前复现路线内。
 
 ### 1. 确认显卡、声音和下载条件
 
@@ -21,7 +21,7 @@
 ### 2. 安装Visual Studio（可参考 操作流程 目录里的操作截图）
 
 1. 从 [Visual Studio官方下载页](https://visualstudio.microsoft.com/downloads/) 选择 **Visual Studio 2026 Community → Free download**，使用Stable稳定通道；个人学习可用Community，其他用途按其许可选版本。当前项目确定的目标框架是`net10.0`，微软 [.NET SDK与VS兼容表](https://learn.microsoft.com/en-us/dotnet/core/porting/versioning-sdk-msbuild-vs) 列明.NET10/10.0.4xx的支持关系；对此建议vs2026，vs2022不建议搭配net10.0。VS2022的旧安装选择仅保留为历史，不作为这条新机路线。
-2. 运行Visual Studio Installer，在“工作负载”勾选 **“.NET桌面开发”**。保留它的必需组件；在右侧安装详细信息中确认 **“.NET SDK”**，并保留 **“NuGet包管理器”**。已有VS2026时，在Installer对应实例选择“修改”进入同一界面。图形化步骤见 [VS官方安装](https://learn.microsoft.com/en-us/visualstudio/install/install-visual-studio?view=visualstudio)，组件对应见 [组件清单](https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-community?view=visualstudio)。
+2. 运行Visual Studio Installer，在“工作负载”勾选 **“.NET桌面开发”**。保留它的必需组件；在右侧安装详细信息中确认 **“.NET SDK”**，并保留 **“NuGet包管理器”（这两个都没在右侧安装详细信息中找到，到“单个组件”栏选择）**。已有VS2026时，在Installer对应实例选择“修改”进入同一界面。图形化步骤见 [VS官方安装](https://learn.microsoft.com/en-us/visualstudio/install/install-visual-studio?view=visualstudio)，组件对应见 [组件清单](https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-community?view=visualstudio)。
 3. 完成安装后启动VS，在“帮助 → 关于Microsoft Visual Studio”确认版本，随后按本页“从空白文件夹创建方案和项目”操作。当前依赖采用预编译原生库，普通C#开发不需要额外勾选“使用C++的桌面开发”、Unity、CMake或游戏引擎工作负载。
 
 Git是可选的源码版本管理工具，不是创建或运行这套C#工程的前提。需要时从 [Git for Windows官方下载页](https://git-scm.com/install/windows) 选择 **Git for Windows/x64 Setup**；下载页版本会更新，Git版本不由引擎锁文件固定。选择直接使用完整仓库时，另走 [reproduction.md](reproduction.md#existing-repository-setup) 的可选路线。
@@ -51,7 +51,7 @@ dotnet --list-sdks
 
 ## 从空白文件夹创建方案和项目（可参考 操作流程 目录里的操作截图）
 
-下面只建立工程配置，不提供引擎实现。统一示例根目录为`%USERPROFILE%\source\G104Rebuild\g104engine`（这个目录是示例来从0到1搭建另一个工程的，相当于当前工程的 `E:\game_studygames104\g104engine目录`）；`%USERPROFILE%`代表你的Windows用户目录，在VS位置框中填写展开后的实际完整路径。可以换成自己的可写目录，后面的`src`、`samples`、`assets`、`third_party`都直接放在这个根目录下。
+下面只建立工程配置，不提供引擎实现。统一示例根目录为`%USERPROFILE%\source\G104Rebuild\g104engine`（这是从0到1搭建另一个工程的示例位置，对应当前工程的`E:\game_study\games104\g104engine`目录）；`%USERPROFILE%`代表你的Windows用户目录，在VS位置框中填写展开后的实际完整路径。可以换成自己的可写目录，后面的`src`、`samples`、`assets`、`third_party`都直接放在这个根目录下。
 
 ### 1. 创建空白方案并选择准确SDK
 
@@ -150,7 +150,7 @@ Engine的`AllowUnsafeBlocks=true`允许当前引擎使用指针等unsafe接口�
 ```
 
 2. 右键 **G104.Sandbox → 设为启动项目**。Engine是类库，不作为可执行启动项目。
-3. 打开“生成 → 配置管理器”，按本页“x64平台设置与核对”创建/选择方案x64，确认两个项目在Debug和Release中都映射为x64，并勾选“生成”。上面条件组会将这两个x64配置的实际CPU目标固定为x64。
+3. 打开“生成 → 配置管理器”，按本页“x64平台设置与核对”创建/选择方案x64，确认两个项目在Debug和Release中都映射为x64，并勾选“生成”。上面条件组会将这两个x64配置的实际CPU目标固定为x64。（可参考 操作流程 目录里的操作截图）
 
 项目引用依据见 [项目引用管理](https://learn.microsoft.com/en-us/visualstudio/ide/managing-references-in-a-project?view=visualstudio#project-to-project-references)。SDK/框架、ImplicitUsings和Nullable是项目配置，NuGet库不会自动替你创建这两个项目或这些属性。
 

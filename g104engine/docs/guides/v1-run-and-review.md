@@ -22,7 +22,8 @@
 
 ```powershell
 & {
-    $engineRoot = Join-Path $env:USERPROFILE 'source\G104Rebuild\g104engine'
+    # 若工程在其他位置，将引号内的完整内容替换为实际绝对路径。
+    $engineRoot = "$env:USERPROFILE\source\G104Rebuild\g104engine"
     Set-Location -LiteralPath $engineRoot -ErrorAction Stop
     dotnet --version
     if ($LASTEXITCODE -ne 0) { throw '准确SDK不可用，先完成环境检查。' }
@@ -51,7 +52,8 @@
 
 ```powershell
 & {
-    $engineRoot = Join-Path $env:USERPROFILE 'source\G104Rebuild\g104engine'
+    # 若工程在其他位置，将引号内的完整内容替换为实际绝对路径。
+    $engineRoot = "$env:USERPROFILE\source\G104Rebuild\g104engine"
     Set-Location -LiteralPath $engineRoot -ErrorAction Stop
     $authoredFiles = @(
         'shaders/mesh.vert', 'shaders/fullscreen.vert', 'shaders/particle.vert',
@@ -133,6 +135,8 @@
 
 你可以自己编写各模块，也可以手动复制已有实现。复制完整Sandbox入口前，处理模板Program，避免重复顶层入口/类型；代码用到的引擎类和命名空间要完整到位。上面已准备当前V1需要的全部非C#配套；只有主动改变文件名、配置合同或Shader接口时，才需要相应适配资源。某个类尚未完成引起的编译错误属于C#实现阶段，不需要因此升级全部包。
 
+七步前置已经完成、现在希望直接复用完整C#实现时，按 [reproduction.md](reproduction.md#copy-csharp-and-run) 的源码复制步骤操作：仅补齐两个项目的`.cs`源码，保留已配好的工程配置和资源，再进入下方构建与运行检查。
+
 - 只完成窗口时，验证窗口/输入和实际OpenGL版本；接入ImGui后再看面板。
 - 接入物理、模型/动画、音频后，分别验证其初始化、文件读取与释放。
 - 已复原或手动复制当前完整V1时，再使用下方完整工程的构建、Play、声音、保存及专项检查；若你自写了不同入口，应使用你自己的测试办法。
@@ -165,7 +169,8 @@ Release把路径中的`Debug`改为`Release`。不要只复制Sandbox单个DLL�
 
 ```powershell
 & {
-    $engineRoot = Join-Path $env:USERPROFILE 'source\G104Rebuild\g104engine'
+    # 若工程在其他位置，将引号内的完整内容替换为实际绝对路径。
+    $engineRoot = "$env:USERPROFILE\source\G104Rebuild\g104engine"
     Set-Location -LiteralPath $engineRoot -ErrorAction Stop
     dotnet build samples/G104.Sandbox/G104.Sandbox.csproj --no-restore --disable-build-servers -m:1 -c Debug -p:Platform=x64
     if ($LASTEXITCODE -ne 0) { throw 'Debug构建失败，先检查输出。' }
@@ -215,11 +220,14 @@ VS无参数启动使用`%LOCALAPPDATA%/G104Engine/TrainingGroundV1`中的日常�
 
 已有输出可直接运行DLL；需要构建时只使用已有还原依赖。新电脑先完成本页[首次构建](#first-build)；没有对应SDK/还原产物时按环境及依赖页处理，不在验证命令中混入自动restore、升级包或重建工程。构建更新bin/obj，运行的当前目录和应用assets目录不是同一概念。下面的E盘路径是原电脑例子，换机须使用实际路径。
 
-在PowerShell中：
+在PowerShell中整段执行；先把目录改为实际工程位置，切换目录失败时停止，不继续运行旧工作目录下的程序：
 
 ```powershell
-Set-Location -LiteralPath 'E:\game_study\games104\g104engine'
-dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll
+& {
+    Set-Location -LiteralPath 'E:\game_study\games104\g104engine' -ErrorAction Stop
+    dotnet samples/G104.Sandbox/bin/x64/Debug/net10.0/G104.Sandbox.dll
+    if ($LASTEXITCODE -ne 0) { throw '启动失败，先查看路径、构建输出和程序错误。' }
+}
 ```
 
 无参数为可见Edit训练场；Play/F5开始运行，Stop返回当前内存设计。普通无参数运行会读取真实用户保存设计，下方所有自动验证使用隔离根。可选在VS打开现有方案，选择G104.Sandbox与Debug/x64，用F5调试或Ctrl+F5普通运行。

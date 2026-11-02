@@ -66,6 +66,6 @@
 
 助手主要编码，用户学习、运行/调试、验收与讨论；具体权限、模型分工和持久化要求在 [agent-workflow.md](agent-workflow.md) 单点维护。完整V1曾取得正式范围授权，同范围恢复/修复不因换聊天重问；未来路线与新增专题不继承该授权。重大范围/架构/依赖/成本/体验变化先说明理由及影响。
 
-D5的本机新目录克隆、CI、第二设备测试整体暂缓，未来专题规划和V1完成均不自动恢复它们。Git同步、文档保存与应用发布分别处理；发布白名单及个人资料边界见 [git-and-publishing.md](guides/git-and-publishing.md)。私有截图、原笔记和独立参考仓库不因为长期路线调整而纳入改造。
+D5的本机新目录克隆、CI、第二设备测试分别按 [status.md](status.md#second-device-user-result) 维护进度，未来专题规划和V1完成不自动启动尚未获准的事项。Git同步、文档保存与应用发布分别处理；发布白名单及个人资料边界见 [git-and-publishing.md](guides/git-and-publishing.md)。私有截图、原笔记和独立参考仓库不因为长期路线调整而纳入改造。
 
 可选深入：[architecture.md](architecture.md)、[learning-map.md](learning-map.md)、[dependencies.md](guides/dependencies.md)、[v1-baseline.md](plans/v1-baseline.md)、[design-reference-checks-2026-10-03.md](reviews/design-reference-checks-2026-10-03.md)。这些链接补充主题依据，不要求读者重新回入口完成同一任务。

@@ -515,15 +515,22 @@ Kenney来源：[Impact Sounds](https://kenney.nl/assets/impact-sounds)、[Interf
 
 2026-10-22已联网核对上述作者/发行入口：OpenAL官网列出1.25.2二进制与源码；Quaternius页面列出Standard及CC0、RM/非RM的区分；Kenney页面分别列出130/100个声音及CC0；Gyan发行页和版本文本为9.0.2，SHA文本与表一致。该批未下载软件/素材ZIP，也没有证明作者当前提供的四个输入ZIP仍与历史输入逐字节相同；2026-10-23补空白工程步骤时沿用这项有日期的来源核对。若同名文件哈希改变或固定文件不可获取，保留下载记录并停止采用；也可从原电脑手动带来已核输入或正式资源，不需要clone。不能为完成搭建而自行把预期哈希改成新下载值。
 
-在新电脑PowerShell中先确认目录，再逐个查看下载文件的SHA；把最后一行示例文件名替换为表中各项，比较完整64位值。`-LiteralPath`避免把Standard文件名的方括号当通配符。这些命令只读取新电脑已下载的文件：
+在新电脑PowerShell中先确认目录，再逐个查看下载文件的SHA；将`$engineRoot`设为你实际新建的g104engine目录，把Get-FileHash中的示例文件名替换为表中各项，比较完整64位值。`-LiteralPath`避免把Standard文件名的方括号当通配符。整段执行，目录或文件不存在时立即停止；这些命令只读取新电脑已下载的文件：
 
 ```powershell
-$engineRoot = Join-Path $env:USERPROFILE 'source\G104Rebuild\g104engine'
-Set-Location -LiteralPath $engineRoot
-Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[Standard].zip' -Algorithm SHA256
+& {
+    # 若工程在其他位置，将引号内的完整内容替换为实际绝对路径。
+    $engineRoot = "$env:USERPROFILE\source\G104Rebuild\g104engine"
+    Set-Location -LiteralPath $engineRoot -ErrorAction Stop
+    Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[Standard].zip' -Algorithm SHA256 -ErrorAction Stop
+}
 ```
 
-校验通过后，使用资源管理器将四个输入ZIP分别解压到`.cache/v1-preparation/extracted/`下各自独立目录，保留ZIP以便重新核对。FFmpeg ZIP直接解压到`.cache/v1-preparation`，保留其中的配套文件；默认顶层目录应为ffmpeg-9.0.2-essentials_build，下面的命令据此引用bin/ffmpeg.exe。若实际顶层名称不同，应确认确为表中固定包后修改命令内工具路径，无需系统安装或改PATH。
+校验通过后，先在`.cache/v1-preparation`下创建`extracted`目录，再使用资源管理器将四个输入ZIP分别解压到其中各自独立的子目录，保留ZIP以便重新核对。`extracted`仅用于手动查找和挑选文件；当前工程通过`tools/prepare_assets.py`直接读取ZIP，所以没有该目录。正式文件仍按后续步骤放入`assets`或`third_party`。
+
+**FFmpeg的最终目录统一使用`ffmpeg-9.0.2`，与当前工程一致。** 将FFmpeg ZIP解压到`.cache/v1-preparation`；原包自带的顶层目录名是`ffmpeg-9.0.2-essentials_build`，解压后将这一层文件夹改名为`ffmpeg-9.0.2`，保留内部全部配套文件，ZIP文件名不变。完成后应能在资源管理器找到`.cache/v1-preparation/ffmpeg-9.0.2/bin/ffmpeg.exe`，不要多套一层同名目录。当前工程已使用这个短目录名，无需再改。
+
+第7.3节手动转码和第8节可选脚本中的`$ffmpegExe`都按上述短目录定位并调用程序；如果自行改用其他目录名，执行相应命令前也必须修改其中的路径，否则会找不到程序。这是资源准备命令使用的路径，无需系统安装或改PATH；引擎运行时读取生成的WAV，不调用FFmpeg。
 
 <a id="external-resource-placement"></a>
 
@@ -543,7 +550,7 @@ Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[S
 
 ### 7.3 手动提取七段Ogg并离线转码
 
-使用解压放在v1-preparation的ffmpeg工具将7段ogg转码成wav格式供后续给工程运行时使用。
+使用第7.1节准备好的`.cache/v1-preparation/ffmpeg-9.0.2/bin/ffmpeg.exe`将七段Ogg转成WAV，供后续引擎运行时使用。
 
 在`.cache/v1-preparation/selected-audio`创建一个只放所选输入的目录。分别在两包的解压目录中按下列**完整文件名**搜索，确认来自正确声音包，然后将七个原始Ogg复制到selected-audio；不要先重命名输入。普通资源管理器搜索即可完成，不依赖prepare_assets.py。
 
@@ -557,14 +564,17 @@ Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[S
 | Interface Sounds：confirmation_001.ogg   | complete.wav     |
 | Interface Sounds：switch_001.ogg         | switch.wav       |
 
-以下整段仅在你**新建项目**上执行。它先检查工具、七项输入与输出是否存在，再只创建缺少的输出目录；七个目标WAV须尚不存在。`&`调用已解析的FFmpeg绝对路径；`-n`遇到已有输出会退出，防止覆盖资源。这段命令没有在本轮文档维护中执行：
+以下整段仅在你**新建项目**上执行；先将`$engineRoot`设为该项目的实际根目录，不要直接指向已有正式WAV的原工程。它先检查工具、七项输入与输出是否存在，再只创建缺少的输出目录；七个目标WAV须尚不存在。`$ffmpegExe`保存工具的完整路径，`& $ffmpegExe`据此启动转码；`-n`遇到已有输出会退出，防止覆盖资源。这段命令没有在本轮文档维护中执行：
+
+**填写工程路径：** 如果新工程位于`D:\game_study\G104Rebuild\g104engine`，将脚本中定义`$engineRoot`的整行改为`$engineRoot = 'D:\game_study\G104Rebuild\g104engine'`。完整绝对路径直接赋值，不要再用`Join-Path $env:USERPROFILE`拼接，否则会变成`C:\Users\用户名\D:\...`这样的错误路径。后面的`Join-Path $engineRoot '.cache\v1-preparation'`等是在根目录下拼接相对子目录，保留原样。
 
 ```powershell
 & {
-    $engineRoot = Join-Path $env:USERPROFILE 'source\G104Rebuild\g104engine'
+    # 若工程在其他位置，将引号内的完整内容替换为实际绝对路径。
+    $engineRoot = "$env:USERPROFILE\source\G104Rebuild\g104engine"
     Set-Location -LiteralPath $engineRoot -ErrorAction Stop
     $cacheRoot = Join-Path $engineRoot '.cache\v1-preparation'
-    $ffmpegExe = (Resolve-Path -LiteralPath (Join-Path $cacheRoot 'ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe') -ErrorAction Stop).Path
+    $ffmpegExe = (Resolve-Path -LiteralPath (Join-Path $cacheRoot 'ffmpeg-9.0.2\bin\ffmpeg.exe') -ErrorAction Stop).Path
     $audioInputRoot = Join-Path $cacheRoot 'selected-audio'
     $audioOutputRoot = Join-Path $engineRoot 'assets\audio'
     $audioJobs = @(
@@ -635,7 +645,7 @@ Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[S
 默认按以下步骤逐文件取得，不复制C#代码、bin/obj或整个工作区：
 
 1. 在原电脑找到参考工程的g104engine，按上表选取19个实际源资源文件。文本文件要取完整原文，保留.vert/.frag/.glsl/.json扩展名，避免另存成.txt；不要从预览截图或说明段落重拼文件。四个二进制文件直接用文件传输，不能复制其预览或把网页HTML当文件保存。
-2. 通过U盘或普通文件传输将所选文件带到新电脑，保留相对于g104engine的目录层级。目标根为前文的`$engineRoot`，即用户目录下source/G104Rebuild/g104engine；在其中建立assets/shaders、assets/scenes、assets/config、assets/models、assets/tests、assets/audio，再按上表精确路径放置。不要把19个文件全平铺到assets根目录。
+2. 通过U盘或普通文件传输将所选文件带到新电脑，保留相对于g104engine的目录层级。目标根为你实际新建的g104engine目录，各命令中的`$engineRoot`均应填写该位置；本文示例为用户目录下source/G104Rebuild/g104engine。在其中建立assets/shaders、assets/scenes、assets/config、assets/models、assets/tests、assets/audio，再按上表精确路径放置。不要把19个文件全平铺到assets根目录。
 3. 保持Shader include关系和GLB的贴图相对路径：lighting.glsl、material.glsl位于assets/shaders，与引用它们的Shader同目录；material-probe.glb位于assets/models，它的`../tests/checker.png`及`../tests/normal.png`引用必须能找到两张PNG。两个JSON也必须是完整文件，不能只保留当前界面显示的一部分字段。
 4. 如需从项目网页取单个文件，先确认网页对应的是要复原的参考版本，再使用该文件的Raw/原始文件或单文件下载功能；文本保存完整原始内容，二进制必须下载真实文件。这里不承诺某个未核对的远程单文件URL始终可用；无法确认版本或下载内容时，从原电脑传送上述真实文件。无需clone，也不以下载整个仓库为前提。
 5. 在原电脑和新电脑逐项核对这19个文件的相对路径、大小及SHA；默认原样复制应与来源文件一致。再按 [environment.md](environment.md#resource-copy)完成复制配置，并进入 [v1-run-and-review.md](v1-run-and-review.md#blank-project-checks)的只读文件/数据检查。若发现缺文件或引用断开，仍属于前置未完成，先补齐再转入只写C#阶段。
@@ -660,15 +670,16 @@ Get-FileHash -LiteralPath '.\.cache\v1-preparation\Universal Animation Library[S
 
 **脚本会覆盖多项正式资源和asset-manifest.json，且失败时不会自动回滚；必须先制作完整可写副本并保留原文件，再在副本中执行。** 它会依次提取OpenAL DLL/许可和角色GLB/许可，生成两张PNG、材质探针GLB与循环测试WAV，再转换七段声音、更新声音许可并重写manifest；不是只做音频转换。已有character-animation.json只被读取并记入manifest，不会重新生成；场景、Shader、SOURCE.md与OpenAL源码归档也不由脚本生成。
 
-1. 先制作完整可写副本，并在副本内确认tools/prepare_assets.py确实是刚才手动取得的完整文件。放好并逐项校验四个原始输入ZIP及FFmpeg ZIP，另解压FFmpeg，保留配套文件；下面沿用ffmpeg-9.0.2-essentials_build顶层目录，不安装系统工具或改PATH。
+1. 先制作完整可写副本，并在副本内确认tools/prepare_assets.py确实是刚才手动取得的完整文件。放好并逐项校验四个原始输入ZIP及FFmpeg ZIP；按第7.1节保留FFmpeg全部配套文件，并将工具放在副本的`.cache/v1-preparation/ffmpeg-9.0.2/bin/ffmpeg.exe`。当前工程的工具已经使用这个短目录名，复制到副本后不再改名；从ZIP重新解压时按第7.1节改名。不安装系统工具或改PATH。
 2. 打开PowerShell，以下根目录示例指向单独的**副本**，须改为自己的实际副本位置；工作目录必须是该副本的g104engine。先核对路径，再执行：
 
 ```powershell
 & {
-    $engineRoot = Join-Path $env:USERPROFILE 'source\G104Rebuild-assets-copy\g104engine'
+    # 填写独立副本的完整绝对路径，不要填原工程路径。
+    $engineRoot = "$env:USERPROFILE\source\G104Rebuild-assets-copy\g104engine"
     Set-Location -LiteralPath $engineRoot -ErrorAction Stop
     $prepareScript = (Get-Item -LiteralPath '.\tools\prepare_assets.py' -ErrorAction Stop).FullName
-    $ffmpegExe = (Get-Item -LiteralPath '.\.cache\v1-preparation\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe' -ErrorAction Stop).FullName
+    $ffmpegExe = (Get-Item -LiteralPath '.\.cache\v1-preparation\ffmpeg-9.0.2\bin\ffmpeg.exe' -ErrorAction Stop).FullName
     $pythonLauncher = (Get-Command py -CommandType Application -ErrorAction Stop).Source
     & $pythonLauncher -3 --version
     if ($LASTEXITCODE -ne 0) { throw 'Python 3不可用，停止准备。' }

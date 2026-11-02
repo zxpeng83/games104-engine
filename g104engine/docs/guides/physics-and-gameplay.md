@@ -103,7 +103,7 @@ Events每Tick清空，随后只发布当步发生的事实。声音键为`footst
 
 第三轮最终源码由主任务重新进行有效Debug/Release构建，均0警告0错误；两配置`--review-baseline`七项全部PASS，最新日志为`.cache/execution/review-playability-final-debug.log`、`review-playability-final-release.log`。两配置完整`--verify`全部PASS，日志为`review-verify-debug.log`、`review-verify-release.log`，覆盖Core、导航、物理、玩法、动画、默认场景集成及音频文件解析；两配置又各完成240帧集成exercise，GL错误为none、2jump/110moving，日志为`review-graphics-final-debug.log`、`review-graphics-final-release.log`。这些是容量修复后的新构建结果，前一轮六项PASS没有代替本轮验证。
 
-该评审批保持单平面网格A*、有限坡台/Jolt分工、原NPC FSM/感知边界，没有加入NavMesh、多层路径、新AI算法或可调Skin。其证据限本机已有依赖；后来人工首轮体验已初步通过，跨设备D5仍暂缓，学习自测尚未完成。
+该评审批保持单平面网格A*、有限坡台/Jolt分工、原NPC FSM/感知边界，没有加入NavMesh、多层路径、新AI算法或可调Skin。其证据限本机已有依赖；后来人工首轮体验已初步通过，D5分项进度及后续第二设备反馈见 [status.md](../status.md#second-device-user-result)，学习自测尚未完成。
 
 以下新增public入口均挂入原`--verify`，也可单独调用，避免一个失败遮住后续检查：
 
