@@ -5,16 +5,20 @@ using OpenTK.Mathematics;
 namespace G104.Sandbox.Gameplay;
 
 // 从正式种子复制独立内存场景；不写用户设计、不创建图形或音频上下文。
+/// <summary>复制正式种子检查转向、显示球穿越及原坡台接触，保留失败时的最后合法状态。</summary>
 public static class ContactApproachVerification
 {
+    /// <summary>真实模拟和转向循环使用的固定步长，单位秒。</summary>
     private const float Dt = 1f / 60;
 
+    /// <summary>读取种子后执行独立内存样例，汇总失败并核对种子未变及原生世界释放。</summary>
     public static void Run(string assetRoot)
     {
         var seed = SceneSerializer.Load(Path.Combine(assetRoot, "scenes", "training-ground.json"), assetRoot);
         var seedJson = SceneSerializer.Serialize(seed);
         var failures = new List<string>();
         int cases = 0;
+        // 单例失败后记录异常继续后续样例，并核对该例没有泄漏原生世界。
         void Check(string name, Action<Context> action)
         {
             cases++;
@@ -38,6 +42,7 @@ public static class ContactApproachVerification
         foreach (var heading in new[] { "north", "south", "east", "diagonal", "turns" })
             Check($"TRS {kind} {heading} 600 steps", context => VerifyTransformLoop(seed, context, kind, heading));
 
+        // 六个正式PBR球只用于渲染，穿越回归不得人为添加球碰撞。
         var spheres = seed.Objects.Where(item => item.Name.StartsWith("PBR sample ", StringComparison.Ordinal)).ToArray();
         Require(spheres.Length == 6 && spheres.All(item => item.Collider is null),
             "This regression uses the six original render-only PBR spheres; it must not invent sphere colliders.");
@@ -121,6 +126,7 @@ public static class ContactApproachVerification
         if (failures.Count != 0) throw new InvalidOperationException("Contact approach cases failed: " + string.Join("; ", failures));
     }
 
+    /// <summary>隔离角色场景图连续改位置和旋转，不创建Jolt，用于捕获近半周转向分解回归。</summary>
     private static void VerifyTransformLoop(SceneDocument seed, Context context, ObjectKind kind, string heading)
     {
         var document = SceneSerializer.Clone(seed);
@@ -143,6 +149,7 @@ public static class ContactApproachVerification
         Require(actor.Transform.Scale == Float3.One, "Position and rotation updates must preserve the actor's exact authored unit scale.");
     }
 
+    /// <summary>保留完整种子碰撞与NPC，逐步执行真实Simulation并统计位移、支撑和阻挡。</summary>
     private static Metrics Exercise(SceneDocument seed, Context context, string targetName, Vector3 start,
         Func<int, GameInput> inputAtFrame, int frames)
     {
@@ -173,6 +180,7 @@ public static class ContactApproachVerification
             metrics.GroundedFrames += state.Grounded ? 1 : 0;
             metrics.BlockedFrames += state.Blocked ? 1 : 0;
             metrics.MinimumTargetDistance = MathF.Min(metrics.MinimumTargetDistance, (state.Position - targetPosition).Xz.Length);
+            // 以真实查询区分目标接触与目标支撑，避免把靠近显示几何当作碰撞。
             var support = simulation.World.SweepCapsule(state.Position, radius, height, -Vector3.UnitY * 0.2f);
             if (support is { } hit && hit.ObjectId == target.Id)
             {
@@ -194,6 +202,7 @@ public static class ContactApproachVerification
         return metrics;
     }
 
+    /// <summary>由旋转Box顶面平面计算指定世界X/Z的坡面高度，单位米。</summary>
     private static float RampTop(SceneObjectData ramp, float x, float z)
     {
         var matrix = TransformMath.Compose(ramp.Transform);
@@ -203,9 +212,12 @@ public static class ContactApproachVerification
         return top.Y - (normal.X * (x - top.X) + normal.Z * (z - top.Z)) / normal.Y;
     }
 
+    /// <summary>将世界水平运动方向换为yaw为零时的相机输入，不产生跳跃或交互边沿。</summary>
     private static GameInput Input(Vector3 direction, bool sprint) => new(new Vector2(direction.X, -direction.Z), sprint, false, false, 0);
+    /// <summary>按种子走跑速度及固定步估算覆盖指定米距离需要的向上取整帧数。</summary>
     private static int Frames(SceneDocument seed, bool sprint, float distance) => (int)MathF.Ceiling(distance /
         (seed.Objects.Single(item => item.Kind == ObjectKind.Player).Parameters[sprint ? "runSpeed" : "walkSpeed"] * Dt));
+    /// <summary>按样例方向或每30步切换的方向序列生成单位水平意图。</summary>
     private static Vector3 Direction(string heading, int frame) => heading switch
     {
         "north" => -Vector3.UnitZ,
@@ -215,31 +227,49 @@ public static class ContactApproachVerification
         "diagonal" => new Vector3(1, 0, 1).Normalized(),
         _ => ((frame / 30) % 4) switch { 0 => Vector3.UnitZ, 1 => Vector3.UnitX, 2 => -Vector3.UnitZ, _ => -Vector3.UnitX }
     };
+    /// <summary>抛出带具体接触条件的断言异常，由样例包装器汇总。</summary>
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);
     }
 
+    /// <summary>累计一个真实运动样例的行为指标，避免仅凭最终截图判断接触。</summary>
     private sealed class Metrics
     {
+        /// <summary>样例最后一步控制器脚底位置。</summary>
         public Vector3 End;
+        /// <summary>各步实际XZ位移长度之和，单位米。</summary>
         public float PathLength;
+        /// <summary>运动期间脚底与目标中心的最小XZ距离，单位米。</summary>
         public float MinimumTargetDistance = float.MaxValue;
+        /// <summary>角色获得可走支撑的逻辑步数量。</summary>
         public int GroundedFrames;
+        /// <summary>控制器报告水平运动受阻的逻辑步数量。</summary>
         public int BlockedFrames;
+        /// <summary>目标提供可走上表面支撑的逻辑步数量。</summary>
         public int TargetSupportFrames;
+        /// <summary>样例期间是否通过下扫或前扫检测到目标碰撞。</summary>
         public bool TargetContact;
     }
 
+    /// <summary>保存单样例的诊断上下文，避免异常掩盖发生时的具体状态。</summary>
+    /// <param name="name">初始化目标说明，后续可替换为实际场景对象信息。</param>
     private sealed class Context(string name)
     {
+        /// <summary>当前样例独立运行文档，供失败时报告最后合法DTO。</summary>
         public SceneDocument? Document;
+        /// <summary>当前样例场景图引用，随样例记录保留用于定位上下文。</summary>
         public SceneGraph? Graph;
+        /// <summary>当前或已结束样例的模拟引用，供诊断读取最后控制器坐标。</summary>
         public TrainingSimulation? Simulation;
+        /// <summary>当前目标名称及可能附加的GUID诊断信息。</summary>
         public string Target = name;
+        /// <summary>最近开始执行的逻辑步序号；-1表示尚未推进。</summary>
         public int Frame = -1;
+        /// <summary>最近开始的准备、场景提交或断言操作，用于定位失败阶段。</summary>
         public string Operation = "initialize";
 
+        /// <summary>生成目标、步号、操作、最后合法角色TRS与控制器位置的诊断文本。</summary>
         public string Describe()
         {
             var actors = Document?.Objects.Where(item => item.Kind is ObjectKind.Player or ObjectKind.Npc)

@@ -1,7 +1,9 @@
 namespace G104.Engine.Scene;
 
+/// <summary>验证场景结构与可执行边界；不创建GPU或物理资源。</summary>
 public static class SceneValidator
 {
+    /// <summary>检查版本、对象/模板唯一性、父树与引用，再约束移动对象的碰撞后代。</summary>
     public static void Validate(SceneDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -34,6 +36,7 @@ public static class SceneValidator
         }
         var colors = new Dictionary<Guid, int>();
         var depths = new Dictionary<Guid, int>();
+        // 三色访问检测父级环；同时检查实际层级深度、父缩放与目标引用。
         void Visit(SceneObjectData item, int depth)
         {
             if (depth > 128) throw new SceneValidationException("Scene hierarchy exceeds depth 128.");
@@ -55,6 +58,7 @@ public static class SceneValidator
             colors[item.Id] = 2;
         }
         foreach (var item in document.Objects) Visit(item, 0);
+        // 当前物理不会自动同步移动父级下的静态碰撞子体，因此只允许视觉后代。
         foreach (var item in document.Objects.Where(o => o.Collider is { Kind: not ColliderKind.None }))
         {
             Guid? parent = item.ParentId;
@@ -68,11 +72,14 @@ public static class SceneValidator
         }
     }
 
+    /// <summary>玩家与NPC使用世界空间角色控制，必须保持为场景根对象。</summary>
     public static bool RequiresRoot(SceneObjectData item) => item.Kind is ObjectKind.Player or ObjectKind.Npc;
+    /// <summary>在相对容差内判断正统一缩放，以保证父子TRS仍能正确组合。</summary>
     public static bool Uniform(Float3 value) => value.X > 0 && value.Y > 0 && value.Z > 0 &&
         MathF.Abs(value.X - value.Y) <= TransformMath.Tolerance * MathF.Max(value.X, value.Y) &&
         MathF.Abs(value.X - value.Z) <= TransformMath.Tolerance * MathF.Max(value.X, value.Z);
 
+    /// <summary>检查单对象的TRS、材质、模板覆盖、数值参数与路径格式。</summary>
     public static void ValidateObject(SceneObjectData item)
     {
         if (string.IsNullOrWhiteSpace(item.Name)) throw new SceneValidationException("Object name cannot be empty.");

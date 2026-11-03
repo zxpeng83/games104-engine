@@ -5,8 +5,10 @@ using System.Text.Json.Nodes;
 
 namespace G104.Engine.Animation;
 
+/// <summary>在无GL上下文条件下检查真实资产导入、动画采样、配置和显示插值。</summary>
 public static class AnimationVerification
 {
+    /// <summary>读取给定资产根并运行CPU断言；失败抛异常，成功返回检查范围摘要。</summary>
     public static IReadOnlyList<string> Run(string assetRoot)
     {
         var model = new GltfModelLoader(new(assetRoot)).Load("models/UAL1_Standard.glb");
@@ -22,6 +24,7 @@ public static class AnimationVerification
         VerifySettings(model, probe, settings, File.ReadAllText(new AssetRoot(assetRoot).Resolve(AnimationSettings.DefaultAssetPath)));
         VerifyDisplayInterpolation(model, AnimationSettings.Default); // 固定非平凡动作样例，不限制用户JSON可映射静态T-pose。
 
+        // 用合成单轨道隔离LINEAR、STEP精确关键帧及四元数短弧规则。
         var linear = new AnimationClip("linear", 1, [new(0, TrackProperty.Translation, [0,1], [Vector4.Zero,new(10,0,0,0)], false)]);
         var pose = new[] { new NodePose(Vector3.Zero, Quaternion.Identity, Vector3.One) };
         AnimationSampler.Sample(linear, .25f, pose); Require(MathF.Abs(pose[0].Translation.X - 2.5f) < .0001f, "LINEAR求值");
@@ -41,6 +44,7 @@ public static class AnimationVerification
         Vector3 transformed = Vector3.TransformPosition(Vector3.Zero, spaces.CreatePalette(0,0,world)[0] * world[0]);
         Require(MathF.Abs(transformed.X - 4) < .0001f, "逆绑定/当前关节/mesh局部空间公式");
 
+        // 真实角色模型连续推进多个固定步，核对循环事件及接地状态边沿。
         var controller = new AnimationController(model);
         for (int i = 0; i < 180; i++) controller.Update(1f / 60, new(2.2f, true, 0));
         var footsteps = controller.DrainEvents();
@@ -65,6 +69,7 @@ public static class AnimationVerification
         return ["SharpGLTF: 67 nodes / 65 joints / 43 clips / meter-scale Y-up", "Material probe: PNG + normal texture + relative URI", "Animation: LINEAR / STEP / shortest arc / mesh-relative palette", "Animation controller: locomotion blend / JumpStart-Loop-Land / unique loop events", "Animation config: strict JSON / actual non-default clip-speed-time-marker behavior / shared immutable definition", "Animation facts: upward Jump / downward Fall / actual-contact Land", "Animation display: previous-current local TRS / endpoints / shared alpha for mesh and palette / no logic-event advancement"];
     }
 
+    /// <summary>核对显示端点、局部层级中间姿态及重复采样不推进逻辑或事件。</summary>
     private static void VerifyDisplayInterpolation(GltfModel model, AnimationSettings settings)
     {
         var controller = new AnimationController(model, settings);
@@ -96,6 +101,7 @@ public static class AnimationVerification
         float pendingTime = pending.StateTime; pending.ResetInterpolation();
         Require(pending.State == CharacterAnimationState.JumpStart && pending.StateTime == pendingTime && pending.DrainEvents().Single().Name == "Jump", "显示历史重置不丢弃尚未消费事件");
     }
+    /// <summary>逐行比较模型矩阵数组，允许小幅浮点误差。</summary>
     private static bool EqualMatrices(Matrix4[] a, Matrix4[] b)
     {
         if (a.Length != b.Length) return false;
@@ -105,6 +111,7 @@ public static class AnimationVerification
         return true;
     }
 
+    /// <summary>用有效非默认配置检查真实采样接线，并验证严格拒绝和实例隔离。</summary>
     private static void VerifySettings(GltfModel model, GltfModel probe, AnimationSettings loaded, string json)
     {
         var actualFileController = new AnimationController(model, loaded);
@@ -144,6 +151,7 @@ public static class AnimationVerification
         belowThreshold.Update(1f / 60, new(0, false, .5f));
         Require(belowThreshold.State == CharacterAnimationState.JumpLoop && belowThreshold.DrainEvents().Single().Name == "Fall", "配置minJumpVelocity实际区分低速离地");
 
+        // 共享配置只读引用，但实例游标、姿态与事件必须各自独立。
         var sibling = new AnimationController(model, custom); var active = new AnimationController(model, custom);
         NodePose[] siblingPose = sibling.Pose.ToArray(); active.Update(.1f, new(2, true, 0));
         Require(ReferenceEquals(active.Settings, sibling.Settings) && sibling.LocomotionPhase == 0 && !Different(sibling.Pose, siblingPose) && sibling.DrainEvents().Length == 0, "共享定义且游标/Pose/事件独立");
@@ -167,6 +175,7 @@ public static class AnimationVerification
         Require(!Different(staticController.Pose, bindPose) && staticController.DrainEvents().Length == 0, "无角色clips的静态模型保留bind pose");
         Reject(() => new AnimationController(probe, custom, character: true), "角色不能因0clips而免检");
 
+        // 每次复制原JSON并施加一种坏输入，避免用例之间相互污染。
         void Bad(Action<JsonObject> mutate)
         { var invalid = JsonNode.Parse(json)!.AsObject(); mutate(invalid); Reject(() => AnimationSettings.Parse(invalid.ToJsonString()), "坏配置拒绝"); }
         Bad(c => c["unknownField"] = 1); Bad(c => c.Remove("schemaVersion")); Bad(c => c["schemaVersion"] = 2);
@@ -183,6 +192,7 @@ public static class AnimationVerification
         var copied = new AnimationSettings(defaults.ClipMap, 1, 2, 12, .1f, .2f, .2f, .1f, sourceMarkers); sourceMarkers[0] = .9f;
         Require(copied.FootstepMarkers[0] == .25f, "共享定义不暴露调用者原数组");
     }
+    /// <summary>比较局部TRS差异，四元数按绝对点积消除正负等价影响。</summary>
     private static bool Different(NodePose[] a, NodePose[] b)
     {
         for (int i = 0; i < a.Length; i++)
@@ -193,12 +203,15 @@ public static class AnimationVerification
         }
         return false;
     }
+    /// <summary>要求操作以配置或参数异常被拒绝，避免无效输入被静默接受。</summary>
     private static void Reject(Action action, string message)
     {
         try { action(); }
         catch (Exception error) when (error is System.Text.Json.JsonException or InvalidDataException or ArgumentException) { return; }
         throw new InvalidOperationException("Animation verification expected rejection: " + message);
     }
+    /// <summary>检查矩阵所有分量均为有限数，捕获无效蒙皮结果。</summary>
     private static bool Finite(Matrix4 m) => new[] { m.Row0, m.Row1, m.Row2, m.Row3 }.All(r => float.IsFinite(r.X) && float.IsFinite(r.Y) && float.IsFinite(r.Z) && float.IsFinite(r.W));
+    /// <summary>将失败条件转换为带动画检查上下文的异常。</summary>
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException("Animation verification failed: " + message); }
 }

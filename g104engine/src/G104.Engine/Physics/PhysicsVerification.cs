@@ -3,8 +3,10 @@ using OpenTK.Mathematics;
 
 namespace G104.Engine.Physics;
 
+/// <summary>通过真实Jolt查询和有限角色场景检查后端边界、运动规则与原生资源清理。</summary>
 public static class PhysicsVerification
 {
+    /// <summary>创建受控场景执行查询、角色、动态箱和双世界断言；失败直接抛异常。</summary>
     public static void Run()
     {
         var ownersBefore = PhysicsWorld.ActiveWorlds;
@@ -16,6 +18,7 @@ public static class PhysicsVerification
         var graph = new SceneGraph(document);
         using (var world = new PhysicsWorld(document, graph))
         {
+            // 先验证原生查询的空间与命中语义，再用同一世界推进角色规则。
             var hit = world.Raycast(new Vector3(0, 5, 0), -Vector3.UnitY, 10);
             Require(hit is { } ground && ground.ObjectId == floor.Id && MathF.Abs(ground.Position.Y) < 0.02f && ground.Normal.Y > 0.99f, "Native ray query must identify the transformed floor and its normal.");
             var sweep = world.SweepCapsule(new Vector3(0, 0.03f, 0), 0.35f, 1.9f, new Vector3(0, 0, -8));
@@ -61,6 +64,7 @@ public static class PhysicsVerification
             Require(world.SweepCapsule(new Vector3(0, 0.03f, 0), 0.35f, 1.9f, new Vector3(0, 0, -8)) is not null,
                 "Re-enabled collision must return to the same world.");
 
+            // 动态箱只验后端重力、接触与睡眠，另用候选世界检查全局库寿命。
             var dynamic = world.CreateDynamicBox(new Vector3(-7, 3, 0), Vector3.One);
             for (int i = 0; i < 180; i++) world.Step(1f / 60);
             Require(MathF.Abs(world.BodyPosition(dynamic).Y - 0.5f) < 0.08f && world.BodySleeping(dynamic),
@@ -75,6 +79,7 @@ public static class PhysicsVerification
         VerifySlopeAndStepLimit();
     }
 
+    /// <summary>核对父旋转、统一缩放和局部中心偏移只应用一次。</summary>
     private static void VerifyParentTransform()
     {
         var parent = new SceneObjectData
@@ -93,6 +98,7 @@ public static class PhysicsVerification
             "Collision size, center offset and orientation must inherit the parent's transform exactly once.");
     }
 
+    /// <summary>验证撞顶清除向上速度后仍能回落接地。</summary>
     private static void VerifyCeiling()
     {
         var document = new SceneDocument { Objects = [Box("Floor", new Vector3(0, -0.5f, 0), new Vector3(6, 1, 6)), Box("Ceiling", new Vector3(0, 2.3f, 0), new Vector3(3, 0.4f, 3))] };
@@ -109,6 +115,7 @@ public static class PhysicsVerification
         Require(peak < 0.23f && character.State.Grounded, "A ceiling must cancel upward velocity without leaving the character suspended.");
     }
 
+    /// <summary>核对可走坡、坡角上限拒绝以及超过跨步高度的台阶阻挡。</summary>
     private static void VerifySlopeAndStepLimit()
     {
         var ramp = Box("30 degree ramp", new Vector3(0, 0.9f, 0), new Vector3(3, 0.2f, 4));
@@ -133,11 +140,13 @@ public static class PhysicsVerification
             $"A step above the 0.35m height limit must block movement; actual {character.State.Position}.");
     }
 
+    /// <summary>创建带局部Box尺寸的静态对象，位置以世界根节点设置。</summary>
     private static SceneObjectData Box(string name, Vector3 position, Vector3 size) => new()
     {
         Name = name, Collider = new ColliderData { Kind = ColliderKind.Box, Size = Float3.From(size) },
         Transform = new TransformData { Position = Float3.From(position) }
     };
+    /// <summary>将失败断言转换为包含具体规则说明的异常。</summary>
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);

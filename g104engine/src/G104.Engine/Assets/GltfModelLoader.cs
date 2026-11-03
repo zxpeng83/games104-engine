@@ -9,8 +9,11 @@ using NVector4 = System.Numerics.Vector4;
 
 namespace G104.Engine.Assets;
 
+/// <summary>将受限glTF 2.0资产转换为引擎CPU数据，并明确拒绝未支持输入。</summary>
+/// <param name="assets">负责根目录约束及外部文件路径校验的资产入口。</param>
 public sealed class GltfModelLoader(AssetRoot assets)
 {
+    /// <summary>校验文件及外部依赖，导入默认场景三角形、材质、skin和TRS动画。</summary>
     public GltfModel Load(string relativePath)
     {
         string path = assets.Resolve(relativePath);
@@ -22,6 +25,7 @@ public sealed class GltfModelLoader(AssetRoot assets)
             throw new InvalidDataException($"模型版本不是glTF 2.0：{relativePath}");
         if (document.TryGetProperty("extensionsUsed", out var extensions) && extensions.GetArrayLength() > 0)
             throw new InvalidDataException($"V1尚不支持glTF扩展：{string.Join(", ", extensions.EnumerateArray().Select(x => x.GetString()))}");
+        // 先检查外部buffer/image引用的本地路径，再交给第三方解析器读取。
         foreach (string listName in new[] { "buffers", "images" })
         {
             if (!document.TryGetProperty(listName, out var list)) continue;
@@ -48,6 +52,7 @@ public sealed class GltfModelLoader(AssetRoot assets)
         }
         int[] order = BuildOrder(nodes);
         var skinnedNodes = new HashSet<int>();
+        // 关节和蒙皮mesh的祖先也影响蒙皮空间，因此一并纳入正缩放检查。
         void AddSkinAncestors(int index)
         { for (int current = index; current >= 0; current = nodes[current].Parent) skinnedNodes.Add(current); }
         foreach (var skin in root.LogicalSkins)
@@ -77,6 +82,7 @@ public sealed class GltfModelLoader(AssetRoot assets)
                     throw new InvalidDataException($"节点{node.Name}超过V1每顶点四个骨骼影响");
                 string[] supported = ["POSITION", "NORMAL", "TEXCOORD_0", "TANGENT", "JOINTS_0", "WEIGHTS_0"];
                 // 未被材质引用的额外UV集不影响UV0绘制；真正引用UV1的贴图会在材质导入时报错。
+                // 允许未引用的额外UV集，并对刚性节点忽略无需消费的skin属性。
                 bool Unsupported(string key) => !supported.Contains(key) && !key.StartsWith("TEXCOORD_", StringComparison.Ordinal)
                     && !(node.Skin is null && (key.StartsWith("JOINTS_", StringComparison.Ordinal) || key.StartsWith("WEIGHTS_", StringComparison.Ordinal)));
                 if (primitive.VertexAccessors.Keys.Any(Unsupported))
@@ -94,6 +100,7 @@ public sealed class GltfModelLoader(AssetRoot assets)
                 ModelMaterial material = ImportMaterial(primitive.Material);
                 if ((material.BaseColorImage is not null || material.NormalImage is not null || material.MetallicRoughnessImage is not null) && uv is null)
                     throw new InvalidDataException($"模型{relativePath}节点{nodes[node.LogicalIndex].Name}[{node.LogicalIndex}] primitive{primitiveIndex}贴图材质需要TEXCOORD_0");
+                // 统一到20个float的顶点布局；骨骼索引有界检查后再归一化权重。
                 var vertices = new float[positions.Count * 20];
                 for (int i = 0; i < positions.Count; i++)
                 {
@@ -123,6 +130,7 @@ public sealed class GltfModelLoader(AssetRoot assets)
                 primitives.Add(new(node.LogicalIndex, node.Skin?.LogicalIndex ?? -1, vertices, indices, material, uv is not null, primitiveIndex));
             }
         }
+        // 动画只接收节点TRS轨道；不把未实现的Morph或曲线模式静默降级。
         var clips = new Dictionary<string, AnimationClip>(StringComparer.Ordinal);
         foreach (var animation in root.LogicalAnimations)
         {
@@ -155,6 +163,7 @@ public sealed class GltfModelLoader(AssetRoot assets)
         return new() { SourcePath = relativePath, Nodes = nodes, EvaluationOrder = order, Primitives = primitives.ToArray(), Skins = skins, Clips = clips };
     }
 
+    /// <summary>读取gltf正文或GLB首个JSON块，并校验GLB版本、总长和块边界。</summary>
     private static JsonDocument ReadJson(string path, string extension)
     {
         if (extension == ".gltf") return JsonDocument.Parse(File.ReadAllBytes(path));
@@ -167,6 +176,7 @@ public sealed class GltfModelLoader(AssetRoot assets)
         return JsonDocument.Parse(reader.ReadBytes(jsonLength));
     }
 
+    /// <summary>提取金属粗糙度、法线和alpha遮罩输入，拒绝不支持的材质特性。</summary>
     private static ModelMaterial ImportMaterial(Material? material)
     {
         if (material is null) return new(Vector4.One, 1, 1, false, null, null, null, 1, -1);
@@ -184,6 +194,7 @@ public sealed class GltfModelLoader(AssetRoot assets)
             material.DoubleSided, Image(color), Image(normal), Image(mr), normal?.GetFactor("NormalScale") ?? 1, material.Alpha == AlphaMode.MASK ? material.AlphaCutoff : -1);
     }
 
+    /// <summary>复制可选PNG/JPEG编码和采样参数，保留到渲染层解码上传。</summary>
     private static ModelTexture? Image(MaterialChannel? channel)
     {
         var image = channel?.Texture?.PrimaryImage;
@@ -195,6 +206,7 @@ public sealed class GltfModelLoader(AssetRoot assets)
             sampler is null || sampler.MagFilter == TextureInterpolationFilter.DEFAULT ? 9729 : (int)sampler.MagFilter);
     }
 
+    /// <summary>将平移或缩放关键帧转换为统一四分量轨道，时间单位为秒。</summary>
     private static AnimationTrack ReadVectorTrack(int node, TrackProperty property, IAnimationSampler<NVector3> sampler)
     {
         CheckInterpolation(sampler.InterpolationMode);
@@ -202,15 +214,18 @@ public sealed class GltfModelLoader(AssetRoot assets)
         return new(node, property, keys.Select(x => x.Item1).ToArray(), keys.Select(x => new Vector4(x.Item2.X, x.Item2.Y, x.Item2.Z, 0)).ToArray(), sampler.InterpolationMode == AnimationInterpolationMode.STEP);
     }
 
+    /// <summary>只接受自研采样器已实现的LINEAR和STEP模式。</summary>
     private static void CheckInterpolation(AnimationInterpolationMode mode)
     {
         if (mode is not (AnimationInterpolationMode.LINEAR or AnimationInterpolationMode.STEP)) throw new InvalidDataException($"V1动作插值尚不支持：{mode}");
     }
 
+    /// <summary>深度优先生成父节点先行的求值顺序，并拒绝层级环。</summary>
     private static int[] BuildOrder(ModelNode[] nodes)
     {
         var order = new List<int>();
         var visiting = new byte[nodes.Length];
+        // 三色访问区分未访问、递归中与已完成节点，防止父链成环。
         void Visit(int i)
         {
             if (visiting[i] == 2) return;
@@ -224,14 +239,18 @@ public sealed class GltfModelLoader(AssetRoot assets)
         return order.ToArray();
     }
 
+    /// <summary>向交错顶点数组复制指定数量的向量分量。</summary>
     private static void Put(float[] values, int offset, NVector4 value, int count)
     { for (int i = 0; i < count; i++) values[offset + i] = value[i]; }
 
+    /// <summary>按三角形UV累积切线，再正交化并计算手性；退化UV使用安全回退。</summary>
     internal static void GenerateTangents(float[] vertices, uint[] indices)
     {
         var tangent = new Vector3[vertices.Length / 20];
         var bitangent = new Vector3[tangent.Length];
+        // 从交错数组读取顶点位置，供相邻三角形累积切线。
         Vector3 V(int i) => new(vertices[i * 20], vertices[i * 20 + 1], vertices[i * 20 + 2]);
+        // 读取UV0；退化参数化由后续正交回退处理。
         Vector2 U(int i) => new(vertices[i * 20 + 6], vertices[i * 20 + 7]);
         for (int i = 0; i < indices.Length; i += 3)
         {
@@ -257,7 +276,10 @@ public sealed class GltfModelLoader(AssetRoot assets)
         }
     }
 
+    /// <summary>按相同XYZ分量转换System.Numerics向量，不额外改变坐标轴。</summary>
     private static Vector3 Convert(NVector3 v) => new(v.X, v.Y, v.Z);
+    /// <summary>保持XYZW分量转换旋转四元数。</summary>
     private static Quaternion Convert(NQuaternion q) => new(q.X, q.Y, q.Z, q.W);
+    /// <summary>保持行布局逐元素转换矩阵，与引擎行向量约定衔接。</summary>
     private static Matrix4 Convert(NMatrix m) => new(m.M11, m.M12, m.M13, m.M14, m.M21, m.M22, m.M23, m.M24, m.M31, m.M32, m.M33, m.M34, m.M41, m.M42, m.M43, m.M44);
 }

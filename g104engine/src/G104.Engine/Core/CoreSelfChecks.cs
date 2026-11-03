@@ -4,8 +4,10 @@ using OpenTK.Mathematics;
 
 namespace G104.Engine.Core;
 
+/// <summary>无需图形或物理原生后端的基础行为检查；文件检查使用隔离目录。</summary>
 public static class CoreSelfChecks
 {
+    /// <summary>依次检查基础合同，失败抛异常；返回实际完成的检查说明。</summary>
     public static IReadOnlyList<string> Run(string? verificationRoot = null)
     {
         var passed = new List<string>();
@@ -18,6 +20,7 @@ public static class CoreSelfChecks
         return passed;
     }
 
+    /// <summary>检查不同显示帧率下的固定步总数、慢帧丢时与余量重置。</summary>
     private static void CheckClock()
     {
         foreach (var rate in new[] { 30, 60, 144 })
@@ -37,6 +40,7 @@ public static class CoreSelfChecks
         Require(slow.Alpha == 0 && slow.Advance(0, _ => throw new Exception("Unexpected tick.")).Steps == 0, "Clock reset retained time.");
     }
 
+    /// <summary>检查零步边沿保留、补步单次消费以及UI捕获和失焦清空。</summary>
     private static void CheckInput()
     {
         var input = new InputBuffer();
@@ -53,6 +57,7 @@ public static class CoreSelfChecks
         Require(input.Consume().Move == Vector2.Zero && input.ConsumeLook() == Vector2.Zero, "Focus loss retained inputs.");
     }
 
+    /// <summary>检查行向量层级、局部姿态插值、保持世界重挂接及非法变换拒绝。</summary>
     private static void CheckTransforms()
     {
         var root = Item("Root", ObjectKind.Group, new Vector3(3, 2, 1));
@@ -102,6 +107,7 @@ public static class CoreSelfChecks
         CheckTransformUpdates();
     }
 
+    /// <summary>检查单字段更新保留其余TRS，以及近180度和多级父变换的精度。</summary>
     private static void CheckTransformUpdates()
     {
         var leaf = Item("TRS leaf", ObjectKind.StaticMesh, new Vector3(1, 2, 3));
@@ -165,6 +171,7 @@ public static class CoreSelfChecks
             "World rotation conversion through noncommuting rotated/scaled ancestors failed.");
     }
 
+    /// <summary>检查事务分组、回滚、DTO身份、重做分支和真实保存基准。</summary>
     private static void CheckHistory()
     {
         var group = Item("Group", ObjectKind.Group, Vector3.Zero);
@@ -232,6 +239,7 @@ public static class CoreSelfChecks
         Require(player.Parameters["radius"] == .35f && drag.History.UndoCount == 0 && drag.History.RedoCount == 1,
             "Cancel after a rejected frame lost the drag start or redo branch.");
 
+        // 保存基准来自实际目标文件；加载种子设计不能把其他存档当成已保存。
         var saved = SceneSerializer.Clone(drag.Graph.Document); saved.Name = "Custom saved design";
         drag.History.SetSavedBaseline(saved);
         Require(drag.History.IsDirty, "Reset seed was marked saved against another saved design.");
@@ -243,6 +251,7 @@ public static class CoreSelfChecks
         Require(drag.History.IsDirty, "Missing or rejected saved file was marked saved.");
     }
 
+    /// <summary>检查模板实例深复制、稳定新ID与显式覆盖白名单。</summary>
     private static void CheckTemplates()
     {
         var template = Item("Cube", ObjectKind.StaticMesh, Vector3.Zero);
@@ -260,6 +269,7 @@ public static class CoreSelfChecks
         Reject(graph.Rebuild, "Forbidden template override accepted.");
     }
 
+    /// <summary>在随机隔离目录检查保存替换、坏文件保全、严格JSON和资产路径边界。</summary>
     private static void CheckSerialization(string? verificationRoot)
     {
         string root = Path.GetFullPath(verificationRoot ?? Path.GetTempPath());
@@ -312,17 +322,21 @@ public static class CoreSelfChecks
         }
     }
 
+    /// <summary>创建检查所需的最小场景对象，避免依赖训练场资源。</summary>
     private static SceneObjectData Item(string name, ObjectKind kind, Vector3 position) => new()
     {
         Name = name, Kind = kind, Transform = new TransformData { Position = Float3.From(position) }
     };
 
+    /// <summary>以世界位置误差小于0.0005米判断向量接近。</summary>
     private static void Near(Vector3 actual, Vector3 expected, string message) => Require((actual - expected).Length < 0.0005f, $"{message} Expected {expected}, got {actual}.");
+    /// <summary>将不满足的检查条件转为带上下文的失败异常。</summary>
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);
     }
 
+    /// <summary>要求操作抛出约定的验证异常，操作成功反而判为检查失败。</summary>
     private static void Reject(Action operation, string message)
     {
         try { operation(); }

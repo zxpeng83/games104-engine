@@ -22,51 +22,94 @@ namespace G104.Sandbox;
 /// <summary>组装训练场；通用功能在Engine，专属场景/交互及演示流程在Sandbox。</summary>
 public sealed class TrainingWindow : GameWindow
 {
+    /// <summary>本窗口的资产、用户数据与演练启动配置。</summary>
     private readonly LaunchOptions _options;
+    /// <summary>把显示帧时间换成固定模拟步，提供显示插值余量。</summary>
     private readonly FixedStepClock _clock=new();
+    /// <summary>缓存按住态、一次性边沿和单独消费的鼠标视角量。</summary>
     private readonly InputBuffer _input=new();
+    /// <summary>窗口拥有的CPU粒子实例；Play/Stop清空个体。</summary>
     private readonly ParticleSystem _particles=new();
+    /// <summary>UI请求队列，在本帧安全点统一修改设计或运行状态。</summary>
     private readonly Queue<Action> _commands=[];
+    /// <summary>场景编辑界面；通过命令队列提交设计变更。</summary>
     private readonly SceneEditorPanel _editorPanel=new();
+    /// <summary>可编辑设计场景，Play期间仍保留其内存内容和历史。</summary>
     private SceneGraph _design=null!;
+    /// <summary>对当前设计执行受校验且可撤销的编辑操作。</summary>
     private SceneEditor _editor=null!;
+    /// <summary>实际用户保存目标的内容快照，用来判断未保存更改。</summary>
     private SceneDocument? _savedDesignBaseline;
+    /// <summary>Play时从设计深复制的独立逻辑场景；Stop后释放引用。</summary>
     private SceneGraph? _runtime;
+    /// <summary>运行场景的玩法与物理世界；非null即处于Play。</summary>
     private TrainingSimulation? _simulation;
+    /// <summary>窗口拥有的GL渲染器，必须在有效上下文线程释放。</summary>
     private TrainingRenderer? _renderer;
+    /// <summary>窗口拥有的ImGui输入与GL后端，随窗口清理。</summary>
     private ImGuiController? _ui;
+    /// <summary>窗口寿命内共享音频Buffer和独立Voice；初始化失败时可为空。</summary>
     private AudioSystem? _audio;
+    /// <summary>本显示帧的只读渲染描述，连接场景姿态与表现层。</summary>
     private IReadOnlyList<RenderObject> _objects=[];
+    /// <summary>当前显示相机的位置、目标和视图/投影矩阵。</summary>
     private CameraState _camera;
+    /// <summary>编辑器或骨骼调试当前选中的稳定对象ID。</summary>
     private Guid? _selected;
+    /// <summary>
+    /// _yaw/_pitch：相机水平角/俯仰角，单位弧度；_distance：目标距离，单位米。
+    /// _alpha：显示插值比例；_fps：平滑帧率；_frameMilliseconds：平滑显示帧毫秒数。
+    /// </summary>
     private float _yaw,_pitch=.33f,_distance=7,_alpha=1,_fps,_frameMilliseconds;
+    /// <summary>Edit模式的世界空间观察目标；可聚焦选中对象。</summary>
     private Vector3 _editTarget=new(0,1,0);
+    /// <summary>_paused为用户暂停，_suspended为实际暂停/失焦状态，_disposed防止重复释放。</summary>
     private bool _paused,_suspended,_disposed;
+    /// <summary>工具栏或状态区显示的最近操作结果。</summary>
     private string _message="Ready. Select Play to explore the training ground.";
+    /// <summary>音频后端信息或初始化失败原因，仅供状态展示。</summary>
     private string _audioStatus="not initialized";
+    /// <summary>_frame记录显示更新次数；_footstep用于交替选择两段脚步音。</summary>
     private int _frame,_footstep;
+    /// <summary>手动循环测试音的Voice句柄；0表示未播放。</summary>
     private int _loopVoice;
+    /// <summary>_showPath控制NPC路径叠加；_showSkeleton控制选中对象骨架叠加。</summary>
     private bool _showPath=true,_showSkeleton;
+    /// <summary>最近消费到的动画事件说明，供学习观察。</summary>
     private string _animationEvent="none";
+    /// <summary>当前显示使用的管线；与设计中下次Play的配置分别记录。</summary>
     private RenderPipelineMode _activePipeline;
+    /// <summary>_discardNextDelta丢弃切换后的旧帧时间；_rejectedSavedDesign记录原存档被拒绝。</summary>
     private bool _discardNextDelta=true,_rejectedSavedDesign;
+    /// <summary>被拒绝的原存档在再次保存前建立的备份路径。</summary>
     private string? _rejectedBackup;
+    /// <summary>_exerciseJumpEvents统计跳跃事实；_exerciseMovementFrames统计实际移动的固定步。</summary>
     private int _exerciseJumpEvents,_exerciseMovementFrames;
+    /// <summary>演练在Play前保存的未保存设计文本，用于确认Stop没有覆盖设计。</summary>
     private string? _exerciseUnsavedDesign;
+    /// <summary>演练在Play前记录的Undo条数，用于确认Stop保留编辑历史。</summary>
     private int _exerciseUnsavedHistory;
+    /// <summary>等待未保存更改对话框决策的目标设计路径。</summary>
     private string? _pendingLoad;
+    /// <summary>防止同一待加载请求每帧重复打开确认弹窗。</summary>
     private bool _loadModalOpened;
+    /// <summary>渲染调试输出选择，如法线、深度或阴影。</summary>
     private RenderDebugView _debug;
+    /// <summary>接触专项演练的输入、观测和断言状态，仅专项启动时创建。</summary>
     private ContactWindowExercise? _contactExercise;
+    /// <summary>用户设计的固定保存路径，位于启动配置指定的数据根下。</summary>
     private string SavePath=>Path.Combine(_options.UserDataRoot,"Scenes","training-ground.json");
+    /// <summary>是否已提交运行模拟，作为Edit/Play切换的事实来源。</summary>
     private bool Playing=>_simulation is not null;
 
+    /// <summary>创建OpenGL4.3核心窗口；自动演练启动时隐藏窗口。</summary>
     public TrainingWindow(LaunchOptions options):base(GameWindowSettings.Default,new NativeWindowSettings
     {
         ClientSize=new Vector2i(1440,900), Title="G104Engine | Training Ground V1", API=ContextAPI.OpenGL,
         APIVersion=new Version(4,3),Profile=ContextProfile.Core,Flags=ContextFlags.ForwardCompatible,StartVisible=!options.Exercise
     }) { _options=options; }
 
+    /// <summary>在当前GL上下文准备设计、渲染、UI与可选音频，拒绝坏存档时保留原件。</summary>
     protected override void OnLoad()
     {
         base.OnLoad();
@@ -78,6 +121,7 @@ public sealed class TrainingWindow : GameWindow
         SceneDocument initial;
         string seed=Path.Combine(_options.AssetRoot,"scenes","training-ground.json");
         bool hadUserSave=!_options.ContactExercise&&File.Exists(SavePath);
+        // 读取或资源准备失败都回退到种子；原用户文件只保留，不在加载时覆盖。
         if(hadUserSave)
         {
             try { initial=SceneSerializer.Load(SavePath,_options.AssetRoot); }
@@ -106,18 +150,21 @@ public sealed class TrainingWindow : GameWindow
         if(_options.ContactExercise) _contactExercise=new ContactWindowExercise(initial);
     }
 
+    /// <summary>窗口尺寸变化时，用实际帧缓冲像素尺寸调整渲染目标。</summary>
     protected override void OnResize(ResizeEventArgs e)
     {
         base.OnResize(e);
         if(FramebufferSize.X>0&&FramebufferSize.Y>0) _renderer?.Resize(FramebufferSize.X,FramebufferSize.Y);
     }
 
+    /// <summary>接收DPI等引起的像素尺寸变化，仅为非零目标重建附件。</summary>
     protected override void OnFramebufferResize(FramebufferResizeEventArgs e)
     {
         base.OnFramebufferResize(e);
         if(e.Width>0&&e.Height>0) _renderer?.Resize(e.Width,e.Height);
     }
 
+    /// <summary>采集显示帧输入、处理命令并推进固定步，最后生成插值画面数据。</summary>
     protected override void OnUpdateFrame(FrameEventArgs e)
     {
         base.OnUpdateFrame(e);
@@ -129,10 +176,12 @@ public sealed class TrainingWindow : GameWindow
         _ui.BeginFrame(this,Math.Max(dt,1e-4f));
         DrawToolbar();_selected=_editorPanel.Draw(_editor,Playing,_selected,Enqueue);DrawStatus();
         ReleaseUiFocusForSceneClick(MouseState.IsButtonPressed(MouseButton.Left));
+        // UI先收集请求，随后在采集角色输入和执行模拟前应用场景变更。
         ProcessCommands();
         if(_options.ContactExercise) ExerciseContacts();
         else if(_options.Exercise) Exercise();
         bool suspended=(!_options.Exercise&&(!IsFocused||WindowState==OpenTK.Windowing.Common.WindowState.Minimized))||_paused;
+        // 状态切换同时清输入、累计时间与显示历史，恢复时不补算暂停区间。
         if(suspended!=_suspended) { _suspended=suspended;_discardNextDelta=true;_clock.Reset();_input.Clear();_runtime?.ResetInterpolation();_renderer.ResetDisplayHistory();_audio?.SetPaused(suspended); }
         if(KeyboardState.IsKeyPressed(Keys.Escape)&&!_ui.WantsKeyboard) { if(Playing) Enqueue(Stop); else Close(); }
         if(KeyboardState.IsKeyPressed(Keys.F5)&&!_ui.WantsKeyboard) Enqueue(Playing ? Stop : Play);
@@ -158,6 +207,7 @@ public sealed class TrainingWindow : GameWindow
         }
         _input.Push(new InputState(move,look,jump,interact,!suspended,
             !_options.Exercise&&_ui.WantsKeyboard,!_options.Exercise&&_ui.WantsMouse,sprint));
+        // 视角每显示帧只消费一次；本帧所有模拟补步共享同一个水平参考。
         Vector2 frameLook=_input.ConsumeLook();_yaw-=frameLook.X*.004f;_pitch=Math.Clamp(_pitch+frameLook.Y*.004f,.08f,1.25f);
         if(!_ui.WantsMouse) _distance=Math.Clamp(_distance-MouseState.ScrollDelta.Y*.5f,2.5f,15);
         if(_options.ContactExercise) { _yaw=0;_pitch=.33f;_distance=7; }
@@ -199,13 +249,16 @@ public sealed class TrainingWindow : GameWindow
         _audio?.SetListener(_camera.Position,(_camera.Target-_camera.Position).Normalized());
     }
 
+    /// <summary>点击非UI区域时释放文字/键盘焦点，恢复场景快捷键。</summary>
     internal static void ReleaseUiFocusForSceneClick(bool leftPressed)
     {
         // 控件激活会阻挡Hovered查询；Capture仍包含UI点击/拖动及弹窗归属。
         if(leftPressed&&!ImGui.GetIO().WantCaptureMouse) ImGui.SetWindowFocus(null!);
     }
 
+    /// <summary>把UI操作延迟到统一安全点，避免绘制控件时修改场景结构。</summary>
     private void Enqueue(Action action)=>_commands.Enqueue(action);
+    /// <summary>依序执行已排队命令；单条失败显示原因并继续处理队列。</summary>
     private void ProcessCommands()
     {
         while(_commands.TryDequeue(out var action))
@@ -214,6 +267,7 @@ public sealed class TrainingWindow : GameWindow
         }
     }
 
+    /// <summary>执行一条编辑命令并报告拒绝，保留History已恢复的合法设计状态。</summary>
     internal static void ExecuteEditorCommand(SceneEditor editor,Action action,Action<Exception> rejected)
     {
         try { action(); }
@@ -221,6 +275,7 @@ public sealed class TrainingWindow : GameWindow
         catch(Exception error) { rejected(error); }
     }
 
+    /// <summary>完整准备运行副本、物理与渲染后再提交Play，失败不替换现有设计。</summary>
     private void Play()
     {
         if(Playing) return;
@@ -234,6 +289,7 @@ public sealed class TrainingWindow : GameWindow
             _renderer!.Prepare(BuildObjects(candidate,1));
         }
         catch { simulation?.Dispose();throw; }
+        // 到这里物理与渲染候选均已成功，才公开新的运行世界。
         _runtime=candidate;_simulation=simulation;
         _activePipeline=candidate.Document.Rendering.Pipeline;
         _renderer!.ResetAnimations();
@@ -244,6 +300,7 @@ public sealed class TrainingWindow : GameWindow
         Console.WriteLine("Play prepared: "+candidate.Document.Rendering.Pipeline);
     }
 
+    /// <summary>切回原设计并释放运行世界，保留未保存编辑与Undo历史。</summary>
     private void Stop()
     {
         if(!Playing) return;
@@ -256,6 +313,7 @@ public sealed class TrainingWindow : GameWindow
         _message="Stopped; unsaved design edits and undo history retained.";Console.WriteLine("Stop restored design");
     }
 
+    /// <summary>校验并原子保存设计；被拒绝的旧存档先备份，成功后更新保存基准。</summary>
     private void Save()
     {
         if(_editor.History.InTransaction) _editor.History.CommitTransaction();
@@ -269,9 +327,11 @@ public sealed class TrainingWindow : GameWindow
         _editor.History.MarkSaved();_message="Saved design: "+SavePath;
     }
 
+    /// <summary>Edit下先校验并准备候选设计资源，成功后才替换当前设计。</summary>
     private void LoadDesign(string path)
     {
         if(Playing) throw new InvalidOperationException("Stop before loading another design.");
+        // 先准备候选资源；失败抛出时当前设计和编辑历史仍有效。
         var candidate=new SceneGraph(SceneSerializer.Load(path,_options.AssetRoot));
         _renderer!.Prepare(BuildObjects(candidate,1));
         if(string.Equals(Path.GetFullPath(path),Path.GetFullPath(SavePath),StringComparison.OrdinalIgnoreCase))
@@ -283,6 +343,7 @@ public sealed class TrainingWindow : GameWindow
         _discardNextDelta=true;
     }
 
+    /// <summary>创建编辑历史并绑定实际保存文件基准，避免种子被误标为已保存。</summary>
     internal static SceneEditor CreateDesignEditor(SceneGraph design,SceneDocument? savedBaseline)
     {
         var editor=new SceneEditor(design);
@@ -290,22 +351,26 @@ public sealed class TrainingWindow : GameWindow
         return editor;
     }
 
+    /// <summary>存在未保存更改时挂起加载并交由弹窗决策，否则立即加载。</summary>
     private void RequestLoad(string path)
     {
         if(_editor.History.IsDirty) { _pendingLoad=path;_loadModalOpened=false; }
         else LoadDesign(path);
     }
 
+    /// <summary>给历史操作接上资产/GL预备回调，资源失败发生在设计提交之前。</summary>
     private void ConnectEditorPreparation() => _editor.History.PrepareChange = candidate =>
     {
         SceneSerializer.ValidateAssets(candidate.Document,_options.AssetRoot);
         _renderer!.Prepare(BuildObjects(candidate,1));
     };
 
+    /// <summary>筛选可见对象并生成同一alpha的显示变换；动画输入来自实际运行状态。</summary>
     private IReadOnlyList<RenderObject> BuildObjects(SceneGraph graph,float alpha)=>graph.Document.Objects
         .Where(o=>o.Visible&&o.Kind!=ObjectKind.Group).Select(o=>new RenderObject(o.Id,graph.InterpolatedWorldMatrix(o.Id,alpha),o,
             _simulation is not null && ReferenceEquals(graph,_runtime) ? _simulation.AnimationFor(o.Id) : new AnimationInputs(0,true,0),alpha)).ToArray();
 
+    /// <summary>围绕显示目标构建右手相机，Play时通过射线缩短距离以避开遮挡。</summary>
     private void UpdateCamera()
     {
         Vector3 target=_editTarget;
@@ -326,6 +391,7 @@ public sealed class TrainingWindow : GameWindow
             Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(55),Math.Max(1,FramebufferSize.X)/(float)Math.Max(1,FramebufferSize.Y),.08f,120));
     }
 
+    /// <summary>将本固定步的一次玩法事实映射为声音与粒子，不由绘制重复触发。</summary>
     private void Feedback(SimulationEvent fact)
     {
         if(_options.Exercise&&fact.Sound=="jump") _exerciseJumpEvents++;
@@ -338,6 +404,7 @@ public sealed class TrainingWindow : GameWindow
         if(fact.Particles) _particles.Burst(fact.Position+Vector3.UnitY*.5f,fact.Color);
     }
 
+    /// <summary>绘制Play/保存/加载等入口，破坏性状态切换统一排入命令队列。</summary>
     private void DrawToolbar()
     {
         ImGui.SetNextWindowPos(new NVector2(12,12),ImGuiCond.Always);ImGui.SetNextWindowSize(new NVector2(680,112),ImGuiCond.Always);
@@ -351,6 +418,7 @@ public sealed class TrainingWindow : GameWindow
         ImGui.BeginDisabled(Playing);int pipeline=(int)_design.Document.Rendering.Pipeline;
         if(ImGui.Combo("Pipeline (next Play)",ref pipeline,"Forward\0Deferred\0")) { var mode=(RenderPipelineMode)pipeline;Enqueue(()=>_editor.SetRenderPipeline(mode)); }
         ImGui.EndDisabled();
+        // 确认弹窗先决策，再在安全点执行保存/加载；取消只清待处理请求。
         if(_pendingLoad is not null&&!_loadModalOpened) { ImGui.OpenPopup("Unsaved design");_loadModalOpened=true; }
         bool modalOpen=true;
         if(ImGui.BeginPopupModal("Unsaved design",ref modalOpen,ImGuiWindowFlags.AlwaysAutoResize))
@@ -372,6 +440,7 @@ public sealed class TrainingWindow : GameWindow
         ImGui.End();
     }
 
+    /// <summary>展示运行与渲染状态，并提供叠加显示及音频测试控制。</summary>
     private void DrawStatus()
     {
         ImGui.SetNextWindowPos(new NVector2(Math.Max(710,ClientSize.X-350),12),ImGuiCond.Always);
@@ -407,6 +476,7 @@ public sealed class TrainingWindow : GameWindow
         ImGui.TextWrapped("Save: "+SavePath);ImGui.End();
     }
 
+    /// <summary>按预定显示帧执行综合窗口演练，检查模式切换、编辑回滚及资源准备。</summary>
     private void Exercise()
     {
         if(_frame==3)
@@ -467,6 +537,7 @@ public sealed class TrainingWindow : GameWindow
         if(_frame==238) _editor.History.Undo();
     }
 
+    /// <summary>准备接触专项的独立运行场景，之后由真实窗口链采集输入与结果。</summary>
     private void ExerciseContacts()
     {
         if(!_contactExercise!.BeginFrame(_frame)) return;
@@ -480,16 +551,19 @@ public sealed class TrainingWindow : GameWindow
         _contactExercise.Prepared(_runtime!,_simulation!);
     }
 
+    /// <summary>把NPC路径和选中骨架投影到ImGui背景层，仅最终画面显示叠加。</summary>
     private void DrawWorldDebug()
     {
         if(_debug!=RenderDebugView.Final) return;
         var draw=ImGui.GetBackgroundDrawList();
+        // 世界点经view/projection变换到客户区坐标；相机后方的点不绘制。
         NVector2? Project(Vector3 point)
         {
             Vector4 clip=Vector4.TransformRow(new Vector4(point,1),_camera.View*_camera.Projection);
             if(clip.W<=.01f) return null;
             return new NVector2((clip.X/clip.W*.5f+.5f)*ClientSize.X,(-clip.Y/clip.W*.5f+.5f)*ClientSize.Y);
         }
+        // 两个端点都可投影时才提交屏幕线段。
         void Line(Vector3 a,Vector3 b,uint color)
         {
             var first=Project(a);var second=Project(b);if(first.HasValue&&second.HasValue) draw.AddLine(first.Value,second.Value,color,2);
@@ -503,6 +577,7 @@ public sealed class TrainingWindow : GameWindow
         }
     }
 
+    /// <summary>检查同GUID从角色切到静态模型时骨架空间不残留角色校正。</summary>
     private void VerifyStaticSkeletonSpace()
     {
         var original=_objects.First(o=>o.Design.Kind==ObjectKind.Player);
@@ -526,6 +601,7 @@ public sealed class TrainingWindow : GameWindow
         Console.WriteLine("Exercise same model GUID switched character/static: bind skeleton space matches raw model nodes.");
     }
 
+    /// <summary>只读取显示数据绘制场景和UI，按演练配置留图并判断退出条件。</summary>
     protected override void OnRenderFrame(FrameEventArgs e)
     {
         base.OnRenderFrame(e);
@@ -553,11 +629,14 @@ public sealed class TrainingWindow : GameWindow
         }
     }
 
+    /// <summary>窗口卸载时先清理自有资源，再执行基类卸载。</summary>
     protected override void OnUnload() { DisposeResources();base.OnUnload(); }
 
+    /// <summary>同帧读取两条管线的RGB差异作一致性检查，最后恢复原管线配置。</summary>
     private void ComparePipelines(RenderSettings settings)
     {
         RenderPipelineMode original=settings.Pipeline;
+        // 读取当前颜色缓冲的RGBA8像素，供同帧管线误差统计。
         byte[] ReadPixels()
         {
             byte[] data=new byte[checked(FramebufferSize.X*FramebufferSize.Y*4)];
@@ -567,6 +646,7 @@ public sealed class TrainingWindow : GameWindow
         try
         {
             settings.Pipeline=RenderPipelineMode.Forward;_renderer!.Render(_camera,_objects,settings,_particles.Visuals(),RenderDebugView.Final);
+            // 两条管线一致只证明本场景输出接近；独立光照正确性由专项参考检查。
             byte[] forward=ReadPixels();
             settings.Pipeline=RenderPipelineMode.Deferred;_renderer.Render(_camera,_objects,settings,_particles.Visuals(),RenderDebugView.Final);
             byte[] deferred=ReadPixels();long difference=0;int maximum=0;
@@ -578,11 +658,13 @@ public sealed class TrainingWindow : GameWindow
         finally { settings.Pipeline=original; }
     }
 
+    /// <summary>幂等释放音频、物理、渲染与UI；单项失败仍继续清理其余资源。</summary>
     public void DisposeResources()
     {
         if(_disposed) return;
         // 外层finally也调用本方法；GL释放必须发生在窗口Context仍有效时。
         Exception? failure=null;
+        // 记录首个释放异常并继续其余清理，避免一个失败遗留整组资源。
         void Release(Action action) { try { action(); } catch(Exception error) { failure??=error; } }
         if(_audio is not null) Release(_audio.Dispose);
         if(_simulation is not null) Release(_simulation.Dispose);

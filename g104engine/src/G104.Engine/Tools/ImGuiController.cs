@@ -11,13 +11,21 @@ namespace G104.Engine.Tools;
 /// <summary>ImGui.NET只提供UI数据；这里负责OpenTK输入及GL3顶点/裁剪/状态适配。</summary>
 public sealed class ImGuiController : IDisposable
 {
+    /// <summary>本后端创建并销毁的ImGui原生上下文；输入回调先切换到此上下文。</summary>
     private readonly nint _context;
+    /// <summary>输入事件所属窗口，由外层窗口生命周期拥有。</summary>
     private readonly GameWindow _window;
+    /// <summary>_vao保存UI顶点布局；_vertices/_indices为每帧流式顶点/索引缓冲。</summary>
+    /// <remarks>_program为UI着色程序；_font为字体纹理，全部GL句柄由本后端在当前上下文释放。</remarks>
     private int _vao, _vertices, _indices, _program, _font;
+    /// <summary>_frame标记已开帧待绘制；_disposed防止重复释放；_focused保存按事件顺序收到的焦点状态。</summary>
     private bool _frame, _disposed, _focused;
+    /// <summary>ImGui当前是否捕获键盘，用于窗口决定游戏快捷键的输入归属。</summary>
     public bool WantsKeyboard => ImGui.GetIO().WantCaptureKeyboard;
+    /// <summary>ImGui当前是否捕获鼠标，包括活动控件与模态窗口的捕获。</summary>
     public bool WantsMouse => ImGui.GetIO().WantCaptureMouse;
 
+    /// <summary>绑定一个窗口，创建UI上下文及GPU资源并订阅输入；失败时解除订阅并清理已创建资源。</summary>
     public ImGuiController(GameWindow window)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
@@ -32,6 +40,7 @@ public sealed class ImGuiController : IDisposable
             unsafe { io.NativePtr->IniFilename = null; }
             ImGui.StyleColorsDark();
             var style = ImGui.GetStyle(); style.WindowRounding = 5; style.FrameRounding = 3;
+            // 整段原始字符串为UI顶点shader：逻辑像素坐标经正交投影进入裁剪空间。
             int vertex = Shader(ShaderType.VertexShader, """
                 #version 430 core
                 layout(location=0) in vec2 position;
@@ -44,6 +53,7 @@ public sealed class ImGuiController : IDisposable
             int fragment = 0;
             try
             {
+                // 整段原始字符串为UI片元shader：字体/控件纹理与顶点颜色相乘。
                 fragment = Shader(ShaderType.FragmentShader, """
                     #version 430 core
                     in vec2 texCoord; in vec4 tint;
@@ -58,6 +68,7 @@ public sealed class ImGuiController : IDisposable
             _vao = GL.GenVertexArray(); _vertices = GL.GenBuffer(); _indices = GL.GenBuffer();
             GL.BindVertexArray(_vao); GL.BindBuffer(BufferTarget.ArrayBuffer, _vertices);
             GL.BindBuffer(BufferTarget.ElementArrayBuffer, _indices);
+            // ImDrawVert共20字节：float2位置、float2 UV、归一化RGBA8颜色；索引在本绑定中为16位。
             GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0,2,VertexAttribPointerType.Float,false,20,0);
             GL.EnableVertexAttribArray(1); GL.VertexAttribPointer(1,2,VertexAttribPointerType.Float,false,20,8);
             GL.EnableVertexAttribArray(2); GL.VertexAttribPointer(2,4,VertexAttribPointerType.UnsignedByte,true,20,16);
@@ -85,23 +96,29 @@ public sealed class ImGuiController : IDisposable
         catch { Dispose(); throw; }
     }
 
+    /// <summary>切回绑定的ImGui上下文并提交一个Unicode码点。</summary>
     public void AddCharacter(uint codePoint) { ImGui.SetCurrentContext(_context); ImGui.GetIO().AddInputCharacter(codePoint); }
 
+    /// <summary>提交逻辑窗口坐标；失焦时使用无效位置，防止旧位置继续参与点击。</summary>
     private void AddMousePosition(ImGuiIOPtr io)
     {
         io.AddMousePosEvent(_focused ? _window.MousePosition.X : -float.MaxValue,
                             _focused ? _window.MousePosition.Y : -float.MaxValue);
     }
 
+    /// <summary>按窗口事件顺序提交焦点内鼠标位置，不等待帧末状态采样。</summary>
     private void OnMouseMove(MouseMoveEventArgs e)
     {
         if (!_focused) return;
         ImGui.SetCurrentContext(_context); ImGui.GetIO().AddMousePosEvent(e.X,e.Y);
     }
 
+    /// <summary>把窗口按下事件转交到统一按钮入口。</summary>
     private void OnMouseDown(MouseButtonEventArgs e) => AddMouseButton(e.Button,true);
+    /// <summary>把窗口松开事件转交到统一按钮入口，避免帧间短点击丢失。</summary>
     private void OnMouseUp(MouseButtonEventArgs e) => AddMouseButton(e.Button,false);
 
+    /// <summary>只接收前五个鼠标按钮，并在按钮事件前提交当前位置以保留点击发生地点。</summary>
     private void AddMouseButton(MouseButton button, bool down)
     {
         int index=(int)button;
@@ -112,6 +129,7 @@ public sealed class ImGuiController : IDisposable
         io.AddMouseButtonEvent(index,down);
     }
 
+    /// <summary>将有焦点时的滚轮相对增量提交一次，避免后续帧重复采样。</summary>
     private void OnMouseWheel(MouseWheelEventArgs e)
     {
         if (!_focused) return;
@@ -119,6 +137,7 @@ public sealed class ImGuiController : IDisposable
         var io=ImGui.GetIO(); AddMousePosition(io); io.AddMouseWheelEvent(e.OffsetX,e.OffsetY);
     }
 
+    /// <summary>依事件值切换焦点；失焦先使位置无效再释放全部按钮，取消未完成点击。</summary>
     private void OnFocusedChanged(FocusedChangedEventArgs e)
     {
         // OpenTK先派发事件后更新IsFocused，回调必须读取事件值。
@@ -131,11 +150,15 @@ public sealed class ImGuiController : IDisposable
             for (int button=0; button<5; button++) io.AddMouseButtonEvent(button,false);
     }
 
+    /// <summary>仅在窗口有焦点时接收OpenTK产生的文本输入。</summary>
     private void OnTextInput(TextInputEventArgs e)
     {
         if (_focused) AddCharacter((uint)e.Unicode);
     }
 
+    /// <summary>更新逻辑尺寸、帧缓冲缩放、秒制时间步及键盘按住态，然后开UI帧。</summary>
+    /// <param name="window">必须是构造时绑定的同一窗口。</param>
+    /// <param name="deltaTime">显示帧间隔秒数，限制在可用范围内供ImGui消费。</param>
     public void BeginFrame(GameWindow window, float deltaTime)
     {
         if (!ReferenceEquals(window,_window)) throw new ArgumentException("ImGui input belongs to its bound window.",nameof(window));
@@ -159,6 +182,7 @@ public sealed class ImGuiController : IDisposable
         ImGui.NewFrame(); _frame = true;
     }
 
+    /// <summary>将支持的OpenTK键映射到ImGui键；未支持项返回None。</summary>
     private static ImGuiKey MapKey(Keys key)
     {
         if (key is >= Keys.A and <= Keys.Z) return ImGuiKey.A + (key-Keys.A);
@@ -178,6 +202,7 @@ public sealed class ImGuiController : IDisposable
         };
     }
 
+    /// <summary>消费本帧UI绘制列表，在当前GL上下文上传/裁剪/绘制，并在finally恢复所改GL状态。</summary>
     public unsafe void Render()
     {
         ImGui.SetCurrentContext(_context);
@@ -202,6 +227,7 @@ public sealed class ImGuiController : IDisposable
             GL.BlendFuncSeparate(BlendingFactorSrc.SrcAlpha,BlendingFactorDest.OneMinusSrcAlpha,BlendingFactorSrc.One,BlendingFactorDest.OneMinusSrcAlpha);
             GL.Disable(EnableCap.CullFace); GL.Disable(EnableCap.DepthTest); GL.Enable(EnableCap.ScissorTest);
             GL.Viewport(0,0,width,height); GL.UseProgram(_program); GL.BindVertexArray(_vao); GL.BindSampler(0,0);
+            // UI坐标原点在左上，正交投影反转Y；CPU行矩阵按transpose=false上传适配GLSL列向量。
             Matrix4 projection=Matrix4.CreateOrthographicOffCenter(data.DisplayPos.X,data.DisplayPos.X+data.DisplaySize.X,
                 data.DisplayPos.Y+data.DisplaySize.Y,data.DisplayPos.Y,-1,1);
             GL.UniformMatrix4(GL.GetUniformLocation(_program,"projection"),false,ref projection);
@@ -224,6 +250,7 @@ public sealed class ImGuiController : IDisposable
                     int bottom=(int)((clip.W-data.DisplayPos.Y)*data.FramebufferScale.Y);
                     x=Math.Clamp(x,0,width); y=Math.Clamp(y,0,height); right=Math.Clamp(right,0,width); bottom=Math.Clamp(bottom,0,height);
                     if(right<=x||bottom<=y) continue;
+                    // 控件裁剪先乘DPI缩放，再由左上逻辑坐标改为GL左下像素坐标。
                     GL.Scissor(x,height-bottom,right-x,bottom-y);
                     GL.BindTexture(TextureTarget.Texture2D,(int)command.TextureId);
                     GL.DrawElementsBaseVertex(PrimitiveType.Triangles,(int)command.ElemCount,DrawElementsType.UnsignedShort,
@@ -242,7 +269,9 @@ public sealed class ImGuiController : IDisposable
         }
     }
 
+    /// <summary>按保存的启用状态恢复一个GL能力开关。</summary>
     private static void Set(EnableCap capability,bool enabled) { if(enabled) GL.Enable(capability); else GL.Disable(capability); }
+    /// <summary>编译内嵌ASCII shader；成功转交句柄，失败先删除再抛出编译日志。</summary>
     private static int Shader(ShaderType type,string source)
     {
         int shader=GL.CreateShader(type); GL.ShaderSource(shader,source); GL.CompileShader(shader);
@@ -251,6 +280,7 @@ public sealed class ImGuiController : IDisposable
         string error=GL.GetShaderInfoLog(shader); GL.DeleteShader(shader); throw new InvalidOperationException(error);
     }
 
+    /// <summary>解除窗口事件、结束未完成UI帧，随后释放GL句柄和ImGui上下文；由窗口在有效GL上下文调用。</summary>
     public void Dispose()
     {
         if(_disposed) return;

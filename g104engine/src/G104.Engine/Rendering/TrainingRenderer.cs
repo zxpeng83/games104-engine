@@ -6,32 +6,60 @@ using OpenTK.Mathematics;
 
 namespace G104.Engine.Rendering;
 
+/// <summary>本帧多Pass提交统计；不包含独立GPU计时，也不等于唯一场景几何数量。</summary>
+/// <param name="DrawCalls">网格、全屏和粒子绘制调用总数。</param>
+/// <param name="Triangles">各Pass累计提交的三角形数。</param>
+/// <param name="AnimatedInstances">当前缓存中标记为角色的动画实例数。</param>
+/// <param name="Width">本帧渲染目标像素宽度。</param>
+/// <param name="Height">本帧渲染目标像素高度。</param>
 public readonly record struct RendererStatistics(int DrawCalls, int Triangles, int AnimatedInstances, int Width, int Height);
 
 // 固定Pass顺序用于学习和对照；GL资源始终由创建它们的当前上下文线程释放。
+/// <summary>持有固定渲染Pass及共享GPU资源；所有GL操作由创建线程在有效当前上下文执行。</summary>
 public sealed class TrainingRenderer : IDisposable
 {
+    /// <summary>用于检查GL调用归属的创建线程标识，不能证明上下文本身仍然有效。</summary>
     private readonly int ownerThread = Environment.CurrentManagedThreadId;
+    /// <summary>解析shader、配置、模型与纹理的资产根。</summary>
     private readonly AssetRoot assets;
+    /// <summary>解析CPU侧模型数据；其结果随后上传为共享GPU网格。</summary>
     private readonly GltfModelLoader loader;
+    /// <summary>本渲染器拥有的共享纹理缓存，按活动绘制引用保留。</summary>
     private readonly TextureCache textures;
+    /// <summary>角色Clip映射及动画参数配置，用于验证和创建实例控制器。</summary>
     private readonly AnimationSettings animationSettings;
+    /// <summary>窗口寿命内共享的基础网格，渲染器最终统一释放。</summary>
     private readonly Dictionary<PrimitiveKind, GpuMesh> primitives = [];
+    /// <summary>按模型路径复用的CPU数据与GPU网格；离场时释放网格。</summary>
     private readonly Dictionary<string, GpuModel> models = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>按对象GUID保存独立动画控制器，同时借用共享模型。</summary>
     private readonly Dictionary<Guid, (GpuModel Model, AnimationController Controller, bool Character)> instances = [];
+    /// <summary>当前帧实际请求的纹理键，用于帧末清除不再引用的纹理。</summary>
     private readonly HashSet<string> usedTextures = new(StringComparer.Ordinal);
+    /// <summary>forward为前向着色；gbuffer为几何写入；shadow为阴影深度；deferred为延迟光照。</summary>
+    /// <remarks>sky为背景；tonemap为调试/曝光映射；fxaa为最终抗锯齿；particle为透明粒子，程序均由渲染器拥有。</remarks>
     private ShaderProgram? forward, gbuffer, shadow, deferred, sky, tonemap, fxaa, particle;
+    /// <summary>当前尺寸的G-buffer/HDR/LDR附件；Resize成功后原子替换并释放旧组。</summary>
     private RenderTargets? targets;
+    /// <summary>fullscreenVao为全屏三角VAO；boneBuffer为骨骼UBO；shadowBuffer/shadowTexture为阴影FBO及深度贴图。</summary>
+    /// <remarks>skyTexture为天空立方贴图；particleVao/particleVbo为粒子布局和动态顶点缓冲，均在Dispose释放。</remarks>
     private int fullscreenVao, boneBuffer, shadowBuffer, shadowTexture, skyTexture, particleVao, particleVbo;
+    /// <summary>drawCalls与triangles分别累计当前帧跨Pass绘制调用和提交三角形数。</summary>
     private int drawCalls, triangles;
+    /// <summary>zeroSize表示窗口无可绘制尺寸；disposed表示资源释放已开始，后续调用被拒绝。</summary>
     private bool zeroSize, disposed;
+    /// <summary>世界到方向光裁剪空间的CPU行向量矩阵，供阴影写入和采样共用。</summary>
     private Matrix4 lightViewProjection;
+    /// <summary>方向光方形阴影贴图的边长像素数。</summary>
     public const int ShadowResolution = 2048;
     // 每灯RGB辐射最多1e12：反射基础色[0,1]、最多5灯与Exposure<=20的BRDF中间乘积仍在FP32内。
     // 这是明确拒绝极端输入的数值子集，不截断高光、光照输出或粗糙度。
+    /// <summary>允许上传到shader的单灯每色道辐射上限；CPU先用double预乘检查。</summary>
     public const double MaximumShaderRadiance = 1e12;
+    /// <summary>最近完成帧的提交统计，未绘制帧不会刷新。</summary>
     public RendererStatistics Statistics { get; private set; }
 
+    /// <summary>同步创建程序、基础网格、阴影/天空/粒子与尺寸附件；失败清理已创建GPU资源。</summary>
     public TrainingRenderer(string assetRoot, int width, int height)
     {
         assets = new(assetRoot); loader = new(assets); textures = new(assets);
@@ -53,6 +81,7 @@ public sealed class TrainingRenderer : IDisposable
         catch { Dispose(); throw; }
     }
 
+    /// <summary>忽略零尺寸并暂停绘制；非零尺寸先创建完整新附件，再释放旧附件。</summary>
     public void Resize(int width, int height)
     {
         EnsureOwner();
@@ -63,6 +92,7 @@ public sealed class TrainingRenderer : IDisposable
         var previous = targets; targets = replacement; previous?.Dispose();
     }
 
+    /// <summary>按模拟步长秒数推进模型实例，移除消失GUID并释放离场共享模型网格。</summary>
     public void UpdateAnimations(float dt, IReadOnlyList<RenderObject> objects)
     {
         EnsureOwner();
@@ -80,6 +110,7 @@ public sealed class TrainingRenderer : IDisposable
         { foreach (var mesh in models[path].Meshes) mesh.Dispose(); models.Remove(path); }
     }
 
+    /// <summary>提交场景前验证材质与角色合同并预载GPU资源；失败只回滚本次新增模型/纹理。</summary>
     public void Prepare(IReadOnlyList<RenderObject> objects)
     {
         EnsureOwner();
@@ -119,6 +150,7 @@ public sealed class TrainingRenderer : IDisposable
         }
     }
 
+    /// <summary>清动画实例和场景模型/纹理，保留通用程序、基础网格与渲染目标。</summary>
     public void ResetScene()
     {
         EnsureOwner(); instances.Clear();
@@ -126,23 +158,30 @@ public sealed class TrainingRenderer : IDisposable
         models.Clear(); textures.Retain(new HashSet<string>()); usedTextures.Clear();
     }
 
+    /// <summary>成功提交Play/Stop/Load后重建动画状态，保留已经准备的共享GPU资产。</summary>
     public void ResetAnimations()
     {
         // 成功Play/Stop/Load提交后重建实例状态，保留刚Prepare验证的GPU资源。
         EnsureOwner(); instances.Clear();
     }
 
+    /// <summary>将动画显示插值历史收束到当前逻辑姿态，不重置游标或未消费事件。</summary>
     public void ResetDisplayHistory()
     {
         EnsureOwner();
         foreach (var instance in instances.Values) instance.Controller.ResetInterpolation();
     }
 
+    /// <summary>读取指定实例的动画调试文字，无模型实例时返回提示。</summary>
     public string AnimationDebug(Guid id) => instances.TryGetValue(id, out var entry) ? entry.Controller.DebugText : "No animated model";
+    /// <summary>一次取走指定实例累计动画事件，避免绘制频率导致重复消费。</summary>
     public AnimationEvent[] DrainAnimationEvents(Guid id) => instances.TryGetValue(id, out var entry) ? entry.Controller.DrainEvents() : [];
 
+    /// <summary>验证入口：读取左下原点像素的线性HDR RGBA，不经过色调映射。</summary>
     internal Vector4 ReadHdrPixel(int x, int y) => ReadTargetPixel(x, y, false);
+    /// <summary>验证入口：读取G-buffer世界法线与存储后的粗糙度。</summary>
     internal Vector4 ReadNormalRoughPixel(int x, int y) => ReadTargetPixel(x, y, true);
+    /// <summary>检查像素范围、读回指定浮点附件，并恢复先前读FBO绑定。</summary>
     private Vector4 ReadTargetPixel(int x, int y, bool normalRough)
     {
         EnsureOwner();
@@ -158,6 +197,7 @@ public sealed class TrainingRenderer : IDisposable
         finally { GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, previous); }
     }
 
+    /// <summary>生成插值后骨架父子连线的世界端点，与网格共用角色修正和实例变换。</summary>
     public IReadOnlyList<(Vector3 Start, Vector3 End)> SkeletonDebug(Guid id, Matrix4 instanceWorld, float alpha = 1)
     {
         if (!instances.TryGetValue(id, out var entry)) return [];
@@ -174,6 +214,7 @@ public sealed class TrainingRenderer : IDisposable
         return lines;
     }
 
+    /// <summary>绘制阴影、主路径、透明粒子和后处理；读取显示姿态，不推进动画或粒子模拟。</summary>
     public void Render(CameraState camera, IReadOnlyList<RenderObject> objects, RenderSettings settings, IReadOnlyList<ParticleVisual> particles, RenderDebugView debugView)
     {
         EnsureOwner(); if (zeroSize || targets is null) return;
@@ -181,6 +222,7 @@ public sealed class TrainingRenderer : IDisposable
         if (!float.IsFinite(settings.Exposure) || settings.Exposure <= 0) throw new InvalidDataException("渲染曝光必须为有限正数");
         drawCalls = triangles = 0;
         usedTextures.Clear();
+        // CPU采用行向量：先View后Projection；其逆用于Deferred从深度重建世界位置。
         Matrix4 viewProjection = camera.View * camera.Projection;
         Matrix4 inverseViewProjection = viewProjection.Inverted();
         Vector3 sunDirection = settings.SunDirection.ToVector();
@@ -205,6 +247,7 @@ public sealed class TrainingRenderer : IDisposable
             GL.PolygonOffset(3, 2);
             DrawObjects(shadow!, lightViewProjection, objects, true); GL.Disable(EnableCap.PolygonOffsetFill);
         }
+        // 即使主路径为Forward，材质/法线/深度调试仍需要先写G-buffer。
         bool needGbuffer = settings.Pipeline == RenderPipelineMode.Deferred || debugView is RenderDebugView.BaseColor or RenderDebugView.Normals or RenderDebugView.Roughness or RenderDebugView.Depth;
         if (needGbuffer)
         {
@@ -222,6 +265,7 @@ public sealed class TrainingRenderer : IDisposable
             BindTexture(deferred, "uDepth", targets.Depth, 2); BindSky(deferred, 6); Fullscreen();
             GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, targets.GBuffer);
             GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, targets.HdrBuffer);
+            // 将几何深度复制到HDR独立深度附件，让后续粒子正确受不透明表面遮挡。
             GL.BlitFramebuffer(0, 0, targets.Width, targets.Height, 0, 0, targets.Width, targets.Height, ClearBufferMask.DepthBufferBit, BlitFramebufferFilter.Nearest);
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, targets.HdrBuffer);
         }
@@ -231,6 +275,7 @@ public sealed class TrainingRenderer : IDisposable
             GL.Enable(EnableCap.DepthTest); GL.DepthMask(true); GL.Enable(EnableCap.CullFace);
             forward!.Use(); SetLighting(forward, camera, objects, settings, sunDirection); DrawObjects(forward, viewProjection, objects, false);
         }
+        // 粒子在线性HDR空间透明合成，随后统一曝光、Gamma和FXAA。
         DrawParticles(camera, viewProjection, particles);
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, targets.LdrBuffer); tonemap!.Use();
         tonemap.Set("uDebug", (int)debugView); tonemap.Set("uExposure", Math.Clamp(settings.Exposure, .01f, 20));
@@ -245,6 +290,7 @@ public sealed class TrainingRenderer : IDisposable
         textures.Retain(usedTextures);
     }
 
+    /// <summary>按可见对象绘制共享基础网格或模型子网格，复用同一材质/蒙皮路径。</summary>
     private void DrawObjects(ShaderProgram program, Matrix4 viewProjection, IReadOnlyList<RenderObject> objects, bool shadowPass)
     {
         program.Use(); program.Set("uViewProjection", viewProjection); GL.Enable(EnableCap.DepthTest); GL.DepthMask(true);
@@ -262,6 +308,7 @@ public sealed class TrainingRenderer : IDisposable
                 {
                     var primitive = entry.Model.Data.Primitives[i];
                     ValidateModelMaterial(entry.Model.Data, primitive, drawingMaterial);
+                    // 行向量依次经过模型节点、角色外观修正、场景实例；蒙皮palette先回到该mesh局部空间。
                     Matrix4 meshWorld = displayWorld[primitive.Node] * correction * item.ModelMatrix;
                     program.Set("uModel", meshWorld);
                     program.Set("uSkinned", primitive.Skin >= 0 ? 1 : 0);
@@ -287,6 +334,7 @@ public sealed class TrainingRenderer : IDisposable
         GL.FrontFace(FrontFaceDirection.Ccw);
     }
 
+    /// <summary>组合导入材质与实例tint，检查最终反射色并绑定颜色/法线/金属粗糙度纹理。</summary>
     private void BindMaterial(ShaderProgram program, ModelMaterial imported, string key, MaterialData design, bool useImported)
     {
         // 模型实例颜色作tint，保留同一GLB内不同子材质的颜色差异。
@@ -303,6 +351,7 @@ public sealed class TrainingRenderer : IDisposable
         BindTexture(program, "uBaseTexture", baseTexture, 0); BindTexture(program, "uNormalTexture", normalTexture, 1); BindTexture(program, "uMrTexture", mrTexture, 2);
     }
 
+    /// <summary>优先采用场景覆盖贴图，否则借用导入贴图；记录引用键并区分sRGB颜色和线性数据。</summary>
     private (int Base, int Normal, int Mr) LoadTextures(ModelMaterial imported, string key, MaterialData design)
     {
         int baseTexture = 0, normalTexture = 0, mrTexture = 0;
@@ -314,6 +363,7 @@ public sealed class TrainingRenderer : IDisposable
         return (baseTexture, normalTexture, mrTexture);
     }
 
+    /// <summary>检查模型最终有效反射色，以及任何有效贴图所必需的源TEXCOORD_0。</summary>
     private static void ValidateModelMaterial(GltfModel model, ModelPrimitive primitive, MaterialData design)
     {
         ModelMaterial imported = primitive.Material;
@@ -325,6 +375,7 @@ public sealed class TrainingRenderer : IDisposable
             throw new InvalidDataException($"模型{model.SourcePath}节点{model.Nodes[primitive.Node].Name}[{primitive.Node}] primitive{primitive.PrimitiveIndex}最终贴图材质需要TEXCOORD_0；源网格没有UV0");
     }
 
+    /// <summary>为HDR点光marker生成有限反射材质，保留原灯色和设计历史供照明使用。</summary>
     private static MaterialData DrawingMaterial(SceneObjectData design)
     {
         MaterialData material = design.Material;
@@ -337,6 +388,7 @@ public sealed class TrainingRenderer : IDisposable
             BaseColorTexture = material.BaseColorTexture, NormalTexture = material.NormalTexture };
     }
 
+    /// <summary>以double检查有限非负乘积及用途上限，再转换float，拒绝值不作静默钳制。</summary>
     private static float CheckedProduct(float left, float right, string label, double maximum = 1)
     {
         double product = (double)left * right;
@@ -347,11 +399,14 @@ public sealed class TrainingRenderer : IDisposable
         }
         return (float)product;
     }
+    /// <summary>逐通道检查RGBA8 G-buffer支持的[0,1]有效反射色。</summary>
     private static Vector3 CheckedReflectance(Vector3 color, string label) => new(
         CheckedProduct(color.X, 1, label + " R"), CheckedProduct(color.Y, 1, label + " G"), CheckedProduct(color.Z, 1, label + " B"));
+    /// <summary>逐通道double预乘光色与强度，检查FP32支持子集后返回shader辐射。</summary>
     private static Vector3 CheckedRadiance(Vector3 color, float intensity, string label) => new(
         CheckedProduct(color.X, intensity, label + " radiance R", MaximumShaderRadiance), CheckedProduct(color.Y, intensity, label + " radiance G", MaximumShaderRadiance), CheckedProduct(color.Z, intensity, label + " radiance B", MaximumShaderRadiance));
 
+    /// <summary>上传世界空间相机、方向光、阴影和最多四盏可见点光；点光位置取场景世界矩阵。</summary>
     private void SetLighting(ShaderProgram program, CameraState camera, IReadOnlyList<RenderObject> objects, RenderSettings settings, Vector3 direction)
     {
         program.Set("uCamera", camera.Position); program.Set("uSunDirection", direction); program.Set("uSunRadiance", CheckedRadiance(settings.SunColor.ToVector(), settings.SunIntensity, "方向光"));
@@ -368,6 +423,7 @@ public sealed class TrainingRenderer : IDisposable
         }
     }
 
+    /// <summary>按GUID取得或重建独立动画实例，角色校验通过后借用路径共享模型。</summary>
     private (GpuModel Model, AnimationController Controller, bool Character) Instance(RenderObject item)
     {
         string path = item.Design.ModelPath ?? "models/UAL1_Standard.glb";
@@ -378,6 +434,7 @@ public sealed class TrainingRenderer : IDisposable
             instances[item.Id] = entry = (model, new(model.Data, animationSettings, character), character);
         return entry;
     }
+    /// <summary>解析模型并上传全部子网格，计算脚底/身高/前向修正；失败释放已上传网格。</summary>
     private GpuModel LoadModel(string path)
     {
         var data = loader.Load(path); var meshes = new List<GpuMesh>();
@@ -392,22 +449,28 @@ public sealed class TrainingRenderer : IDisposable
         catch { foreach (var mesh in meshes) mesh.Dispose(); throw; }
     }
 
+    /// <summary>提交一个网格并累计本Pass的调用数和三角形数。</summary>
     private void Draw(GpuMesh mesh) { mesh.Draw(); drawCalls++; triangles += mesh.IndexCount / 3; }
+    /// <summary>镜像世界矩阵反转正面绕序，双面材质关闭背面剔除。</summary>
     private static void SetCulling(bool doubleSided, Matrix4 world)
     {
         GL.FrontFace(world.Determinant < 0 ? FrontFaceDirection.Cw : FrontFaceDirection.Ccw);
         if (doubleSided) GL.Disable(EnableCap.CullFace); else GL.Enable(EnableCap.CullFace);
     }
+    /// <summary>关闭深度写入、剔除和混合后绘制无顶点缓冲全屏三角形，并累计统计。</summary>
     private void Fullscreen()
     {
         GL.Disable(EnableCap.DepthTest); GL.DepthMask(false); GL.Disable(EnableCap.CullFace); GL.Disable(EnableCap.Blend);
         GL.BindVertexArray(fullscreenVao); GL.DrawArrays(PrimitiveType.Triangles, 0, 3); drawCalls++; triangles++;
     }
+    /// <summary>把2D贴图绑定到指定纹理单元，并同步对应采样器uniform。</summary>
     private static void BindTexture(ShaderProgram program, string uniform, int texture, int unit)
     { GL.ActiveTexture(TextureUnit.Texture0 + unit); GL.BindTexture(TextureTarget.Texture2D, texture); program.Set(uniform, unit); }
+    /// <summary>将本渲染器的天空立方贴图绑定到指定单元供背景采样。</summary>
     private void BindSky(ShaderProgram program, int unit)
     { GL.ActiveTexture(TextureUnit.Texture0 + unit); GL.BindTexture(TextureTarget.TextureCubeMap, skyTexture); program.Set("uSky", unit); }
 
+    /// <summary>创建只含D24深度附件的方向光阴影FBO，所有句柄由渲染器最终释放。</summary>
     private void CreateShadow()
     {
         shadowBuffer = GL.GenFramebuffer(); GL.BindFramebuffer(FramebufferTarget.Framebuffer, shadowBuffer);
@@ -415,6 +478,7 @@ public sealed class TrainingRenderer : IDisposable
         GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, TextureTarget.Texture2D, shadowTexture, 0);
         GL.DrawBuffer(DrawBufferMode.None); GL.ReadBuffer(ReadBufferMode.None); RenderTargets.Check("Shadow");
     }
+    /// <summary>生成六面渐变背景立方贴图；成功转交句柄，失败删除临时纹理。</summary>
     private static int CreateSky()
     {
         int texture = GL.GenTexture();
@@ -443,12 +507,14 @@ public sealed class TrainingRenderer : IDisposable
         }
         catch { GL.DeleteTexture(texture); throw; }
     }
+    /// <summary>创建每顶点9个float的位置/颜色/UV布局及动态粒子缓冲。</summary>
     private void CreateParticles()
     {
         particleVao = GL.GenVertexArray(); particleVbo = GL.GenBuffer(); GL.BindVertexArray(particleVao); GL.BindBuffer(BufferTarget.ArrayBuffer, particleVbo);
         int[] sizes = [3, 4, 2], offsets = [0, 3, 7];
         for (int i = 0; i < 3; i++) { GL.EnableVertexAttribArray(i); GL.VertexAttribPointer(i, sizes[i], VertexAttribPointerType.Float, false, 9 * sizeof(float), offsets[i] * sizeof(float)); }
     }
+    /// <summary>按相机深度从远到近构造Billboard，在HDR中深度测试但不写深度地透明合成。</summary>
     private void DrawParticles(CameraState camera, Matrix4 viewProjection, IReadOnlyList<ParticleVisual> visuals)
     {
         if (visuals.Count == 0) return;
@@ -456,6 +522,7 @@ public sealed class TrainingRenderer : IDisposable
         var sorted = visuals.OrderBy(p => Vector3.TransformPosition(p.Position, camera.View).Z).Take(8192).ToArray();
         Matrix4 inverseView = camera.View.Inverted(); Vector3 right = inverseView.Row0.Xyz, up = inverseView.Row1.Xyz;
         var vertices = new float[sorted.Length * 6 * 9]; int cursor = 0;
+        // 用相机世界右/上轴展开一个角点，并写入位置、颜色与局部UV。
         void Vertex(ParticleVisual visual, float x, float y)
         {
             Vector3 position = visual.Position + (right * (x - .5f) + up * (y - .5f)) * visual.Size;
@@ -470,11 +537,13 @@ public sealed class TrainingRenderer : IDisposable
         GL.DrawArrays(PrimitiveType.Triangles, 0, sorted.Length * 6); drawCalls++; triangles += sorted.Length * 2;
         GL.Disable(EnableCap.Blend); GL.DepthMask(true); GL.DepthFunc(DepthFunction.Less);
     }
+    /// <summary>拒绝已释放对象和跨线程GL调用；实际当前上下文由窗口生命周期保证。</summary>
     private void EnsureOwner()
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         if (Environment.CurrentManagedThreadId != ownerThread) throw new InvalidOperationException("GL调用必须位于创建渲染器的当前上下文线程");
     }
+    /// <summary>在创建线程释放目标、共享资产、程序和专用句柄；同时覆盖部分初始化失败。</summary>
     public void Dispose()
     {
         if (disposed) return;
@@ -487,5 +556,10 @@ public sealed class TrainingRenderer : IDisposable
         foreach (int vao in new[] { fullscreenVao, particleVao }) if (vao != 0) GL.DeleteVertexArray(vao);
         if (shadowBuffer != 0) GL.DeleteFramebuffer(shadowBuffer); if (shadowTexture != 0) GL.DeleteTexture(shadowTexture); if (skyTexture != 0) GL.DeleteTexture(skyTexture);
     }
+    /// <summary>路径共享模型的CPU/GPU组合；Meshes由外层渲染器释放。</summary>
+    /// <param name="Path">缓存使用的模型资产相对路径。</param>
+    /// <param name="Data">导入节点、材质、蒙皮和动画CPU数据。</param>
+    /// <param name="Meshes">与primitive一一对应的GPU网格。</param>
+    /// <param name="ActorCorrection">角色脚底、1.9米高度与素材前向的外观适配矩阵。</param>
     private sealed record GpuModel(string Path, GltfModel Data, GpuMesh[] Meshes, Matrix4 ActorCorrection);
 }

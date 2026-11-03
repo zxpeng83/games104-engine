@@ -2,14 +2,21 @@ using System.Text;
 
 namespace G104.Engine.Audio;
 
+/// <summary>保存整数PCM16交错声道样本；通过Read/Load读取时验证格式与声道。</summary>
+/// <param name="Channels">声道数；Read/Load仅支持单声道或双声道。</param>
+/// <param name="SampleRate">每声道每秒采样帧数，单位Hz。</param>
+/// <param name="Samples">不含容器头的PCM16小端样本数据。</param>
 public sealed record PcmWave(int Channels, int SampleRate, byte[] Samples)
 {
+    /// <summary>同步读取WAV文件，再按RIFF分块解析和验证。</summary>
     public static PcmWave Load(string path) => Read(File.ReadAllBytes(path));
 
+    /// <summary>校验RIFF边界、PCM格式、分块对齐和完整采样帧，拒绝不支持的编码。</summary>
     public static PcmWave Read(byte[] file)
     {
         using var stream = new MemoryStream(file, writable: false);
         using var reader = new BinaryReader(stream, Encoding.ASCII);
+        // 读取四字节ASCII块标识；后续块长度决定如何跳过未知内容。
         string Tag() => Encoding.ASCII.GetString(reader.ReadBytes(4));
         if (file.Length < 12 || Tag() != "RIFF") throw new InvalidDataException("Expected RIFF/WAVE.");
         long end = checked(8L + reader.ReadUInt32());

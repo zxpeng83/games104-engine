@@ -4,8 +4,10 @@ using OpenTK.Mathematics;
 
 namespace G104.Engine.Navigation;
 
+/// <summary>检查纯网格搜索规则、浮点尾格边界及真实物理端点连接。</summary>
 public static class NavigationVerification
 {
+    /// <summary>执行尾格专项及绕障、断路、穿角、预算和子格障碍断言。</summary>
     public static void Run()
     {
         VerifyNonIntegralBounds();
@@ -31,6 +33,7 @@ public static class NavigationVerification
         VerifyPhysicsEndpoints();
     }
 
+    /// <summary>核对非整除格子的实际半开范围、裁剪格心和一个ULP尾格的合法端点。</summary>
     public static void VerifyNonIntegralBounds()
     {
         VerifyRoundedTailSampling();
@@ -56,6 +59,7 @@ public static class NavigationVerification
                 boundaryGrid.FindPath(start, new Vector3(0.5f, 0, maximum)).Result == NavigationResult.InvalidGoal,
                 "Maximum boundaries must be exclusive for both integral and clipped grids.");
         }
+        // 统一检查裁剪网格的格心与路径点均落在真实范围内。
         bool Inside(Vector3 point) => point.X >= 0 && point.Z >= 0 && point.X < 2.1f && point.Z < 2.1f;
         Require((grid.CellCenter(2, 2) - new Vector3(2.05f, 0, 2.05f)).Length < 0.00001f,
             "The final cell must use the center of its clipped interval [2,2.1).");
@@ -93,6 +97,7 @@ public static class NavigationVerification
             "Physics-backed navigation must connect valid positions in the final clipped cell.");
     }
 
+    /// <summary>用真实物理地板检查零宽尾格不参与采样，边界内可表示端点仍可通行。</summary>
     public static void VerifyRoundedTailSampling()
     {
         var document = new SceneDocument
@@ -118,6 +123,7 @@ public static class NavigationVerification
         Require(grid.CanTraverse(start, goal), "Rounding into an empty tail cannot reject an otherwise clear interior traversal.");
     }
 
+    /// <summary>检查最大边界内端点索引舍入校正，以及较小导入数组不扩展覆盖范围。</summary>
     public static void VerifyInteriorMaximumRounding()
     {
         foreach (var axis in new[] { 0, 1 })
@@ -149,6 +155,7 @@ public static class NavigationVerification
             "The last representable interior position of a smaller imported occupancy array must remain accepted.");
     }
 
+    /// <summary>验证double跨度分配保留单ULP非零尾格，且双轴最大边界仍排除。</summary>
     public static void VerifySingleUlpTailAllocation()
     {
         // 固定大地板与导航边界独立，避免地板形状的舍入混入容量回归。
@@ -179,6 +186,7 @@ public static class NavigationVerification
         }
     }
 
+    /// <summary>用格心之间的细墙验证真实端点与格心连接受阻及端点自身穿透的拒绝。</summary>
     private static void VerifyPhysicsEndpoints()
     {
         var document = new SceneDocument
@@ -202,6 +210,7 @@ public static class NavigationVerification
         Require(grid.FindPath(grid.CellCenter(1, 1), new Vector3(0.5f, 0, 0)).Result == NavigationResult.InvalidGoal,
             "An actual goal inside a collider must fail even when its sampled cell is clear.");
     }
+    /// <summary>将导航规则失败转换为带具体条件说明的异常。</summary>
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);

@@ -11,8 +11,10 @@ using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Desktop;
 
+// 应用入口：先分派专项检查，无验证参数时启动训练场；异常统一返回失败退出码。
 try
 {
+    // 烟测只检查托管运行环境与程序集信息，不创建窗口或原生设备。
     if(args.Contains("--smoke",StringComparer.OrdinalIgnoreCase))
     {
         Console.WriteLine("Mode:             smoke");
@@ -25,6 +27,7 @@ try
         Console.WriteLine("Smoke result:     PASS");return 0;
     }
     var options=LaunchOptions.Parse(args);
+    // 此检查创建真实输入后端窗口，结果与无窗口UI检查分别判断。
     if(args.Contains("--verify-ui-input",StringComparer.OrdinalIgnoreCase))
     {
         using var verificationWindow=new G104.Sandbox.Tools.UiInputVerificationWindow();
@@ -46,6 +49,7 @@ try
         using var verificationWindow=new G104.Sandbox.Tools.RenderingVerificationWindow(options);
         verificationWindow.Run();return verificationWindow.Failed ? 1 : 0;
     }
+    // 逐项捕获回归失败，使一项失败后仍能收集其余检查结果。
     if(args.Contains("--review-baseline",StringComparer.OrdinalIgnoreCase))
     {
         var checks=new (string Name,Action Check)[]
@@ -66,6 +70,7 @@ try
         }
         return failures==0 ? 0 : 1;
     }
+    // 综合检查包含CPU规则和Jolt原生路径；GPU、音频设备与手感另行验证。
     if(args.Contains("--verify",StringComparer.OrdinalIgnoreCase))
     {
         foreach(string check in CoreSelfChecks.Run(Path.Combine(options.UserDataRoot,"Checks"))) Console.WriteLine("PASS core: "+check);
@@ -87,6 +92,7 @@ try
         Console.WriteLine("PASS audio: prepared WAV chunk parsing/PCM16/mono");
         Console.WriteLine("Verification complete; GPU/audio-device/hand-feel checks remain separate.");return 0;
     }
+    // 实际创建OpenAL设备与上下文，检查Voice和共享Buffer的使用及释放。
     if(args.Contains("--verify-audio",StringComparer.OrdinalIgnoreCase))
     {
         using var audio=new AudioSystem(options.AssetRoot);
@@ -97,6 +103,7 @@ try
         Console.WriteLine("PASS OpenAL actual context/buffers/2D+3D sources/pause/resume/cleanup: "+audio.Backend);
         return 0;
     }
+    // 外层finally保证Run异常时也在窗口上下文仍有效时清理资源。
     using var window=new TrainingWindow(options);
     try { window.Run(); }
     finally { window.DisposeResources(); }
@@ -104,5 +111,6 @@ try
 }
 catch(Exception error) { Console.Error.WriteLine(error);return 1; }
 
+// 读取程序集构建版本用于环境留证；缺少详细版本时逐级回退。
 static string VersionOf(Assembly assembly)=>assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
     ??assembly.GetName().Version?.ToString()??"unknown";

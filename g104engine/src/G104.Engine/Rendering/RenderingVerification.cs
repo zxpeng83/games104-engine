@@ -9,14 +9,18 @@ using System.Text.Json.Nodes;
 namespace G104.Engine.Rendering;
 
 // 入口要求当前线程持有GL上下文。CPU参考独立使用double公式，不以两管线互相吻合作为正确性证明。
+/// <summary>在真实GL上下文中验证定向生产渲染路径；独立CPU公式/像素参考用于判定，不代表完整视觉验收。</summary>
 public static class RenderingVerification
 {
+    /// <summary>奇数边长的离屏验证目标，便于中心像素对准几何中心。</summary>
     private const int Size = 129;
 
+    /// <summary>建立隔离资产、执行各项定向检查并汇总；失败统一抛出，要求调用线程持有GL上下文。</summary>
     public static IReadOnlyList<string> Run(string assetRoot, string? verificationRoot = null)
     {
         string root = CreateFixtures(assetRoot, verificationRoot);
         var results = new List<string>(); int failures = 0;
+        // 各项失败分别留证，继续执行其余检查，最后统一报告。
         void Check(string name, Action<List<string>> action)
         {
             try { action(results); results.Add($"PASS {name}"); }
@@ -40,15 +44,19 @@ public static class RenderingVerification
         return results;
     }
 
+    /// <summary>创建朝向原点的四米宽高正交相机，避免透视采样位置干扰参考。</summary>
     private static CameraState FrontCamera(Vector3 position) => new(position, Vector3.Zero,
         Matrix4.LookAt(position, Vector3.Zero, Vector3.UnitY), Matrix4.CreateOrthographic(4, 4, .1f, 20));
+    /// <summary>创建朝+Z的白色金属测试平面，仅改变感知粗糙度。</summary>
     private static RenderObject Plane(float roughness) => new(Guid.NewGuid(),
         Matrix4.CreateScale(10) * Matrix4.CreateRotationX(MathF.PI / 2),
         new() { Name = "GGXPlane", Primitive = PrimitiveKind.Plane,
             Material = new() { BaseColor = Float3.One, Metallic = 1, Roughness = roughness } }, new());
+    /// <summary>生成关闭阴影/FXAA的单位白方向光设置，隔离主路径BRDF行为。</summary>
     private static RenderSettings Light(RenderPipelineMode pipeline, Vector3 direction, float intensity = 1) => new()
     { Pipeline = pipeline, SunDirection = Float3.From(direction), SunColor = Float3.One, SunIntensity = intensity, Shadows = false, Fxaa = false };
 
+    /// <summary>对两管线多组粗糙度和光角读取HDR，与独立double GGX参考比较。</summary>
     private static void VerifyBrdf(TrainingRenderer renderer, List<string> results)
     {
         var camera = FrontCamera(new(0, 0, 5));
@@ -69,6 +77,7 @@ public static class RenderingVerification
     }
 
     // 通用GGX定义与Schlick-GGX geometry，N=V=(0,0,1)，白色金属F=1，NL在最后乘入。
+    /// <summary>计算N=V=+Z、白色金属的GGX/Schlick-GGX出射参考，结果已包含入射余弦。</summary>
     private static double ReferenceBrdf(double perceptualRoughness, double lightAngle)
     {
         double alpha = perceptualRoughness * perceptualRoughness, alphaSquared = alpha * alpha;
@@ -80,6 +89,7 @@ public static class RenderingVerification
         return distribution * geometry / 4;
     }
 
+    /// <summary>验证低粗糙度高光超过半精度上限仍保留有限HDR，且最终色调映射有限。</summary>
     private static void VerifyHdrRange(TrainingRenderer renderer, List<string> results)
     {
         foreach (var pipeline in Enum.GetValues<RenderPipelineMode>())
@@ -96,6 +106,7 @@ public static class RenderingVerification
         }
     }
 
+    /// <summary>构造径向距离和视深度顺序相反的两粒子，与独立source-over像素参考比较。</summary>
     private static void VerifyParticles(TrainingRenderer renderer, List<string> results)
     {
         var camera = new CameraState(Vector3.Zero, -Vector3.UnitZ, Matrix4.Identity, Matrix4.CreateOrthographic(4, 4, .1f, 20));
@@ -103,6 +114,7 @@ public static class RenderingVerification
         ParticleVisual far = new(new(.99f, 0, -5.001f), new(0, 0, 1, .5f), .15f);
         const int x = 96, y = Size / 2;
         float worldX = ((x + .5f) / Size * 2 - 1) * 2;
+        // 根据测试像素的世界X和shader圆形衰减独立计算覆盖alpha。
         float Alpha(ParticleVisual p) { float radius = MathF.Abs(worldX - p.Position.X) * 2 / p.Size; return p.Color.W * (1 - radius) * (1 - radius); }
         float a = Alpha(near), b = Alpha(far);
         foreach (var pipeline in Enum.GetValues<RenderPipelineMode>())
@@ -122,6 +134,7 @@ public static class RenderingVerification
         }
     }
 
+    /// <summary>检查超范围光照提前拒绝、旧HDR保留，以及double预乘后合法高辐射仍可绘制。</summary>
     private static void VerifyInputRange(TrainingRenderer renderer, List<string> results)
     {
         var camera = FrontCamera(new(0, 0, 5)); var plane = Plane(.045f);
@@ -159,6 +172,7 @@ public static class RenderingVerification
         results.Add($"FP32支持上限HDR={hdr.X:G9}; 明确拒绝值不钳制D/粗糙度");
     }
 
+    /// <summary>区分最终反射色合同和HDR灯色合同，检查Prepare/两管线拒绝及合法tint组合。</summary>
     private static void VerifyReflectanceRange(TrainingRenderer renderer, string root, List<string> results)
     {
         var camera = FrontCamera(new(0, 0, 5));
@@ -211,6 +225,7 @@ public static class RenderingVerification
         results.Add("模型factor.5*tint2合法，factor1*tint2拒绝；SunColor2及PointLight颜色(2,1,.5)合法，原设计未改");
     }
 
+    /// <summary>从真实G-buffer读取量化值，验证Deferred BRDF仍保留声明的0.045粗糙度下限。</summary>
     private static void VerifyRoughnessFloor(TrainingRenderer renderer, List<string> results)
     {
         renderer.Render(FrontCamera(new(0, 0, 5)), [Plane(.045f)], Light(RenderPipelineMode.Deferred, -Vector3.UnitZ), [], RenderDebugView.Final);
@@ -221,6 +236,7 @@ public static class RenderingVerification
         Require(Math.Abs(actual - expected) < expected * .0003, "G-buffer写入将.045略向下舍入时，BRDF仍必须保留声明的.045下限");
     }
 
+    /// <summary>验证无UV模型追加贴图覆盖失败后，原显示、动画游标和未消费事件仍保持。</summary>
     private static void VerifyOverride(TrainingRenderer renderer, string root, bool normal, List<string> results)
     {
         renderer.ResetScene();
@@ -259,6 +275,7 @@ public static class RenderingVerification
         results.Add(rejection!);
     }
 
+    /// <summary>验证共享mesh中没有skin的刚性节点只用节点变换，并忽略源皮肤属性。</summary>
     private static void VerifyRigidSkin(string root, List<string> results)
     {
         var model = new GltfModelLoader(new(root)).Load("shared-skin.gltf");
@@ -271,6 +288,7 @@ public static class RenderingVerification
         results.Add("shared-skin.gltf: skin node + rigid node PASS；Khronos NODE_SKINNED_MESH_WITHOUT_SKIN为Warning");
     }
 
+    /// <summary>用生产lighting.glsl探针覆盖近相反掠射V/L，并与独立单位half-vector公式比较。</summary>
     private static void VerifyAntipodalBrdf(string root, List<string> results)
     {
         using var target = new RenderTargets(1, 1);
@@ -298,6 +316,7 @@ public static class RenderingVerification
         finally { GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0); GL.BindVertexArray(0); GL.UseProgram(0); GL.DeleteVertexArray(vao); }
     }
 
+    /// <summary>在唯一隔离目录复制生产shader/角色配置并写最小模型和探针，保留目录供失败复查。</summary>
     private static string CreateFixtures(string assetRoot, string? verificationRoot)
     {
         string root = Path.Combine(verificationRoot ?? Path.Combine(Path.GetTempPath(), "G104.RenderingVerification"), Guid.NewGuid().ToString("N"));
@@ -315,6 +334,7 @@ public static class RenderingVerification
         halfBase["meshes"]![0]!["primitives"]![0]!["material"] = 0;
         File.WriteAllText(Path.Combine(root, "half-base.gltf"), halfBase.ToJsonString());
         WriteNormalPng(Path.Combine(root, "plus-x-normal.png"));
+        // 整段原始字符串是GLSL探针；只调用生产brdf，CPU期望值在另一条公式路径计算。
         File.WriteAllText(Path.Combine(root, "shaders", "brdf-probe.frag"), """
             #version 430 core
             #include "lighting.glsl"
@@ -330,10 +350,12 @@ public static class RenderingVerification
         return root;
     }
 
+    /// <summary>写嵌入二进制的最小glTF三角形，可选UV与共享mesh的刚性/蒙皮节点组合。</summary>
     private static void WriteTriangle(string path, bool hasUv, bool sharedSkin)
     {
         var views = new JsonArray(); var accessors = new JsonArray();
         using var buffer = new MemoryStream(); using var writer = new BinaryWriter(buffer, Encoding.UTF8, true);
+        // 追加float属性数据、bufferView和accessor，返回供primitive引用的索引。
         int Attribute(float[] data, string type, int count, float[]? min = null, float[]? max = null)
         {
             int offset = (int)buffer.Position; foreach (float value in data) writer.Write(value);
@@ -372,12 +394,15 @@ public static class RenderingVerification
         File.WriteAllText(path, document.ToJsonString());
     }
 
+    /// <summary>生成单像素+X切线法线PNG作为贴图覆盖夹具，避免依赖额外图像资产。</summary>
     private static void WriteNormalPng(string path)
     {
         using var file = File.Create(path); file.Write([137,80,78,71,13,10,26,10]);
+        // 写PNG块的长度、类型、数据和CRC，不把编码逻辑当渲染参考。
         void Chunk(string name, byte[] data)
         {
             byte[] type = Encoding.ASCII.GetBytes(name);
+            // 按PNG要求写入大端32位整数。
             void Big(uint value) => file.Write([(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value]);
             Big((uint)data.Length); file.Write(type); file.Write(data);
             uint crc = uint.MaxValue;
@@ -390,6 +415,8 @@ public static class RenderingVerification
         Chunk("IDAT", compressed.ToArray()); Chunk("IEND", []);
     }
 
+    /// <summary>检查读回RGBA四个分量均为有限值，排除NaN/无穷。</summary>
     private static bool Finite(Vector4 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z) && float.IsFinite(v.W);
+    /// <summary>将未满足的定向验证条件转换成上层可汇总的失败异常。</summary>
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 }

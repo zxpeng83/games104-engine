@@ -7,13 +7,16 @@ using NVector2 = System.Numerics.Vector2;
 namespace G104.Sandbox.Tools;
 
 // 原生ImGui输入/控件/队列检查，无窗口、GL或用户存档访问。
+/// <summary>在真实原生ImGui控件和命令队列上验证编辑事务边界，不创建窗口或GL资源。</summary>
 public static class EditorUiVerification
 {
+    /// <summary>逐项运行编辑UI定向检查并汇总失败；仅存档检查访问显式隔离根。</summary>
     public static IReadOnlyList<string> Run(string verificationRoot)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(verificationRoot);
         var passed = new List<string>();
         var failures = new List<string>();
+        // 每项单独收集通过或失败，避免首个异常遮蔽其余交互边界。
         void Check(string name, Action test)
         {
             try { test(); passed.Add(name); Console.WriteLine("UI PASS: " + name); }
@@ -32,6 +35,7 @@ public static class EditorUiVerification
         return passed;
     }
 
+    /// <summary>验证文本未提前提交，换树选择时提交一次，并可用一次Undo恢复旧对象。</summary>
     private static void CheckTextSelection(string label)
     {
         using var ui = new UiSession();
@@ -47,6 +51,7 @@ public static class EditorUiVerification
         Require(Read(a, label) != value, "Undo did not restore the original text.");
     }
 
+    /// <summary>验证非法拖动帧只回滚该帧，整段手势仍合并为一次Undo或被Escape完整取消。</summary>
     private static void CheckRejectedDrag(bool cancel)
     {
         using var ui = new UiSession(character: true);
@@ -79,6 +84,7 @@ public static class EditorUiVerification
         }
     }
 
+    /// <summary>验证Enter只提交一次，Escape取消的草稿不会在后续选择变化时复活。</summary>
     private static void CheckTextKeys()
     {
         using var ui = new UiSession();
@@ -90,6 +96,7 @@ public static class EditorUiVerification
         Require(a.Name == "Committed" && ui.Editor.History.UndoCount == 1, "Escape left a draft that committed at a later boundary.");
     }
 
+    /// <summary>验证收起材质分组时仍提交被隐藏的贴图草稿。</summary>
     private static void CheckMaterialCollapse()
     {
         using var ui = new UiSession();
@@ -99,6 +106,7 @@ public static class EditorUiVerification
             "Texture draft was lost when its header hid the field.");
     }
 
+    /// <summary>验证场景面板窗口收起后仍提交被隐藏的名称草稿。</summary>
     private static void CheckWindowCollapse()
     {
         using var ui = new UiSession();
@@ -108,6 +116,7 @@ public static class EditorUiVerification
             "Name draft was lost when its scene window collapsed.");
     }
 
+    /// <summary>验证工具栏松开触发的命令能看到此前鼠标按下造成的文本提交。</summary>
     private static void CheckToolbarOrder()
     {
         using var ui = new UiSession();
@@ -125,6 +134,7 @@ public static class EditorUiVerification
         Require(observed == "Toolbar A" && ui.Editor.History.UndoCount == 1, "Toolbar command missed the text committed on mouse down.");
     }
 
+    /// <summary>在隔离目录验证加载/重置/保存的dirty基线，既有自定义存档不被Reset改写。</summary>
     private static void CheckSavedBaseline(string verificationRoot)
     {
         string root = Path.GetFullPath(verificationRoot);
@@ -161,6 +171,7 @@ public static class EditorUiVerification
         }
     }
 
+    /// <summary>按测试字段标签读取设计值，以同一断言覆盖名称和资产路径。</summary>
     private static string Read(SceneObjectData item, string label) => label switch
     {
         "Name" => item.Name,
@@ -170,25 +181,39 @@ public static class EditorUiVerification
         _ => throw new ArgumentOutOfRangeException(nameof(label))
     };
 
+    /// <summary>将未满足的交互或持久化条件转为可汇总失败。</summary>
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);
     }
 
+    /// <summary>独占临时ImGui上下文和两对象编辑场景，驱动真实面板/命令路径并采集控件区域。</summary>
     private sealed class UiSession : IDisposable
     {
+        /// <summary>创建验证会话前的ImGui上下文，释放时恢复。</summary>
         private readonly nint _previous = ImGui.GetCurrentContext();
+        /// <summary>本会话创建并销毁的隔离ImGui上下文。</summary>
         private readonly nint _context;
+        /// <summary>被测生产面板实例，跨帧保留真实草稿和事务状态。</summary>
         private readonly SceneEditorPanel _panel = new();
+        /// <summary>从真实绘制采集的标签到逻辑像素矩形映射。</summary>
         private readonly Dictionary<string, (NVector2 Min, NVector2 Max)> _items = [];
+        /// <summary>按生产安全点顺序执行的编辑命令队列。</summary>
         private readonly Queue<Action> _commands = [];
+        /// <summary>本会话的设计/历史所有者，用于核对实际提交结果。</summary>
         public SceneEditor Editor { get; }
+        /// <summary>第一个被编辑对象的GUID，可配置为角色或模型。</summary>
         public Guid First { get; }
+        /// <summary>第二个树节点GUID，用于触发选择离开边界。</summary>
         public Guid Second { get; }
+        /// <summary>面板返回的当前对象选择。</summary>
         public Guid? Selected { get; private set; }
+        /// <summary>实际命令执行中被场景验证拒绝的帧数。</summary>
         public int Rejected { get; private set; }
+        /// <summary>可选帧前绘制入口，用于验证工具栏与面板命令先后。</summary>
         public Action? BeforePanel { get; set; }
 
+        /// <summary>创建无窗口验证上下文、字体及测试设计；关闭ini持久化并预绘制以获得控件位置。</summary>
         public UiSession(bool character = false)
         {
             _context = ImGui.CreateContext();
@@ -212,6 +237,7 @@ public static class EditorUiVerification
             Frame(); Frame();
         }
 
+        /// <summary>取得实际数值框或树文本内的点击点，避开标签和展开箭头。</summary>
         public NVector2 Center(string label)
         {
             Require(_items.ContainsKey(label), "Control not drawn: " + label);
@@ -220,15 +246,19 @@ public static class EditorUiVerification
             return new NVector2(rect.Min.X + Math.Min(70, (rect.Max.X - rect.Min.X) * .35f), (rect.Min.Y + rect.Max.Y) * .5f);
         }
 
+        /// <summary>向真实ImGui IO发送按下/松开并额外推进一帧完成点击。</summary>
         public void Click(string label) { var point = Center(label); Mouse(point, true); Mouse(point, false); Frame(); }
+        /// <summary>提交逻辑像素位置及左键状态后推进面板一帧。</summary>
         public void Mouse(NVector2 point, bool down)
         {
             var io = ImGui.GetIO(); io.AddMousePosEvent(point.X, point.Y); io.AddMouseButtonEvent(0, down); Frame();
         }
+        /// <summary>以按下帧和松开帧提交一个ImGui键。</summary>
         public void Key(ImGuiKey key)
         {
             ImGui.GetIO().AddKeyEvent(key, true); Frame(); ImGui.GetIO().AddKeyEvent(key, false); Frame();
         }
+        /// <summary>点击真实输入框，通过Ctrl+A和UTF-8输入替换其草稿。</summary>
         public void ReplaceText(string label, string value)
         {
             Click(label);
@@ -237,8 +267,11 @@ public static class EditorUiVerification
             io.AddKeyEvent(ImGuiKey.A, false); io.AddKeyEvent(ImGuiKey.ModCtrl, false); Frame();
             io.AddInputCharactersUTF8(value); Frame();
         }
+        /// <summary>把工具栏验证操作排到面板共用命令队列尾部。</summary>
         public void Enqueue(Action command) => _commands.Enqueue(command);
+        /// <summary>记录最近绘制控件的实际逻辑像素区域。</summary>
         public void Observe(string label) => _items[label] = (ImGui.GetItemRectMin(), ImGui.GetItemRectMax());
+        /// <summary>依次绘制工具栏/面板、通过生产命令执行器消费队列，再结束ImGui帧。</summary>
         public void Frame()
         {
             ImGui.NewFrame();
@@ -253,9 +286,11 @@ public static class EditorUiVerification
             });
             ImGui.Render();
         }
+        /// <summary>销毁临时上下文并恢复进入验证前的上下文，不拥有外部GL或窗口资源。</summary>
         public void Dispose() { ImGui.DestroyContext(_context); ImGui.SetCurrentContext(_previous); }
     }
 
+    /// <summary>调用已加载cimgui取得原生IO地址，仅供关闭测试ini写入。</summary>
     [DllImport("cimgui", CallingConvention = CallingConvention.Cdecl, EntryPoint = "igGetIO")]
     private static extern nint GetNativeIo();
 }

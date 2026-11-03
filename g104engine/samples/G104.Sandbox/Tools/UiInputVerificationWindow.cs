@@ -10,18 +10,31 @@ using NVector2 = System.Numerics.Vector2;
 namespace G104.Sandbox.Tools;
 
 // 隐藏窗口定向发送Win32消息，经GLFW/OpenTK和生产ImGui后端；不移动桌面鼠标。
+/// <summary>用隐藏窗口定向Win32消息覆盖GLFW/OpenTK到生产ImGui后端的真实输入链路。</summary>
 internal sealed class UiInputVerificationWindow : GameWindow
 {
+    /// <summary>本窗口创建的生产UI后端，在GL上下文仍有效时释放。</summary>
     private ImGuiController? _ui;
+    /// <summary>核实属于本进程的Win32窗口句柄，仅向该窗口发送测试消息。</summary>
     private nint _handle;
+    /// <summary>_buttons统计按钮激活；_downEvents/_upEvents统计OpenTK收到的原生按下/松开事件。</summary>
     private int _buttons, _downEvents, _upEvents;
+    /// <summary>_checked为复选值；_leftPressed为本帧原生左键按下；_textActive为文本激活状态。</summary>
+    /// <remarks>_requestModal/_closeModal为模态开关请求；_modalOpen为实际模态开启结果。</remarks>
     private bool _checked, _leftPressed, _textActive, _requestModal, _closeModal, _modalOpen;
+    /// <summary>真实下拉框选择，0为Forward、1为Deferred。</summary>
     private int _selection;
+    /// <summary>_drag为真实拖动控件值；_wheelInFrame保存ImGui清帧前消费到的滚轮相对量。</summary>
     private float _drag, _wheelInFrame;
+    /// <summary>真实文本控件草稿，用于检查WM_CHAR是否经过OpenTK到达ImGui。</summary>
     private string _text = "Original";
+    /// <summary>_buttonPoint/_checkPoint/_comboPoint分别为按钮、复选框、下拉框的逻辑像素点击点。</summary>
+    /// <remarks>_optionPoint为选项；_textPoint为输入框；_dragPoint为拖动数值框，均从实际控件区域采集。</remarks>
     private NVector2 _buttonPoint, _checkPoint, _comboPoint, _optionPoint, _textPoint, _dragPoint;
+    /// <summary>任一输入检查失败后置真，供外层启动路径决定退出结果。</summary>
     public bool Failed { get; private set; }
 
+    /// <summary>创建唯一标题的隐藏OpenGL 4.3核心窗口，以便定位本进程的测试目标。</summary>
     public UiInputVerificationWindow() : base(GameWindowSettings.Default, new NativeWindowSettings
     {
         ClientSize = new Vector2i(640, 480), API = ContextAPI.OpenGL, APIVersion = new Version(4, 3),
@@ -29,6 +42,7 @@ internal sealed class UiInputVerificationWindow : GameWindow
         Title = "G104 UI input verification " + Guid.NewGuid().ToString("N")
     }) { }
 
+    /// <summary>建立生产UI后端并执行原生点击、拖动、文本、模态、快捷键、焦点和滚轮定向检查。</summary>
     protected override void OnLoad()
     {
         base.OnLoad();
@@ -144,6 +158,7 @@ internal sealed class UiInputVerificationWindow : GameWindow
         Close();
     }
 
+    /// <summary>推进生产UI帧并绘制真实控件，调用生产场景点击清焦路径，可输出输入状态证据。</summary>
     private void Frame(bool trace = false)
     {
         _ui!.BeginFrame(this, 1f / 60);
@@ -188,19 +203,30 @@ internal sealed class UiInputVerificationWindow : GameWindow
         _ui.Render();
     }
 
+    /// <summary>发送窗口客户区逻辑像素WM_MOUSEMOVE，不移动桌面鼠标。</summary>
     private void MoveMouse(NVector2 p) => SendMessageW(_handle, 0x0200, 0, (nint)(((int)p.Y << 16) | (ushort)p.X));
+    /// <summary>推进指定数量UI帧，让原生输入队列经过生产后端消费。</summary>
     private void Frames(int count) { for (int i = 0; i < count; i++) Frame(); }
+    /// <summary>按位置移动、稳定、按下、松开和收尾的顺序模拟一次窗口点击。</summary>
     private void Click(NVector2 point) { MoveMouse(point); Frames(2); Down(); Frames(2); Up(); Frames(3); }
+    /// <summary>定向发送窗口左键按下消息。</summary>
     private void Down() => SendMessageW(_handle, 0x0201, 1, 0);
+    /// <summary>定向发送窗口左键松开消息。</summary>
     private void Up() => SendMessageW(_handle, 0x0202, 0, 0);
+    /// <summary>将未满足的实际输入行为转为失败异常。</summary>
     private static void Require(bool condition, string error) { if (!condition) throw new InvalidOperationException(error); }
+    /// <summary>捕获单项失败、设置窗口失败标记并继续收集其余检查结果。</summary>
     private void Check(string name, Action action)
     {
         try { action(); Console.WriteLine("INPUT PASS: " + name); }
         catch (Exception error) { Failed = true; Console.WriteLine("INPUT FAIL: " + name + ": " + error.Message); }
     }
+    /// <summary>在窗口上下文仍有效时释放残留UI资源，覆盖加载检查异常路径。</summary>
     protected override void OnUnload() { _ui?.Dispose(); _ui = null; base.OnUnload(); }
+    /// <summary>按唯一窗口标题查找测试句柄；使用前还需核对进程身份。</summary>
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern nint FindWindowW(string? className, string name);
+    /// <summary>读取窗口所属线程和进程，用于拒绝把消息发到其他进程。</summary>
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint process);
+    /// <summary>同步向已核实的测试窗口发送Win32消息，让GLFW/OpenTK处理输入。</summary>
     [DllImport("user32.dll")] private static extern nint SendMessageW(nint window, uint message, nint wParam, nint lParam);
 }

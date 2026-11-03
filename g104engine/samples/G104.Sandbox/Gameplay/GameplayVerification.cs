@@ -4,8 +4,10 @@ using OpenTK.Mathematics;
 
 namespace G104.Sandbox.Gameplay;
 
+/// <summary>在无图形窗口的真实模拟中检查NPC感知、设计参数合同及机关一次事实。</summary>
 public static class GameplayVerification
 {
+    /// <summary>执行感知专项与开门穿门完成流程，并检查占用关闭拒绝及清除显式引用的行为。</summary>
     public static void Run()
     {
         VerifyNpcFacing();
@@ -38,6 +40,7 @@ public static class GameplayVerification
             Require(simulation.Completed && completions == 1, "Entering the goal after opening the door must complete once.");
             Require(simulation.NpcPath.Count > 0 && simulation.NpcState is not null, "NPC must produce a path and execute the shared character controller.");
         }
+        // 通过真实移动进入已打开门洞，再尝试关闭以验证占用保护。
         var occupied = CreateScene(new Vector3(0, 0.05f, 2));
         using var guardedSimulation = new TrainingSimulation(occupied, new SceneGraph(occupied));
         var interaction = new GameInput(Vector2.Zero, false, false, true, 0);
@@ -47,6 +50,7 @@ public static class GameplayVerification
         guardedSimulation.Tick(1f / 60, interaction);
         Require(guardedSimulation.DoorOpen && guardedSimulation.Events.Any(item => item.Sound == "denied"),
             "Door closing must be rejected while a character occupies the original collision volume.");
+        // 清除TargetId后保留场景门，确认不会隐式回退到首个门对象。
         var unlinked = CreateScene(new Vector3(0, 0.05f, 2));
         unlinked.Objects.Single(item => item.Kind == ObjectKind.Button).TargetId = null;
         using var unlinkedSimulation = new TrainingSimulation(unlinked, new SceneGraph(unlinked));
@@ -55,6 +59,7 @@ public static class GameplayVerification
             "A cleared explicit button target must not fall back to another door.");
     }
 
+    /// <summary>用静止设计朝向及正反方向对照，检查感知读取逻辑旋转后的局部-Z前向且保留原朝向。</summary>
     public static void VerifyNpcFacing()
     {
         foreach (var (yaw, playerZ, expected) in new[]
@@ -79,6 +84,7 @@ public static class GameplayVerification
         }
     }
 
+    /// <summary>在窄视野下核对感知随当前Slerp逻辑旋转变化，不能提前使用目标朝向。</summary>
     public static void VerifyNpcFacingTransition()
     {
         var document = CreatePerceptionScene(new Vector3(3.5f, 0.05f, 0.5f), 0);
@@ -106,6 +112,7 @@ public static class GameplayVerification
         Require(simulation.NpcMode == NpcMode.Follow, "The NPC must see the player once its current rotation enters the cone.");
     }
 
+    /// <summary>核对设计校验与控制器默认Skin阈值一致，合法半径能够实际准备运行模拟。</summary>
     public static void VerifyCharacterRadiusContract()
     {
         var skin = new CharacterSettings().Skin;
@@ -133,6 +140,7 @@ public static class GameplayVerification
         }
     }
 
+    /// <summary>创建平地和可控静止NPC感知样例，yaw使用弧度。</summary>
     private static SceneDocument CreatePerceptionScene(Vector3 playerPosition, float yaw)
     {
         return new SceneDocument
@@ -149,6 +157,7 @@ public static class GameplayVerification
         };
     }
 
+    /// <summary>创建含显式按钮门引用、NPC和目标区的独立玩法样例。</summary>
     private static SceneDocument CreateScene(Vector3 playerPosition)
     {
         var door = new SceneObjectData
@@ -170,6 +179,7 @@ public static class GameplayVerification
             ]
         };
     }
+    /// <summary>将玩法断言失败转换为包含具体交互或感知条件的异常。</summary>
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);

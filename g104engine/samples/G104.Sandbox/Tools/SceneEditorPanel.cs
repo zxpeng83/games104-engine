@@ -8,26 +8,43 @@ using OQuaternion = OpenTK.Mathematics.Quaternion;
 namespace G104.Sandbox.Tools;
 
 // 面板只提交命令；设计/渲染准备由窗口安全点处理，下一Play重建物理世界。
+/// <summary>把ImGui控件交互整理为设计命令、文本草稿和单次拖动事务，在窗口安全点执行。</summary>
 public sealed class SceneEditorPanel
 {
+    /// <summary>当前拖动事务所属编辑器，切换编辑器或Play时必须收尾。</summary>
     private SceneEditor? _transactionEditor;
+    /// <summary>当前拖动控件的标签，用于跨帧合并同一手势。</summary>
     private string? _transactionOwner;
+    /// <summary>文本草稿对应的对象身份，切换选择前先处理旧对象草稿。</summary>
     private Guid? _draftObject;
+    /// <summary>按字段标签保存尚未提交的文本。</summary>
     private readonly Dictionary<string, string> _textDrafts = [];
+    /// <summary>每份草稿的提交基线，用于避免未修改字段产生历史项。</summary>
     private readonly Dictionary<string, string> _textOriginals = [];
+    /// <summary>保存草稿原对象的应用回调，字段隐藏后仍能提交到正确对象。</summary>
     private readonly Dictionary<string, Action<string>> _textApplications = [];
+    /// <summary>记录仍在编辑的文本字段，防止新帧用设计值覆盖草稿。</summary>
     private readonly HashSet<string> _activeText = [];
+    /// <summary>本帧实际绘制的文本字段，用于帧末识别隐藏边界。</summary>
     private readonly HashSet<string> _drawnText = [];
+    /// <summary>本帧实际绘制的拖动字段，隐藏的事务在帧末收尾。</summary>
     private readonly HashSet<string> _drawnEdits = [];
+    /// <summary>草稿所属编辑器，设计替换时触发旧草稿处理。</summary>
     private SceneEditor? _draftEditor;
+    /// <summary>Escape取消后仍保持激活的拖动控件，待松手前抑制继续应用。</summary>
     private string? _cancelledEditOwner;
+    /// <summary>表示已排队命令完成后有待发布的选择变化。</summary>
     private bool _pendingSelection;
+    /// <summary>下一帧发布的新对象选择，删除时为null。</summary>
     private Guid? _nextSelection;
+    /// <summary>本帧是否按下Escape，统一协调文本与拖动取消。</summary>
     private bool _cancelFrame;
 
     // 验证时采集真实控件区域；正常窗口未订阅，不改变交互。
+    /// <summary>可选验证探针，报告真实控件标签及逻辑像素矩形。</summary>
     internal Action<string, NVector2, NVector2>? ObserveItem { get; set; }
 
+    /// <summary>绘制树和有限设计字段，按交互顺序排队命令并返回当前选择；运行态控件只读。</summary>
     public Guid? Draw(SceneEditor editor, bool playing, Guid? selected, Action<Action> enqueue)
     {
         ArgumentNullException.ThrowIfNull(editor);
@@ -91,6 +108,7 @@ public sealed class SceneEditorPanel
 
             ImGui.Separator();
             var children = editor.Graph.Document.Objects.ToLookup(item => item.ParentId);
+            // 递归绘制设计层级；切换选择前先提交旧字段并结束旧拖动。
             Guid? DrawNode(SceneObjectData item, Guid? current)
             {
                 var descendants = children[item.Id].ToArray();
@@ -249,6 +267,7 @@ public sealed class SceneEditorPanel
         }
     }
 
+    /// <summary>结束旧事务后排队创建对象，优先采用匹配模板，命令成功后发布新选择。</summary>
     private void QueueCreate(SceneEditor editor, ObjectKind kind, Action<Action> enqueue)
     {
         FinishTransaction(enqueue, cancel: false);
@@ -269,6 +288,7 @@ public sealed class SceneEditorPanel
         });
     }
 
+    /// <summary>列出不在自身子树且满足缩放合同的父节点，角色根禁止修改父级。</summary>
     private void DrawParent(SceneEditor editor, SceneObjectData item, Action<Action> enqueue)
     {
         ImGui.BeginDisabled(SceneValidator.RequiresRoot(item));
@@ -292,12 +312,14 @@ public sealed class SceneEditorPanel
         finally { ImGui.EndDisabled(); }
     }
 
+    /// <summary>结束当前事务后排队保持世界姿态的重挂接操作。</summary>
     private void QueueParent(SceneEditor editor, Guid id, Guid? parent, Action<Action> enqueue)
     {
         FinishTransaction(enqueue, cancel: false);
         enqueue(() => editor.Reparent(id, parent));
     }
 
+    /// <summary>绘制目标GUID选择；按钮只允许门目标，选取后排队更新引用。</summary>
     private void DrawTarget(SceneEditor editor, SceneObjectData item, Action<Action> enqueue)
     {
         if (item.Kind != ObjectKind.Button && item.TargetId is null) return;
@@ -322,6 +344,7 @@ public sealed class SceneEditorPanel
         finally { ImGui.EndCombo(); }
     }
 
+    /// <summary>维护字段草稿，Enter或编辑后离开时排队一次提交；Escape由统一取消路径处理。</summary>
     private void DrawText(string label, string current, Action<string> apply, Action<Action> enqueue)
     {
         _drawnText.Add(label);
@@ -346,6 +369,7 @@ public sealed class SceneEditorPanel
         }
     }
 
+    /// <summary>在选择/窗口/分组隐藏边界提交或丢弃草稿，可仅处理本帧未绘制的字段。</summary>
     private void FlushTextDrafts(Action<Action> enqueue, bool cancel, bool onlyUndrawn = false)
     {
         foreach (var label in _textDrafts.Keys.Where(label => !onlyUndrawn || !_drawnText.Contains(label)).ToArray())
@@ -363,6 +387,7 @@ public sealed class SceneEditorPanel
         }
     }
 
+    /// <summary>把控件激活到松开合并为一条历史事务；被拒帧不结束手势，Escape后抑制残余拖动。</summary>
     private void TrackEdit(SceneEditor editor, string label, bool changed, Action apply, Action<Action> enqueue)
     {
         ObserveItem?.Invoke(label, ImGui.GetItemRectMin(), ImGui.GetItemRectMax());
@@ -384,6 +409,7 @@ public sealed class SceneEditorPanel
         if (ImGui.IsItemDeactivated() && _transactionOwner == label) FinishTransaction(enqueue, cancel: false);
     }
 
+    /// <summary>清除面板事务身份并排队提交或取消实际History事务，保持命令执行顺序。</summary>
     private void FinishTransaction(Action<Action> enqueue, bool cancel)
     {
         if (_transactionEditor is not { } editor) return;
@@ -397,6 +423,7 @@ public sealed class SceneEditorPanel
         });
     }
 
+    /// <summary>复制当前TRS再应用字段变化，统一交给编辑器验证和记录历史。</summary>
     private static void EditTransform(SceneEditor editor, Guid id, Action<TransformData> change)
     {
         var transform = TransformMath.Clone(editor.Graph.Object(id).Transform);
@@ -404,6 +431,7 @@ public sealed class SceneEditorPanel
         editor.SetTransform(id, transform);
     }
 
+    /// <summary>复制完整可编辑材质再修改，避免草稿直接污染当前设计对象。</summary>
     private static void EditMaterial(SceneEditor editor, Guid id, Action<MaterialData> change)
     {
         var source = editor.Graph.Object(id).Material;
@@ -413,6 +441,8 @@ public sealed class SceneEditorPanel
         editor.SetMaterial(id, material);
     }
 
+    /// <summary>把引擎三分量值复制为ImGui使用的Numerics向量。</summary>
     private static NVector3 ToUi(Float3 value) => new(value.X, value.Y, value.Z);
+    /// <summary>将空白资产文本转换为null，非空路径去除首尾空白。</summary>
     private static string? Optional(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
