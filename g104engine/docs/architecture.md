@@ -3,15 +3,15 @@
 本页解释现有Engine/Sandbox怎样连接、何处写数据，以及时间、空间和资源寿命的约定。当前接续/同步查 [status.md](status.md)；设计来源及演变查 [decisions.md](decisions.md) 和 [v1-baseline.md](plans/v1-baseline.md)。本页不是运行结果台账。
 
 <a id="overview"></a>
-## 总体结构
 
+## 总体结构
 
 项目用第三人称非战斗训练场串联输入、控制器、动画、渲染、机关、NPC 与工具，同时保留独立行为检查。近期 Gameplay/客户端工程实践重点影响顺序，不取消渲染、物理、动画、Gameplay、AI、工具链、资产、粒子、声音、网络和现代引擎架构的学习深度；旧 2–4 周预算不是整个项目期限。
 
-| 项目 | 当前实际职责 | 依赖边界 |
-| --- | --- | --- |
-| [G104.Engine](../src/G104.Engine/G104.Engine.csproj) | Core、Scene、Editor、Assets、Animation、Physics、Navigation、Rendering、Effects、Audio、Tools 通用能力 | 不依赖 Sandbox，不持有训练场专属按钮/目标流程 |
-| [G104.Sandbox](../samples/G104.Sandbox/G104.Sandbox.csproj) | 启动选项、窗口/安全点组装、训练场 C# Gameplay、NPC FSM、设计面板和演示验证 | 使用 Engine；示例布局与演示控制在此项目 |
+| 项目                                                       | 当前实际职责                                                                                           | 依赖边界                                      |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| [G104.Engine](../src/G104.Engine/G104.Engine.csproj)        | Core、Scene、Editor、Assets、Animation、Physics、Navigation、Rendering、Effects、Audio、Tools 通用能力 | 不依赖 Sandbox，不持有训练场专属按钮/目标流程 |
+| [G104.Sandbox](../samples/G104.Sandbox/G104.Sandbox.csproj) | 启动选项、窗口/安全点组装、训练场 C# Gameplay、NPC FSM、设计面板和演示验证                             | 使用 Engine；示例布局与演示控制在此项目       |
 
 不为架构图的每个方框建立独立程序集。当前对象由 GUID 和有限组件式设计字段组织，系统在明确阶段消费；没有完整数据导向 ECS、通用组件注册/反射框架、异步资产流或自研 Job System。所用库的工作线程也不等于引擎已有通用任务图。
 
@@ -42,51 +42,106 @@ flowchart TD
 
 下表直接定位实现。它是架构导航，读懂本页不要求先读完整模块指南。
 
-
-| 文件/目录 | 阅读时回答的问题 | 类型 |
-| --- | --- | --- |
-| [Program](../samples/G104.Sandbox/Program.cs) / [LaunchOptions](../samples/G104.Sandbox/LaunchOptions.cs) | 默认V1窗口、smoke、verify、UI/UI-input/render/contact/audio与隔离数据根如何选择，异常/退出码归谁处理？ | 启动/验证组装 |
-| [TrainingWindow](../samples/G104.Sandbox/TrainingWindow.cs) | 窗口、UI、安全点、输入、固定模拟、相机/渲染、Play/Stop 和清理如何连接？ | 训练场组装 |
-| [FixedStepClock](../src/G104.Engine/Core/FixedStepClock.cs) / [InputBuffer](../src/G104.Engine/Core/InputBuffer.cs) | 零步/多步帧、超时/补步、输入边沿和鼠标如何消费？ | 自研 Core |
-| [SceneData](../src/G104.Engine/Scene/SceneData.cs) / [SceneGraph](../src/G104.Engine/Scene/SceneGraph.cs) | 设计身份/父关系与逻辑/显示世界矩阵是否混用？ | 自研设计/场景 |
-| [TransformMath](../src/G104.Engine/Scene/TransformMath.cs) / [SceneValidator](../src/G104.Engine/Scene/SceneValidator.cs) / [SceneParameterRules](../src/G104.Engine/Scene/SceneParameterRules.cs) | TRS、剪切、父缩放、根限制、参数/引用在哪里拒绝？ | 自研数学/约束 |
-| [SceneSerializer](../src/G104.Engine/Scene/SceneSerializer.cs) / [AssetPath](../src/G104.Engine/Scene/AssetPath.cs) / [TemplateCatalog](../src/G104.Engine/Scene/TemplateCatalog.cs) | JSON、资产边界、原子保存、模板实例的设计语义是什么？ | 自研适配 + .NET JSON/文件库 |
-| [SceneEditor](../src/G104.Engine/Editor/SceneEditor.cs) / [EditorHistory](../src/G104.Engine/Editor/EditorHistory.cs) | UI 改动如何验证/准备/提交、失败回滚，Undo 怎样保持身份/dirty？ | 自研命令/有限快照 |
-| [SceneEditorPanel](../samples/G104.Sandbox/Tools/SceneEditorPanel.cs) / [ImGuiController](../src/G104.Engine/Tools/ImGuiController.cs) | 控件如何排队命令、拖动事务怎样收束、ImGui 怎样接输入和GL？ | ImGui.NET集成 + 自研后端/设计面板 |
-| [GltfModelLoader](../src/G104.Engine/Assets/GltfModelLoader.cs) / [GltfModel](../src/G104.Engine/Assets/GltfModel.cs) / [AssetRoot](../src/G104.Engine/Assets/AssetRoot.cs) | 标准格式怎样变成本项目模型，默认节点、边界、URI和skin如何处理？ | SharpGLTF集成 + 自研转换 |
-| [AnimationController](../src/G104.Engine/Animation/AnimationController.cs) | Clip、速度混合、跳跃过渡、事件序列与pose如何求值？ | 自研运行时 |
-| [PhysicsWorld](../src/G104.Engine/Physics/PhysicsWorld.cs) | Jolt世界/形状/query、矩阵包装边界、GUID和基础刚体寿命是什么？ | 第三方后端集成/适配 |
-| [KinematicCharacter](../src/G104.Engine/Physics/KinematicCharacter.cs) | feet位置如何沿合法查询位移，坡台/墙/跳跃怎样决策？ | 自研角色规则 |
-| [NavigationGrid](../src/G104.Engine/Navigation/NavigationGrid.cs) | 同一碰撞描述如何采样平面净空、A*和路径/端点怎样验空？ | 自研受控导航 |
-| [TrainingSimulation](../samples/G104.Sandbox/Gameplay/TrainingSimulation.cs) | 门/目标/玩家/NPC 如何按阶段提交一次事实？ | 专属 C# Gameplay/FSM |
-| [TrainingRenderer](../src/G104.Engine/Rendering/TrainingRenderer.cs) / [RenderContracts](../src/G104.Engine/Rendering/RenderContracts.cs) | 相同对象/动画/材质怎样进入两条管线、debug和透明合成？ | 自研固定 Pass |
-| [GpuResources](../src/G104.Engine/Rendering/GpuResources.cs) / [PrimitiveMeshes](../src/G104.Engine/Rendering/PrimitiveMeshes.cs) / [GLSL](../assets/shaders) | GL资源、贴图/目标/Shader失败怎样清理，颜色/空间怎样一致？ | OpenTK/StbImageSharp集成 + 自研资源/几何/Shader |
-| [ParticleSystem](../src/G104.Engine/Effects/ParticleSystem.cs) | 一次Burst怎样出生/推进/死亡/清理，有限容量在哪里？ | 自研 CPU 粒子 |
-| [PcmWave](../src/G104.Engine/Audio/PcmWave.cs) / [AudioSystem](../src/G104.Engine/Audio/AudioSystem.cs) | WAV分块、共享Clip、独立Voice、Listener和上下文怎样管理？ | 自研解析/管理 + OpenAL |
-| [初始场景](../assets/scenes/training-ground.json) / [资源清单](../assets/licenses/asset-manifest.json) | 哪些是随程序初始资源，哪些是用户设计，来源/许可在哪里？ | 设计/部署数据 |
+| 文件/目录                                                                                                                                                                                       | 阅读时回答的问题                                                                                       | 类型                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| [Program](../samples/G104.Sandbox/Program.cs) / [LaunchOptions](../samples/G104.Sandbox/LaunchOptions.cs)                                                                                         | 默认V1窗口、smoke、verify、UI/UI-input/render/contact/audio与隔离数据根如何选择，异常/退出码归谁处理？ | 启动/验证组装                                   |
+| [TrainingWindow](../samples/G104.Sandbox/TrainingWindow.cs)                                                                                                                                      | 窗口、UI、安全点、输入、固定模拟、相机/渲染、Play/Stop 和清理如何连接？                                | 训练场组装                                      |
+| [FixedStepClock](../src/G104.Engine/Core/FixedStepClock.cs) / [InputBuffer](../src/G104.Engine/Core/InputBuffer.cs)                                                                               | 零步/多步帧、超时/补步、输入边沿和鼠标如何消费？                                                       | 自研 Core                                       |
+| [SceneData](../src/G104.Engine/Scene/SceneData.cs) / [SceneGraph](../src/G104.Engine/Scene/SceneGraph.cs)                                                                                         | 设计身份/父关系与逻辑/显示世界矩阵是否混用？                                                           | 自研设计/场景                                   |
+| [TransformMath](../src/G104.Engine/Scene/TransformMath.cs) / [SceneValidator](../src/G104.Engine/Scene/SceneValidator.cs) / [SceneParameterRules](../src/G104.Engine/Scene/SceneParameterRules.cs) | TRS、剪切、父缩放、根限制、参数/引用在哪里拒绝？                                                       | 自研数学/约束                                   |
+| [SceneSerializer](../src/G104.Engine/Scene/SceneSerializer.cs) / [AssetPath](../src/G104.Engine/Scene/AssetPath.cs) / [TemplateCatalog](../src/G104.Engine/Scene/TemplateCatalog.cs)               | JSON、资产边界、原子保存、模板实例的设计语义是什么？                                                   | 自研适配 + .NET JSON/文件库                     |
+| [SceneEditor](../src/G104.Engine/Editor/SceneEditor.cs) / [EditorHistory](../src/G104.Engine/Editor/EditorHistory.cs)                                                                             | UI 改动如何验证/准备/提交、失败回滚，Undo 怎样保持身份/dirty？                                         | 自研命令/有限快照                               |
+| [SceneEditorPanel](../samples/G104.Sandbox/Tools/SceneEditorPanel.cs) / [ImGuiController](../src/G104.Engine/Tools/ImGuiController.cs)                                                            | 控件如何排队命令、拖动事务怎样收束、ImGui 怎样接输入和GL？                                             | ImGui.NET集成 + 自研后端/设计面板               |
+| [GltfModelLoader](../src/G104.Engine/Assets/GltfModelLoader.cs) / [GltfModel](../src/G104.Engine/Assets/GltfModel.cs) / [AssetRoot](../src/G104.Engine/Assets/AssetRoot.cs)                        | 标准格式怎样变成本项目模型，默认节点、边界、URI和skin如何处理？                                        | SharpGLTF集成 + 自研转换                        |
+| [AnimationController](../src/G104.Engine/Animation/AnimationController.cs)                                                                                                                       | Clip、速度混合、跳跃过渡、事件序列与pose如何求值？                                                     | 自研运行时                                      |
+| [PhysicsWorld](../src/G104.Engine/Physics/PhysicsWorld.cs)                                                                                                                                       | Jolt世界/形状/query、矩阵包装边界、GUID和基础刚体寿命是什么？                                          | 第三方后端集成/适配                             |
+| [KinematicCharacter](../src/G104.Engine/Physics/KinematicCharacter.cs)                                                                                                                           | feet位置如何沿合法查询位移，坡台/墙/跳跃怎样决策？                                                     | 自研角色规则                                    |
+| [NavigationGrid](../src/G104.Engine/Navigation/NavigationGrid.cs)                                                                                                                                | 同一碰撞描述如何采样平面净空、A*和路径/端点怎样验空？                                                  | 自研受控导航                                    |
+| [TrainingSimulation](../samples/G104.Sandbox/Gameplay/TrainingSimulation.cs)                                                                                                                     | 门/目标/玩家/NPC 如何按阶段提交一次事实？                                                              | 专属 C# Gameplay/FSM                            |
+| [TrainingRenderer](../src/G104.Engine/Rendering/TrainingRenderer.cs) / [RenderContracts](../src/G104.Engine/Rendering/RenderContracts.cs)                                                         | 相同对象/动画/材质怎样进入两条管线、debug和透明合成？                                                  | 自研固定 Pass                                   |
+| [GpuResources](../src/G104.Engine/Rendering/GpuResources.cs) / [PrimitiveMeshes](../src/G104.Engine/Rendering/PrimitiveMeshes.cs) / [GLSL](../assets/shaders)                                      | GL资源、贴图/目标/Shader失败怎样清理，颜色/空间怎样一致？                                              | OpenTK/StbImageSharp集成 + 自研资源/几何/Shader |
+| [ParticleSystem](../src/G104.Engine/Effects/ParticleSystem.cs)                                                                                                                                   | 一次Burst怎样出生/推进/死亡/清理，有限容量在哪里？                                                     | 自研 CPU 粒子                                   |
+| [PcmWave](../src/G104.Engine/Audio/PcmWave.cs) / [AudioSystem](../src/G104.Engine/Audio/AudioSystem.cs)                                                                                           | WAV分块、共享Clip、独立Voice、Listener和上下文怎样管理？                                               | 自研解析/管理 + OpenAL                          |
+| [初始场景](../assets/scenes/training-ground.json) / [资源清单](../assets/licenses/asset-manifest.json)                                                                                            | 哪些是随程序初始资源，哪些是用户设计，来源/许可在哪里？                                                | 设计/部署数据                                   |
 
 ## 数据身份与写入者
 
+| 数据                    | 当前负责者                                                       | 消费者与限制                                                  |
+| ----------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------- |
+| 设计 `SceneDocument`  | `SceneEditor` 命令、`EditorHistory`、`SceneSerializer`     | 保存 JSON、编辑预览和 Play 克隆；运行状态不能直接写回         |
+| 对象持久身份            | 非空唯一 GUID；可空 ParentId/TargetId                            | 创建/删除撤销恢复原身份；资产不使用运行句柄作身份             |
+| 输入按住态/边沿         | `InputBuffer`                                                  | Move/Sprint 持续；Jump/Interact 只在一次有效模拟步消费        |
+| 水平移动参考            | 窗口每显示帧单次消费鼠标 Look 后确定 yaw                         | 多个补步使用相同参考；相机俯仰不产生玩家竖直移动              |
+| 角色逻辑 feet/速度/接地 | `KinematicCharacter` 与 `TrainingSimulation.SubmitCharacter` | 碰撞、Gameplay、动画输入读取；动画和相机不覆盖角色位移        |
+| 机关状态                | `TrainingSimulation.Interact/CheckGoal`                        | 先校验距离/视线/关闭占用，再提交门画面、碰撞和导航事实        |
+| NPC 决策与任务          | `TrainingSimulation` FSM、`NavigationGrid` 路径              | 下一步移动意图由角色执行，区分到达/受阻/无路；与动画 FSM 分离 |
+| 逻辑/显示矩阵           | `SceneGraph` 当前/前一步局部 TRS                               | 逻辑世界给物理；显示世界用统一 alpha，不反写逻辑              |
+| 节点姿态/palette        | `AnimationController`、`GltfModel`                           | 模型内部树独立于设计场景树；in-place 不抽取 root motion       |
+| 一次事实事件            | 每个 `TrainingSimulation.Tick` 生成并在当步消费                | 音效和粒子使用同一事实；Render 不重发事件                     |
 
-| 数据 | 当前负责者 | 消费者与限制 |
-| --- | --- | --- |
-| 设计 `SceneDocument` | `SceneEditor` 命令、`EditorHistory`、`SceneSerializer` | 保存 JSON、编辑预览和 Play 克隆；运行状态不能直接写回 |
-| 对象持久身份 | 非空唯一 GUID；可空 ParentId/TargetId | 创建/删除撤销恢复原身份；资产不使用运行句柄作身份 |
-| 输入按住态/边沿 | `InputBuffer` | Move/Sprint 持续；Jump/Interact 只在一次有效模拟步消费 |
-| 水平移动参考 | 窗口每显示帧单次消费鼠标 Look 后确定 yaw | 多个补步使用相同参考；相机俯仰不产生玩家竖直移动 |
-| 角色逻辑 feet/速度/接地 | `KinematicCharacter` 与 `TrainingSimulation.SubmitCharacter` | 碰撞、Gameplay、动画输入读取；动画和相机不覆盖角色位移 |
-| 机关状态 | `TrainingSimulation.Interact/CheckGoal` | 先校验距离/视线/关闭占用，再提交门画面、碰撞和导航事实 |
-| NPC 决策与任务 | `TrainingSimulation` FSM、`NavigationGrid` 路径 | 下一步移动意图由角色执行，区分到达/受阻/无路；与动画 FSM 分离 |
-| 逻辑/显示矩阵 | `SceneGraph` 当前/前一步局部 TRS | 逻辑世界给物理；显示世界用统一 alpha，不反写逻辑 |
-| 节点姿态/palette | `AnimationController`、`GltfModel` | 模型内部树独立于设计场景树；in-place 不抽取 root motion |
-| 一次事实事件 | 每个 `TrainingSimulation.Tick` 生成并在当步消费 | 音效和粒子使用同一事实；Render 不重发事件 |
+表中“运行句柄”可以理解为系统交给程序的资源标识：
+
+**是什么：** 用来识别和操作纹理、缓冲区、声音源、物理刚体等运行资源，可能表现为整数、原生指针或专门的封装类型。它不是变量名，其含义也不等同于 C# 托管对象的引用。
+
+**怎样获取：** 通常调用管理该资源的系统 API，由系统通过返回值或输出参数交回句柄，再把它保存到变量或字段里。具体调用哪个函数，取决于资源属于哪个系统；封装类也可能公开 `Handle` 属性供读取已有句柄。
+
+以本工程 [GpuResources.cs](../src/G104.Engine/Rendering/GpuResources.cs) 的纹理创建方式为例，窗口已建立有效的当前 OpenGL 上下文后，在该上下文所属线程调用：
+
+```csharp
+int textureHandle = GL.GenTexture();
+```
+
+这句代码可以拆成三个动作：
+
+1. **调用 API：** `GL.GenTexture()` 向 OpenGL 申请一个纹理标识。
+2. **取得返回值：** 假设 OpenGL 这次返回 `42`，具体数值由 OpenGL 决定；`42` 只是说明用的例子。
+3. **保存句柄：** 把返回值赋给 `textureHandle`。`textureHandle` 是程序员起的变量名，变量里保存的整数值才是后续要传给 OpenGL 的句柄。修改变量名不会改变它所指的资源。
+
+后续操作时，把保存的句柄传回 OpenGL：
+
+```csharp
+GL.BindTexture(TextureTarget.Texture2D, textureHandle);
+```
+
+这表示把该句柄指定的纹理绑定到当前活动纹理单元的二维纹理目标，后续再上传像素、设置参数等。拿到纹理标识不表示图片内容已经上传，也不表示完整纹理存储已经分配。
+
+本工程中不同资源的获取接口如下；表中只列取得标识的调用，资源准备还需各自的后续步骤：
+
+| 要获取什么     | 获取方式                                       | 返回值及用途                                                     |
+| -------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
+| 纹理句柄       | `GL.GenTexture()`                            | 整数形式的纹理标识，用于绑定、上传内容或删除对应纹理             |
+| 缓冲区句柄     | `GL.GenBuffer()`                             | 整数形式的缓冲区标识，用于绑定、上传数据或删除对应缓冲区         |
+| 着色器程序句柄 | `GL.CreateProgram()`                         | 整数形式的程序标识，用于附加着色器、链接程序，并在成功后用于绘制 |
+| 声音缓冲区句柄 | `AL.GenBuffer()`                             | 整数形式的声音缓冲区标识，用于填入音频数据并关联播放源           |
+| 播放源句柄     | `AL.GenSource()`                             | 整数形式的播放源标识，用于设置播放参数、播放或停止声音           |
+| 物理刚体标识   | `System.BodyInterface.CreateAndAddBody(...)` | `BodyID`，用于在对应物理系统中定位和操作刚体                   |
+
+图形例子见上述文件，声音和物理例子分别见 [AudioSystem.cs](../src/G104.Engine/Audio/AudioSystem.cs) 与 [PhysicsWorld.cs](../src/G104.Engine/Physics/PhysicsWorld.cs)。不同系统、不同资源类型的标识不能混用，即使整数值碰巧相同，也不代表同一个资源。
+
+如果资源已经由封装类创建，也可以从它公开的属性取得已有句柄。例如本工程的 `ShaderProgram` 类声明了：
+
+```csharp
+public int Handle { get; private set; }
+```
+
+它的构造函数中通过下面这句创建程序对象并保存句柄，之后再附加着色器和链接程序：
+
+```csharp
+Handle = GL.CreateProgram();
+```
+
+外部拿到这个 `ShaderProgram` 对象后，可以通过 `shaderProgram.Handle` 读取已保存的整数句柄；读取属性不会再次创建程序对象。这里 `shaderProgram` 保存的是 C# 包装对象的引用，包装对象内部的 `Handle` 保存的是 OpenGL 程序句柄，两者分工不同。
+
+因此，获取句柄要看对应 API 或封装类提供什么接口。不能自己随便写一个数字，也没有对任意 C# 变量统一调用的“取资源句柄”函数；`Handle` 只是某些封装使用的属性名，并非所有对象都有。
+
+**为什么不用作资产身份：** 句柄只在对应资源和运行环境有效时有意义；释放后失效，重新创建时可能改变，旧值也可能被复用。因此本工程的设计 JSON 保存资产路径等可重新定位的引用，加载后再创建资源、取得句柄；场景对象的持久身份则由 GUID 维护。
 
 V1 不是把全部 Runtime 内存序列化的运行存档。GPU、Jolt、音频句柄与动画游标不进入设计 JSON；具体数据/API见 [scene-and-editor.md](guides/scene-and-editor.md)。
 
 <a id="frame-flow"></a>
 <a id="实际帧流程"></a>
-## 实际帧流程
 
+## 实际帧流程
 
 ```mermaid
 flowchart TD
@@ -104,7 +159,7 @@ flowchart TD
     Draw --> Swap["检查GL / 可选隔离截图 / SwapBuffers"]
 ```
 
-`FixedStepClock` 的步长 `1/60` 秒，最多五步、输入时间上限0.25秒；完整积压丢弃，余量产生alpha。零步保存Jump/Interact边沿，多步第一次消费后清边沿，Move/Sprint继续按住。窗口当前也限制显示delta，并在加载/切换/暂停转换时丢弃下一旧delta；时钟统计不代表所有系统耗时。鼠标以显示帧更新参考yaw，同一帧各补步不重复应用 Look。
+`FixedStepClock` 的步长 `1/60` 秒，最多五步、输入时间上限0.25秒（每个tick时，如果积累超过250ms的直接丢弃，超过5步的完整步丢弃但保留余量alpha；如当前tick是260ms，直接丢弃10ms变成250ms，此时有16.6ms*15，即正好15步，超过5步的丢弃，即当前tick只计算5步，对否余量0ms；如当前tick是6步+10ms，此时丢失1步，计算5步，10ms余量到下一个tick）；完整积压丢弃，余量产生alpha。零步保存Jump/Interact边沿，多步第一次消费后清边沿，Move/Sprint继续按住（例如按下 Space，但这一帧执行零个模拟步先保存跳跃请求，等下一次有效模拟步处理；如当前tick时长10ms且按下了space建，但此时不够1步，所以这个操作作为余量留到下一个tick执行）。窗口当前也限制显示delta，并在加载/切换/暂停转换时丢弃下一旧delta；时钟统计不代表所有系统耗时（delta是两次更新的时间间隔，窗口通常先截到最多250ms；例如加载用了2秒，随后包含加载耗时的旧delta会被忽略，不拿来补算运动；时钟只统计自身模拟步数与丢时，不包含窗口提前过滤的时间，也不表示物理、渲染实际执行了多久）。鼠标以显示帧更新参考yaw，同一帧各补步不重复应用 Look（例如本帧右键拖动鼠标向右10像素，只据此更新一次相机水平朝向yaw；即使本帧补算3步，也共用新朝向，这10像素的鼠标增量不会被重复应用3次）。
 
 编辑命令不在物理更新或对象遍历中改集合，即使暂停/零步仍可响应。编辑态推进预览动画，运行态按固定步推进动画/粒子；`Render`只读显示输入。暂停与失焦清理不是确定性网络协议，基本恢复/最小化、连续操作和特殊组合需要各自覆盖证据，不由协议说明推定通过。
 
@@ -115,15 +170,15 @@ flowchart TD
 失焦、最小化、暂停、加载或Play/Stop清时间和输入；恢复丢弃旧delta，并重置SceneGraph与骨骼显示历史。音频暂停/恢复Voice；当前无单步功能。尺寸为零跳过绘制，UI输入适配与角色InputBuffer分工独立。
 
 <a id="space-contracts"></a>
+
 ## 坐标、矩阵与角色边界
 
-
-| 边界 | 实际约定 |
-| --- | --- |
-| 世界 | Y-up、右手、米/秒；局部前 -Z、右 +X |
-| OpenTK CPU | 行向量，局部 S×R×T；`world=local×parentWorld` |
-| GLSL | 列向量，`P×V×M×position`；OpenTK 原始行字节按 `transpose=false` 上传，GPU 数学矩阵相当于 CPU 转置 |
-| glTF 蒙皮 | `palette=inverseBind×jointWorld×inverse(meshWorld)`；`drawModel=meshWorld×instanceCorrection×sceneWorld` |
+| 边界          | 实际约定                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 世界          | Y-up、右手、米/秒；局部前 -Z、右 +X                                                                                 |
+| OpenTK CPU    | 行向量，局部 S×R×T；`world=local×parentWorld`                                                                  |
+| GLSL          | 列向量，`P×V×M×position`；OpenTK 原始行字节按 `transpose=false` 上传，GPU 数学矩阵相当于 CPU 转置            |
+| glTF 蒙皮     | `palette=inverseBind×jointWorld×inverse(meshWorld)`；`drawModel=meshWorld×instanceCorrection×sceneWorld`    |
 | Jolt 形状查询 | 当前绑定版本在 `ToJolt` 内转置；`PhysicsWorld.QueryTransform` 将 Numerics 行 TRS 预转置一次，集中适配该公开边界 |
 
 不能把内存行/列布局等同于向量乘法约定，也不能把 GLSL 上传策略套到 Jolt 包装层。Jolt Body 的位置/四元数参数不经过查询矩阵路径。该差异曾由原生扫掠/穿透结果异常暴露，修复后行为检查通过；推导和固定版本源码见 [physics-and-gameplay.md](guides/physics-and-gameplay.md#固定jolt版本与矩阵边界)、[rendering-and-animation.md](guides/rendering-and-animation.md#空间矩阵与蒙皮) 与 [design-reference-checks-2026-10-03.md](reviews/design-reference-checks-2026-10-03.md)。
@@ -139,17 +194,17 @@ OpenGL投影NDC z为[-1,1]，与固定Piccolo的Vulkan 0..1及Y翻转不同。GL
 SetWorldPosition/SetWorldRotation只修改对应已存TRS字段，保留其余字段；通用SetWorldMatrix/保持世界重挂接才分解矩阵。稳定trace/最大对角四分支及double中间值避免近180°反求小分母，仍维持有限值、正缩放、1e-4重建容差与剪切/反射拒绝。这是合法TRS精度修复，不是放宽场景约束。
 
 <a id="ownership"></a>
+
 ## 所有权、共享与释放
 
-
-| 所有者 | 数据/资源 | 清理/失败规则 |
-| --- | --- | --- |
-| 窗口 | UI/renderer/audio、设计/运行组装、particles/commands | `Run`外层finally和OnUnload均调用幂等DisposeResources，GL仍在有效Context时释放 |
-| 设计/History | DTO/矩阵/100条有限快照、稳定GUID/DTO身份 | 不拥有GPU/Jolt/AL句柄，不能深Clone句柄建立运行隔离 |
-| renderer | 程序/primitive/天空/目标；共享模型/贴图；GUID动画实例 | Prepare失败仅清新资源；Resize完整新目标成功才替换；离场引用清理；ResetScene与Dispose明确分层 |
-| PhysicsWorld | System/Body/Shape/query capsule/filters/jobs | 注销/销毁Body→Shape/System/jobs/filters→最后一个活动世界Foundation.Shutdown |
-| AudioSystem | device/context、共享Buffer、独立Voice | 先停止/解绑/删Voice→Buffer→解除/销毁context→device→加载库；构造部分失败同样清理 |
-| ParticleSystem | CPU个体、512容量和随机源 | 固定步推进/死亡回收，Stop/Play清Clear；不拥有渲染器粒子GPU资源 |
+| 所有者         | 数据/资源                                             | 清理/失败规则                                                                                |
+| -------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 窗口           | UI/renderer/audio、设计/运行组装、particles/commands  | `Run`外层finally和OnUnload均调用幂等DisposeResources，GL仍在有效Context时释放              |
+| 设计/History   | DTO/矩阵/100条有限快照、稳定GUID/DTO身份              | 不拥有GPU/Jolt/AL句柄，不能深Clone句柄建立运行隔离                                           |
+| renderer       | 程序/primitive/天空/目标；共享模型/贴图；GUID动画实例 | Prepare失败仅清新资源；Resize完整新目标成功才替换；离场引用清理；ResetScene与Dispose明确分层 |
+| PhysicsWorld   | System/Body/Shape/query capsule/filters/jobs          | 注销/销毁Body→Shape/System/jobs/filters→最后一个活动世界Foundation.Shutdown                |
+| AudioSystem    | device/context、共享Buffer、独立Voice                 | 先停止/解绑/删Voice→Buffer→解除/销毁context→device→加载库；构造部分失败同样清理          |
+| ParticleSystem | CPU个体、512容量和随机源                              | 固定步推进/死亡回收，Stop/Play清Clear；不拥有渲染器粒子GPU资源                               |
 
 当前AudioSystem在窗口寿命内同步枚举并载入八个WAV：七段Kenney来源转换素材加程序生成的 `loop-test.wav`。Play/Stop只清Voice，Buffer保留到窗口关闭；这不是场景差量音频加载或进程级资源数据库。renderer共享primitive/Shader等通用资源至退出，模型/贴图按活动场景引用复用并卸载；实例删除不是释放所有共享资产。JoltFoundation按活动世界计数，双世界行为已经检查，不能用“当前活动世界”猜测别的世界所有权。
 
@@ -160,8 +215,8 @@ renderer缓存模型/贴图，但没有进程级无限资源数据库；实例�
 音频运行输入为整数PCM16 mono/stereo WAV。3D点声源需mono，Listener随显示相机；32 Voice满时淘汰最早登记者，不等于完整分类/优先级系统。CPU粒子是世界空间Burst/512容量、固定步生成运动死亡和alpha淡出；没有持续Emitter、GPU池、传播/混响或AI听觉。
 
 <a id="scene-lifecycle"></a>
-## 设计、运行与准备提交
 
+## 设计、运行与准备提交
 
 `SceneDocument` 保存schemaVersion=1、GUID、ParentId、LocalTRS、有限Material/Collider/参数/资产与模板信息。设计场景树、glTF默认节点树和skin关节集合是不同结构；场景编辑限制不套到导入模型全部节点。`TemplateId`是单层来源，实例保存完整有效字段与白名单覆盖，父挂接独立管理；当前没有模板变体/嵌套/Apply/Revert。
 
@@ -190,6 +245,7 @@ Undo/Redo 最多 100 条，稳定 GUID/DTO、子树事务、外部 TargetId 引�
 受控父子结构用于“机关组→门/按钮/灯”这类组合。普通对象保存相对TRS，重挂接保world、删除整棵子树为一次Undo；GUID不随换父变化。Player/Npc必须为根且单位缩放，角色/移动门下仅纯显示后代；所有接收设计子对象的节点要求正统一缩放。活动相机/动态刚体根原则是扩展边界，当前DTO没有对应编辑组件；场景树不是物理约束、Prefab嵌套或骨骼挂点。
 
 <a id="render-contracts"></a>
+
 ## 渲染与表现合同
 
 方向光2048² D24/3×3 PCF阴影→Forward或G-buffer/Deferred→天空/透明Billboard→曝光/Reinhard/一次Gamma→FXAA→UI。G-buffer为RGBA8线性基础色/金属度、RGBA16F世界法线/粗糙度、D24；Deferred以深度与逆ViewProjection重建位置。HDR为RGBA32F，修复GGX峰值后保留能量，较旧16F每像素增加8字节；没有通用Render Graph。
@@ -201,7 +257,6 @@ Undo/Redo 最多 100 条，稳定 GUID/DTO、子树事务、外部 TargetId 引�
 动画配置为schema=1的Locomotion/JumpStart/JumpLoop/JumpLand有限映射；逻辑采样、跨Clip混合、相邻局部Pose显示插值是三层。SceneGraph、mesh/palette/skeleton共用alpha；暂停ResetDisplayHistory保游标/事件，成功场景提交ResetAnimations重建实例。精确字段见 [rendering-and-animation.md](guides/rendering-and-animation.md#an5有限数据配置与使用)。
 
 ## 固定参考与可选深入
-
 
 Piccolo 固定参考为 [f5053707fed4d3f94d270a436fb0d3a8ae54e3e5](https://github.com/BoomingTech/Piccolo/tree/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5)。借鉴对象组件、数据交换、资源分层和局部算法，不照搬 Vulkan 投影/矩阵、组件遍历时序或空清理路径。其固定物理参数不证明有本项目累计器，首 Clip/固定权重不证明完整混合，目标重叠检查不证明扫掠墙滑，模式重载不证明保留未保存设计的 Play/Stop。所查 Piccolo 不覆盖完整音频、NPC FSM/A*、网络、Lumen 或 Nanite；不能把课程目标写成参考引擎全部实现。
 
