@@ -4,43 +4,111 @@
 
 理论学习、参考源码核查、本工程实现、用户体验与源码掌握分别记录。原最小3D工作已并入V1；后续模块目标保留，不能把当前有限子集当成完整课程工程目标。
 
+<a id="source-learning-route"></a>
+
+## 推荐的源码学习顺序
+
+已经读过 [architecture.md](architecture.md)，想结合第3节开始读代码时，建议采用**先跟通一个具体行为，再按依赖深入各模块**的两轮学习方式。第3节按课程主题组织，方便查找理论、源码和实现边界；章节编号不是要求逐节学完的顺序，第3.11节则用于跨模块复习。
+
+下面是针对现有V1源码的推荐阅读路线，可以按实际疑问和掌握情况调整。它不代表各阶段已经学完，也不是后续功能的开发排期；每个模块现有的简化范围、未实现内容和验证限制仍按本页对应章节理解。
+
+### 第一轮：沿着W/Space认识各模块怎样合作
+
+先按下方[第一单元](#first-input-lesson)的调用表跟一遍启动、进入Play、移动和跳跃。当前重点是说清**谁调用谁、传递什么数据、谁修改状态，以及何时执行**。
+
+```text
+启动窗口、进入Play
+    ↓
+采集W/Space → 缓存输入 → 固定步消费输入
+    ↓
+计算移动意图 → 角色控制器计算合法运动
+    ↓
+把角色位置、朝向写入运行场景
+    ↓
+生成显示姿态、动画输入和渲染输入 → 绘制画面
+```
+
+遇到物理查询时，先说明“输入什么形状和运动、返回什么碰撞结果”；遇到渲染调用时，先说明“场景姿态怎样交给渲染器”。Jolt内部算法、GL调用细节和蒙皮计算可留到第二轮，不要求第一次就读透每个被调用的方法。设计场景与运行场景的分离、资源由谁持有，也先认识职责边界，之后再深入实现。
+
+这一轮完成时，应能在代码中定位并解释：W在哪里变成移动方向，Space在哪里被缓存和消费，角色位置由谁写入，以及画面为什么读取插值姿态。零步/多步输入的预测、断点位置和观察项直接使用第一单元已有说明。
+
+### 第二轮：按依赖逐步深入实现
+
+下表的源码入口是阅读起点，不要求一次通读所列文件。表内章节号指本页第3节；对应课程笔记、固定参考和实现边界继续从相关章节进入。
+
+| 顺序 | 学习内容与对应章节 | 主要代码入口 | 这一阶段要回答的问题 |
+| --- | --- | --- | --- |
+| 1 | 核心流程与场景基础：3.8、3.5的基础部分 | [InputBuffer.cs](../src/G104.Engine/Core/InputBuffer.cs)、[FixedStepClock.cs](../src/G104.Engine/Core/FixedStepClock.cs)、[SceneData.cs](../src/G104.Engine/Scene/SceneData.cs)、[SceneGraph.cs](../src/G104.Engine/Scene/SceneGraph.cs) | 输入怎样跨显示更新保存？固定步怎样执行？对象的位置和层级在哪里保存？逻辑姿态怎样变成显示姿态，设计与运行数据由谁持有？ |
+| 2 | 玩家移动与角色物理：3.3、3.6的玩家部分 | [TrainingSimulation.cs](../samples/G104.Sandbox/Gameplay/TrainingSimulation.cs)的Tick/SubmitCharacter、[KinematicCharacter.cs](../src/G104.Engine/Physics/KinematicCharacter.cs)、[PhysicsWorld.cs](../src/G104.Engine/Physics/PhysicsWorld.cs) | 相机相对移动意图如何变成实际位移？接地、跳跃、墙滑和有限坡台怎样实现？哪些规则由本工程实现，哪些查询交给Jolt？ |
+| 3 | 机关交互与NPC/导航：3.6 | [TrainingSimulation.cs](../samples/G104.Sandbox/Gameplay/TrainingSimulation.cs)的Interact/UpdateNpc、[NavigationGrid.cs](../src/G104.Engine/Navigation/NavigationGrid.cs) | 按E怎样开门，为什么有时拒绝关门？NPC怎样决定目标、寻找路径，再通过角色控制器实际移动？ |
+| 4 | 基础渲染：3.1的基础部分 | [RenderContracts.cs](../src/G104.Engine/Rendering/RenderContracts.cs)、[PrimitiveMeshes.cs](../src/G104.Engine/Rendering/PrimitiveMeshes.cs)、[GpuResources.cs](../src/G104.Engine/Rendering/GpuResources.cs)、[TrainingRenderer.cs](../src/G104.Engine/Rendering/TrainingRenderer.cs) | 一个简单物体的顶点、模型矩阵、相机和Shader怎样配合把物体画出来？CPU数据怎样上传，GPU资源由谁持有和释放？ |
+| 5 | 模型导入与动画：3.5的模型资产部分、3.2 | [GltfModelLoader.cs](../src/G104.Engine/Assets/GltfModelLoader.cs)、[GltfModel.cs](../src/G104.Engine/Assets/GltfModel.cs)、[AnimationController.cs](../src/G104.Engine/Animation/AnimationController.cs) | 模型数据如何进入引擎？动画怎样采样、混合并求出骨骼姿态？实际移动速度如何决定走路/跑步表现，in-place动画为什么不直接推动角色？ |
+| 6 | 现有Forward/Deferred完整帧流程：继续深入3.1 | [TrainingRenderer.cs](../src/G104.Engine/Rendering/TrainingRenderer.cs)、[Shader目录](../assets/shaders) | 现有两条渲染路径、PBR、阴影、天空/粒子合成、HDR、色调映射和FXAA怎样组织？各Pass读写什么中间结果？这里的“完整”只指当前V1已有流程。 |
+| 7 | 粒子与声音：3.4 | [TrainingWindow.cs](../samples/G104.Sandbox/TrainingWindow.cs)的Feedback、[ParticleSystem.cs](../src/G104.Engine/Effects/ParticleSystem.cs)、[PcmWave.cs](../src/G104.Engine/Audio/PcmWave.cs)、[AudioSystem.cs](../src/G104.Engine/Audio/AudioSystem.cs) | 一次落地事实怎样触发声音和粒子？它们怎样更新、结束？共享音频Buffer、独立Voice及粒子绘制资源分别由谁管理？ |
+| 8 | 编辑器、保存与完整生命周期：3.5、3.8的相关部分 | [SceneSerializer.cs](../src/G104.Engine/Scene/SceneSerializer.cs)、[SceneEditor.cs](../src/G104.Engine/Editor/SceneEditor.cs)、[EditorHistory.cs](../src/G104.Engine/Editor/EditorHistory.cs)、[TrainingWindow.cs](../samples/G104.Sandbox/TrainingWindow.cs)的Play/Stop/DisposeResources及各后端Dispose | 修改、保存、Undo怎样工作？Play/Stop怎样隔离设计与运行？候选场景准备失败时怎样保留旧状态，退出时怎样按所有权释放资源？ |
+
+### 为什么部分模块分开学
+
+- **3.5分阶段阅读。** 场景对象、位置和层级是其他模块的基础，所以提前学；模型导入放在基础渲染之后；完整编辑、Undo、保存和资产生命周期放在熟悉运行流程之后深入。
+- **3.6先玩家、后交互和AI。** 第一轮先跟自己的输入怎样驱动角色；理解控制器后，再看机关与NPC怎样复用场景、物理和移动能力。
+- **渲染分两次深入。** 先掌握顶点、矩阵、Shader和基本绘制，再进入动画与蒙皮。PBR、阴影、Deferred及完整Pass组织可以随后学习，不必把所有渲染细节都当作动画前置。
+- **反馈链可以提前看一小段。** 学开门、跳跃或落地时，就可沿Events→Feedback看声音、粒子如何被触发；第6阶段先认识粒子Pass在合成中的位置，粒子模拟、音频后端和资源管理细节再在第7阶段深入。
+- **资源所有权贯穿各阶段。** 初读时知道谁创建、持有和销毁；涉及GPU时同时注意有效上下文及线程归属。第8阶段再把正常退出、部分失败和场景替换串成完整生命周期，避免到最后才第一次接触释放规则。
+
+### 哪些内容留到后续专题
+
+3.7网络、3.9动态GI、3.10 GPU驱动几何目前没有对应的完整本工程实现，保留为后续专题。3.8中的数据布局/ECS、通用Job System和Fiber等也有尚未实施的范围；现阶段先掌握已有的时间、输入、场景数据、安全点与生命周期机制。各模块的其他后移内容仍见第3节和模块路线，不因列入学习目标就视为已实现。
+
+第3.11节的复习问题可随阶段使用：学习场景/动画时回看三棵树和两类姿态，学习交互时回看请求/提交/事实，学习后端时回看矩阵边界和资源释放。它不是需要最后额外完成的一门模块。
+
+### 每次怎样学，以及读到什么程度再继续
+
+1. **先选一个能用代码回答的问题。** 例如“按下Space的这次显示更新没有执行模拟步，跳跃请求为什么不会丢？”先写出自己的预测。
+2. **沿一条调用链读必要代码。** 记录入口、输入、输出、状态写入者和执行时机；不熟悉的底层调用先说明接口作用，避免一次展开整个物理或渲染后端。
+3. **按需要回查文档和课程笔记。** 架构和数据归属查 [architecture.md](architecture.md)，当前机制查对应指南，理论疑问再沿第3节查具体笔记章节。无需每次重读全部文档。
+4. **用观察核对预测。** 手动学习调试时逐个启用断点，观察关键字段；零步/多步、焦点、暂停与断点改变帧时间的影响，按第一单元解释。运行观察与静态阅读分别说明。
+5. **用自己的话复述并提出一个边界例子。** 能定位调用链、解释数据如何变化，并预测一个失败或特殊情形，就可以进入下一步。例如多补步为什么不重复跳、门洞被占用为什么拒绝关门、动画为什么不写角色世界位移。读完文件、已有自动检查通过，都不能单独代表自己掌握了实现。
+
+下一次具体学习可以从 [InputBuffer.cs](../src/G104.Engine/Core/InputBuffer.cs) 开始，对照 [TrainingWindow.cs](../samples/G104.Sandbox/TrainingWindow.cs) 的OnUpdateFrame，先看Push如何过滤和保存输入，再看Consume/ConsumeLook何时被调用，随后接入 [FixedStepClock.cs](../src/G104.Engine/Core/FixedStepClock.cs) 的Advance，把显示更新与模拟步对应起来。
+
 <a id="first-input-lesson"></a>
+
 ## 第一单元：启动、一帧与一次W/Space输入
 
 目标是追踪一次输入怎样变成角色状态、显示姿态与画面，并能在VS解释一个零步/多步例子。本单元给出全部必要背景；无需先拼读其他三份指南。普通运行从Edit开始，Play/F5建立独立运行世界，Stop保留内存设计；第一次学习先用现有场景，不改保存文件。工程使用现有Debug/x64输出与已锁依赖，不为阅读重新安装或还原；操作政策见 [agent-workflow.md](agent-workflow.md)。
 
 ### 最少前提
 
-- Engine提供可复用的时钟、输入、场景、控制器、动画及渲染；Sandbox的Program/TrainingWindow把它们组装成训练场。
+- G104.Engine提供可复用的时钟、输入、场景、控制器、动画及渲染；G104.Sandbox的Program/TrainingWindow把它们组装成训练场。
 - 一次显示更新可以含零到五个模拟步。模拟dt恒为1/60秒；真实帧时间进入累计器，余量产生alpha，完整积压超过上限会丢弃。
 - 按住W是持续Move，Space刚按下是Jump边沿；请求跳跃仍由控制器检查是否接地，不等于每次按键必然起跳。
 - Look来自按住鼠标右键时的MouseState.Delta；未按右键时为零，UI捕获鼠标时InputBuffer清零该增量。每显示帧只ConsumeLook一次来更新相机yaw/pitch，本帧所有补步共用这个水平参考，不重复累加鼠标位移。
 - 世界Y向上，默认前-Z，单位米/秒。角色Position是feet；胶囊查询中心比脚底高Height/2。动画in-place读取实际速度，不推动角色。
 - 逻辑状态给碰撞/Gameplay；显示把previous/current局部姿态按同一alpha插值。绘制和重复插值不推进模拟或重复发布Jump事件。
-- UI捕获键盘时角色不收该设备输入；失焦/暂停切换清旧输入与时钟。点击画面空白处再操作，避免在文本字段中测试W/Space。
+- UI捕获键盘时角色不收该设备输入（如工具面板的输入框在等待玩家输入文本时，方向w、s、a、d、空格等就不参与移动等游戏逻辑控制）；失焦/暂停切换清旧输入与时钟。点击画面空白处再操作，避免在文本字段中测试W/Space。
 
 ### 调用与数据顺序
 
-| 步骤 | 实际入口 | 观察什么、为什么 |
-| --- | --- | --- |
-| 1 启动 | [Program](../samples/G104.Sandbox/Program.cs)、[LaunchOptions](../samples/G104.Sandbox/LaunchOptions.cs) | 无参数选择TrainingWindow；验证参数分支与异常退出码属于启动组装 |
-| 2 资源就绪 | [TrainingWindow.OnLoad](../samples/G104.Sandbox/TrainingWindow.cs) | 设计Graph、renderer/UI/audio准备；Play从内存设计Clone并准备独立Simulation/PhysicsWorld，全部成功才提交 |
-| 3 本帧采集 | TrainingWindow.OnUpdateFrame | ProcessCommands安全点先处理UI请求；W/S生成Move.Y，Space生成jump，焦点/捕获决定能否进入角色输入 |
-| 4 缓存 | [InputBuffer.Push/Consume](../src/G104.Engine/Core/InputBuffer.cs) | Move/Sprint更新按住态；Jump/Interact以OR积累待消费边沿；Look每显示帧另ConsumeLook一次来更新yaw |
-| 5 固定步 | [FixedStepClock.Advance](../src/G104.Engine/Core/FixedStepClock.cs) | 每步先SceneGraph.CapturePrevious，再Consume；零步不会调用Consume，多步只首步获得旧Jump边沿 |
+| 步骤           | 实际入口                                                                                                                                                                     | 观察什么、为什么                                                                                                                                                                                                           |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 启动         | [Program](../samples/G104.Sandbox/Program.cs)、[LaunchOptions](../samples/G104.Sandbox/LaunchOptions.cs)                                                                       | 无参数选择TrainingWindow；验证参数分支与异常退出码属于启动组装                                                                                                                                                             |
+| 2 资源就绪     | [TrainingWindow.OnLoad](../samples/G104.Sandbox/TrainingWindow.cs)                                                                                                            | 设计Graph、renderer/UI/audio准备；Play从内存设计Clone并准备独立Simulation/PhysicsWorld，全部成功才提交                                                                                                                     |
+| 3 本帧采集     | TrainingWindow.OnUpdateFrame                                                                                                                                                 | ProcessCommands安全点先处理UI请求；W/S生成Move.Y，Space生成jump，焦点/捕获决定能否进入角色输入                                                                                                                             |
+| 4 缓存         | [InputBuffer.Push/Consume](../src/G104.Engine/Core/InputBuffer.cs)                                                                                                            | Move/Sprint更新按住态；Jump/Interact以OR积累待消费边沿；Look每显示帧另ConsumeLook一次来更新yaw                                                                                                                             |
+| 5 固定步       | [FixedStepClock.Advance](../src/G104.Engine/Core/FixedStepClock.cs)                                                                                                           | 每步先SceneGraph.CapturePrevious，再Consume；零步不会调用Consume，多步只首步获得旧Jump边沿                                                                                                                                 |
 | 6 玩法与控制器 | [TrainingSimulation.Tick/SubmitCharacter](../samples/G104.Sandbox/Gameplay/TrainingSimulation.cs)、[KinematicCharacter.Tick](../src/G104.Engine/Physics/KinematicCharacter.cs) | Move经相机yaw映射为水平意图/速度，控制器ray/sweep/overlap决定合法位移、重力、接地与Jumped/Landed；SubmitCharacter只写SceneGraph的feet/旋转；随后BuildObjects通过Simulation.AnimationFor从CharacterState派生AnimationInputs |
-| 7 表现 | TrainingWindow.Feedback、renderer.UpdateAnimations | Simulation每Tick仅发当步事实；声音/粒子消费一次；窗口BuildObjects取得AnimationFor派生输入，UpdateAnimations据实际Speed/Grounded/VerticalVelocity求Pose，Render不重发 |
-| 8 显示 | [SceneGraph.InterpolatedWorldMatrix](../src/G104.Engine/Scene/SceneGraph.cs)、TrainingWindow.BuildObjects/OnRenderFrame | 返回同alpha显示变换与模型骨骼，渲染只读RenderObject；逻辑位置与屏幕位置允许因插值有一个步间差 |
+| 7 表现         | TrainingWindow.Feedback、renderer.UpdateAnimations                                                                                                                           | Simulation每Tick仅发当步事实；声音/粒子消费一次；窗口BuildObjects取得AnimationFor派生输入，UpdateAnimations据实际Speed/Grounded/VerticalVelocity求Pose，Render不重发                                                       |
+| 8 显示         | [SceneGraph.InterpolatedWorldMatrix](../src/G104.Engine/Scene/SceneGraph.cs)、TrainingWindow.BuildObjects/OnRenderFrame                                                       | 返回同alpha显示变换与模型骨骼，渲染只读RenderObject；逻辑位置与屏幕位置允许因插值有一个步间差                                                                                                                              |
 
 建议先在OnUpdateFrame的采集后、InputBuffer.Consume、Simulation.Tick、KinematicCharacter.Tick、SubmitCharacter、BuildObjects各设一个断点，先逐个启用。观察Move、JumpPressed、step、Steps/Alpha、CharacterState.Position/Velocity/Grounded/Jumped，而不是同时展开所有GPU/原生对象。停在断点会改变真实帧时间，恢复后出现丢时/补步属于观测副作用，不能据此判断正常运行性能。
 
 ### 三个小例子
 
-| 条件 | 预期消费与结果 |
-| --- | --- |
-| 零步：累计时间不足1/60秒时按下Space | Push记录Jump边沿，Advance不执行步，下一有效步才Consume；绘制可以发生，但没有新的逻辑Jump事实 |
-| 多步：一显示更新执行三个固定步 | Move/Sprint三个步保持按住，待消费Jump只在第一步为true；控制器若接地可Jumped一次，之后读实际腾空状态；Look不乘三 |
-| 失焦：按键或鼠标旧量尚未消费便切出窗口 | Clear/Reset清边沿/Look/累计时间，恢复丢弃旧delta并重置显示历史，Voice暂停/恢复；不会补算失焦时间或触发旧Jump |
+| 条件                                   | 预期消费与结果                                                                                                  |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 零步：累计时间不足1/60秒时按下Space    | Push记录Jump边沿，Advance不执行步，下一有效步才Consume；绘制可以发生，但没有新的逻辑Jump事实                    |
+| 多步：一显示更新执行三个固定步         | Move/Sprint三个步保持按住，待消费Jump只在第一步为true；控制器若接地可Jumped一次，之后读实际腾空状态；Look不乘三 |
+| 失焦：按键或鼠标旧量尚未消费便切出窗口 | Clear/Reset清边沿/Look/累计时间，恢复丢弃旧delta并重置显示历史，Voice暂停/恢复；不会补算失焦时间或触发旧Jump    |
 
 时钟最多五补步、输入frameSeconds上限0.25秒；不足一步余量保留，超出时间及五步后完整积压记丢弃。窗口也限制显示delta并在切换/同步加载后丢旧帧，两层分工不同，不能把Clock统计当作所有系统耗时。键盘按住态仍由每帧采集；UI鼠标/文字/焦点的事件队列是另一条生产输入链。
 
@@ -56,6 +124,7 @@
 可选深入：[architecture.md](architecture.md#frame-flow)、[scene-and-editor.md](guides/scene-and-editor.md#时钟与输入)、[physics-and-gameplay.md](guides/physics-and-gameplay.md#角色算法与公开查询)。对应笔记是第20节时钟/架构、第10–11节步长/角色控制、第15节3C/Event；下面保留所有模块的精确映射。
 
 <a id="learning-progress"></a>
+
 ## 1. 学习与工程进度分别记录
 
 用户已学完 GAMES104 并整理十份笔记，这是学习背景，不自动代表已经结合本工程解释原理、独立定位代码或通过学习自测。三个维度持续分开：
@@ -67,27 +136,31 @@
 章节导航仍采用主笔记链接和精确大章/章节标题，不批量改原笔记或增加锚点。各笔记完整大章仍是长期学习目标，当前V1只实现各模块约定子集。本文记录已实现的学习入口；后续专题保留工程实践目标，“仅研究”不算替代实现。详细算法/API不重复粘贴方案，阅读对应实际指南和源文件。
 
 <a id="module-scope"></a>
+
 ## 2. 全模块实践与基线边界
 
-| 模块 | 理论/固定参考边界 | 实际代码与有限子集 |
-| --- | --- | --- |
-| 渲染 | Forward/Deferred/PBR/阴影/后处理局部核查，Vulkan需转换 | TrainingRenderer/GpuResources/GLSL；固定Pass、无IBL或完整可见性/LOD |
-| 动画 | 采样/层级/palette及首Clip固定权重差异 | GltfModel/AnimationController；同骨架65关节、速度混合与跳跃有限FSM |
-| 物理 | Jolt查询/过滤/寿命及包装矩阵边界 | PhysicsWorld/KinematicCharacter；后端查询＋自研有限墙滑/跳跃/坡台 |
-| 粒子 | Compute池/Billboard/同步限制局部核查 | 自研CPU ParticleSystem/Billboard，512容量，GPU专题未开始 |
-| 声音 | 固定Piccolo未见完整音频链 | PcmWave/AudioSystem/OpenAL，7转码＋1测试WAV，非完整传播/混音 |
-| 工具链与资产 | ID/实例/编辑消费者/模式重载差异 | 严格JSON/路径、单层模板/受控父子树/有限编辑/100历史 |
-| Gameplay/3C | 输入/Motor/Camera/有限脚本局部核查 | TrainingWindow/Simulation；镜头相对移动、按钮门目标、一次事实 |
-| AI | 所查参考无通用FSM/BT/感知/A*完整链 | 自研Patrol/Follow/Search/Return FSM和平面A*实际控制器跟随 |
-| 网络 | 所查参考未见完整链 | 未实施；传输/复制/预测/校正待专题选型，保留延迟/丢包实验 |
-| 核心架构 | 串行主帧/双缓冲/组件/同步加载及后端线程局部核查 | FixedStepClock/InputBuffer/SceneGraph/Window；布局/ECS/Job/Fiber待专题 |
-| 动态GI/Lumen | 所查参考未见完整Lumen链 | 未实施，具体GI方法待定，不承诺复刻 |
-| GPU几何/Nanite | 参考主链CPU裁剪/直接提交 | 未实施，筛选/LOD/驻留方法待定，不承诺复刻 |
+| 模块           | 理论/固定参考边界                                      | 实际代码与有限子集                                                     |
+| -------------- | ------------------------------------------------------ | ---------------------------------------------------------------------- |
+| 渲染           | Forward/Deferred/PBR/阴影/后处理局部核查，Vulkan需转换 | TrainingRenderer/GpuResources/GLSL；固定Pass、无IBL或完整可见性/LOD    |
+| 动画           | 采样/层级/palette及首Clip固定权重差异                  | GltfModel/AnimationController；同骨架65关节、速度混合与跳跃有限FSM     |
+| 物理           | Jolt查询/过滤/寿命及包装矩阵边界                       | PhysicsWorld/KinematicCharacter；后端查询＋自研有限墙滑/跳跃/坡台      |
+| 粒子           | Compute池/Billboard/同步限制局部核查                   | 自研CPU ParticleSystem/Billboard，512容量，GPU专题未开始               |
+| 声音           | 固定Piccolo未见完整音频链                              | PcmWave/AudioSystem/OpenAL，7转码＋1测试WAV，非完整传播/混音           |
+| 工具链与资产   | ID/实例/编辑消费者/模式重载差异                        | 严格JSON/路径、单层模板/受控父子树/有限编辑/100历史                    |
+| Gameplay/3C    | 输入/Motor/Camera/有限脚本局部核查                     | TrainingWindow/Simulation；镜头相对移动、按钮门目标、一次事实          |
+| AI             | 所查参考无通用FSM/BT/感知/A*完整链                     | 自研Patrol/Follow/Search/Return FSM和平面A*实际控制器跟随              |
+| 网络           | 所查参考未见完整链                                     | 未实施；传输/复制/预测/校正待专题选型，保留延迟/丢包实验               |
+| 核心架构       | 串行主帧/双缓冲/组件/同步加载及后端线程局部核查        | FixedStepClock/InputBuffer/SceneGraph/Window；布局/ECS/Job/Fiber待专题 |
+| 动态GI/Lumen   | 所查参考未见完整Lumen链                                | 未实施，具体GI方法待定，不承诺复刻                                     |
+| GPU几何/Nanite | 参考主链CPU裁剪/直接提交                               | 未实施，筛选/LOD/驻留方法待定，不承诺复刻                              |
 
 近期工程实践重点只影响学习优先级。模块能运行观察、能定位入口、能解释数据/寿命/简化、能指出失败条件，才形成可用学习成果；源码复习、独立调试和学习自测以实际讲解/操作为依据，体验验收不能替代。
 
 <a id="notes-by-module"></a>
+
 ## 3. 十份笔记与实际代码
+
+本节编号用于按课程主题查找代码与理论；实际源码学习先后参见前面的[推荐的源码学习顺序](#source-learning-route)。3.11用于穿插复习跨模块关系，不表示需要按3.1—3.11逐节学完。
 
 ### 3.1 渲染：从场景数据到像素
 
@@ -191,49 +264,86 @@
 
 ### 3.11 跨模块复习顺序
 
-| 知识点 | 实际入口 | 笔记与已知边界 |
-| --- | --- | --- |
-| 一次输入如何变成画面 | TrainingWindow→InputBuffer→TrainingSimulation→KinematicCharacter→SceneGraph→RenderObject | 物理2.4/第8章、Gameplay 3C、动画in-place；CPU/原生链与源码讲解自测分别取证 |
-| 三棵树与两类姿态 | 设计SceneGraph、glTF节点、skin关节；逻辑/显示TRS | 动画9/18/19、工具13.4；默认节点/root/mesh相对palette不可重复应用 |
-| 行列向量与三种边界 | TransformMath、GpuResources、PhysicsWorld.QueryTransform | 动画9.1/9.3/11.8、渲染基础；GL上传与Jolt包装层适配不同，不能二次转置 |
-| 请求、提交和一次事实 | Interact、World.SetEnabled、NavigationGrid.Rebuild、Events、Feedback | Gameplay第15节Event；关闭占用拒绝、一次目标事件已有行为检查 |
-| 设计与运行如何隔离 | SceneSerializer.Clone、Play/Stop、EditorHistory、PrepareChange | 工具13.3/13.6/13.8；不是序列化句柄或从磁盘覆盖未保存设计 |
-| 谁释放哪些资源 | Renderer.Prepare/Resize/Dispose、PhysicsWorld.Dispose、AudioSystem.Dispose、外层finally | 工具实例/共享资产和架构所有权；本机检查不覆盖全部失败注入或第二设备 |
-| 后续布局/并行/网络/GI/GPU实验 | 当前基线及模块路线 | 架构第2–6章、网络第9–11章、GI第3/5–7/13章、GPU几何第1/2/5/8章；目标保留，代码未开始 |
+| 知识点                        | 实际入口                                                                                      | 笔记与已知边界                                                                         |
+| ----------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 一次输入如何变成画面          | TrainingWindow→InputBuffer→TrainingSimulation→KinematicCharacter→SceneGraph→RenderObject | 物理2.4/第8章、Gameplay 3C、动画in-place；CPU/原生链与源码讲解自测分别取证             |
+| 三棵树与两类姿态              | 设计SceneGraph、glTF节点、skin关节；逻辑/显示TRS                                              | 动画9/18/19、工具13.4；默认节点/root/mesh相对palette不可重复应用                       |
+| 行列向量与三种边界            | TransformMath、GpuResources、PhysicsWorld.QueryTransform                                      | 动画9.1/9.3/11.8、渲染基础；GL上传与Jolt包装层适配不同，不能二次转置                   |
+| 请求、提交和一次事实          | Interact、World.SetEnabled、NavigationGrid.Rebuild、Events、Feedback                          | Gameplay第15节Event；关闭占用拒绝、一次目标事件已有行为检查                            |
+| 设计与运行如何隔离            | SceneSerializer.Clone、Play/Stop、EditorHistory、PrepareChange                                | 工具13.3/13.6/13.8；不是序列化句柄或从磁盘覆盖未保存设计                               |
+| 谁释放哪些资源                | Renderer.Prepare/Resize/Dispose、PhysicsWorld.Dispose、AudioSystem.Dispose、外层finally       | 工具实例/共享资产和架构所有权；本机检查不覆盖全部失败注入或第二设备                    |
+| 后续布局/并行/网络/GI/GPU实验 | 当前基线及模块路线                                                                            | 架构第2–6章、网络第9–11章、GI第3/5–7/13章、GPU几何第1/2/5/8章；目标保留，代码未开始 |
 
 <a id="fixed-references"></a>
+
 ## 4. Piccolo 固定版本与差异
 
 主要参考：[固定提交 f5053707fed4d3f94d270a436fb0d3a8ae54e3e5](https://github.com/BoomingTech/Piccolo/tree/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5)。本地独立参考库不随新工程发布、未修改/构建；精确路径/行号与已有源码核查集中见 [design-reference-checks-2026-10-03.md](reviews/design-reference-checks-2026-10-03.md)。
 
-| 固定参考入口 | 借鉴/核查内容 | 与本工程的区别 |
-| --- | --- | --- |
-| [engine.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/engine.cpp)、[level.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/framework/level/level.cpp) | 串行主帧、对象/角色/物理职责 | 所查链无本工程固定累计补步器或完整ECS/Job；我们明确时序和输入去重 |
-| [render_system.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/render_system.cpp)及passes | 渲染交换、Forward/Deferred、共享网格/材质和Pass | 本工程GL4.3、固定Pass和确定性Dispose；不照搬Vulkan投影、缓存键或空清理 |
-| [skeleton.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/animation/skeleton.cpp) | 层级/palette、首Clip固定权重 | 现有数据结构不证明完整混合；本工程STEP/LINEAR、默认节点、mesh相对palette/FSM自研 |
-| [physics_scene.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/physics/physics_scene.cpp)、[character_controller.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/controller/character_controller.cpp) | Jolt Update配置步长、Static创建与目标overlap | 不证明主循环累加器/完整动态玩法/扫掠墙滑；本工程查询与规则行为另验证 |
-| [particle_pass.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/particle_pass.cpp) | 已有Compute模拟/池/Billboard及同步限制 | 不能沿用“只有billboard”的旧判断；本工程现阶段仍为CPU粒子 |
-| [editor_ui.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/editor/source/editor_ui.cpp)、[world_manager.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/framework/world/world_manager.cpp) | 属性消费者、有限Lua/反射、模式切换和磁盘重载 | 不等于本工程100条事务Undo或保留未保存设计的Play/Stop |
-| 所查音频/AI/网络/GI/GPU几何边界 | 未发现这些完整自有运行链 | 另选官方/论文/独立固定参考，不能拿Piccolo覆盖全部课程作为实现证据 |
+| 固定参考入口                                                                                                                                                                                                                                                                                                                                          | 借鉴/核查内容                                   | 与本工程的区别                                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| [engine.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/engine.cpp)、[level.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/framework/level/level.cpp)                                                         | 串行主帧、对象/角色/物理职责                    | 所查链无本工程固定累计补步器或完整ECS/Job；我们明确时序和输入去重                |
+| [render_system.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/render_system.cpp)及passes                                                                                                                                                                              | 渲染交换、Forward/Deferred、共享网格/材质和Pass | 本工程GL4.3、固定Pass和确定性Dispose；不照搬Vulkan投影、缓存键或空清理           |
+| [skeleton.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/animation/skeleton.cpp)                                                                                                                                                                                             | 层级/palette、首Clip固定权重                    | 现有数据结构不证明完整混合；本工程STEP/LINEAR、默认节点、mesh相对palette/FSM自研 |
+| [physics_scene.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/physics/physics_scene.cpp)、[character_controller.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/controller/character_controller.cpp) | Jolt Update配置步长、Static创建与目标overlap    | 不证明主循环累加器/完整动态玩法/扫掠墙滑；本工程查询与规则行为另验证             |
+| [particle_pass.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/render/passes/particle_pass.cpp)                                                                                                                                                                               | 已有Compute模拟/池/Billboard及同步限制          | 不能沿用“只有billboard”的旧判断；本工程现阶段仍为CPU粒子                       |
+| [editor_ui.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/editor/source/editor_ui.cpp)、[world_manager.cpp](https://github.com/BoomingTech/Piccolo/blob/f5053707fed4d3f94d270a436fb0d3a8ae54e3e5/engine/source/runtime/function/framework/world/world_manager.cpp)                             | 属性消费者、有限Lua/反射、模式切换和磁盘重载    | 不等于本工程100条事务Undo或保留未保存设计的Play/Stop                             |
+| 所查音频/AI/网络/GI/GPU几何边界                                                                                                                                                                                                                                                                                                                       | 未发现这些完整自有运行链                        | 另选官方/论文/独立固定参考，不能拿Piccolo覆盖全部课程作为实现证据                |
 
 部分笔记绑定homework01，保留原版上下文，引用时记录原版和main对应关系/缺失。课程、参考与本工程三个进度不能合并；原笔记不批量增加锚点，所查版本与自研实现不声称逐行复刻。
 
 <a id="recording-template"></a>
+
 ## 5. 以后每项实现的记录方式
 
-| 字段 | 必须记录的内容 |
-| --- | --- |
-| 知识点/任务 | 要理解和验证的具体行为，避免只写完成百分比 |
+| 字段          | 必须记录的内容                                                |
+| ------------- | ------------------------------------------------------------- |
+| 知识点/任务   | 要理解和验证的具体行为，避免只写完成百分比                    |
 | 设计/实施状态 | 用户确认、助手授权定案、已有代码、实际通过或待验收；日期/理由 |
-| 实际代码 | 存在的文件/类/方法/消费者链接；后续没写就保留未开始 |
-| 笔记依据 | 十份主笔记与大章/精确标题，不为填表改原笔记 |
-| 固定参考 | 仓库/规范/论文版本及具体路径，引用历史例子注明原版 |
-| 采用/简化 | 为什么采用、范围、拒绝项和可观察限制 |
-| 实现性质 | 自研/第三方集成/仅研究分别写；混合逐部分解释 |
-| 实际证据 | 命令、平台、样例、日志/截图；CPU/原生/GL/听感/用户自测分开 |
-| 接续 | 真实缺口、下一步和长期目标，不写计划等于已完成 |
+| 实际代码      | 存在的文件/类/方法/消费者链接；后续没写就保留未开始           |
+| 笔记依据      | 十份主笔记与大章/精确标题，不为填表改原笔记                   |
+| 固定参考      | 仓库/规范/论文版本及具体路径，引用历史例子注明原版            |
+| 采用/简化     | 为什么采用、范围、拒绝项和可观察限制                          |
+| 实现性质      | 自研/第三方集成/仅研究分别写；混合逐部分解释                  |
+| 实际证据      | 命令、平台、样例、日志/截图；CPU/原生/GL/听感/用户自测分开    |
+| 接续          | 真实缺口、下一步和长期目标，不写计划等于已完成                |
 
 调用关系变化时更新 [architecture.md](architecture.md) 和具体指南；当前执行/接续事实归 [v1-progress.md](execution/v1-progress.md) 与 [status.md](status.md)。新对话按任务读取实际模块和相关笔记，不默认通读十份笔记。D5独立克隆、CI、第二设备的分项进度见 [status.md](status.md#second-device-user-result)，本机PASS不代替它们。
+
+<a id="learning-evidence"></a>
+
+## 可选：2026-10-04迁移前的模块学习/验证证据基线
+
+下表和各项摘录记录迁移前已保存的覆盖与缺口，不是现行任务播报；未来验回/体验更新只维护status和相应任务证据。精确日期、命令、日志在reviews/执行台账，阅读学习单元无需先打开它们。
+
+<details>
+<summary>历史模块表与各专题证据边界</summary>
+
+| 模块           | 理论/参考当前边界                                                                 | 本工程实际入口与证据                                                                                                                                                                 |
+| -------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 渲染           | 已有笔记；固定 Piccolo Forward/Deferred/PBR/阴影/后处理局部核查，Vulkan细节需转换 | `TrainingRenderer/GpuResources` 与GLSL已实现；自动GL运行通过，首轮画面检查初步通过；专项质量/性能未全面验收，IBL等后移                                                             |
+| 动画           | 已有笔记；采样/层级/palette及Piccolo首Clip固定权重差异已核查                      | `GltfModel/AnimationController`、65关节素材与材质探针CPU检查通过；首轮人工验收总体通过，GPU蒙皮/脚滑/过渡观感未逐专项验收                                                          |
+| 物理           | 已有笔记；Jolt查询/过滤/生命周期及固定包装层矩阵边界已核查                        | `PhysicsWorld/KinematicCharacter`原生射线/扫掠/重叠、墙滑/跳跃/坡台/刚体与双世界清理通过；首轮人工操控初步通过，极端复杂接触未验收                                                 |
+| 粒子           | 已有笔记；Piccolo Compute池/Billboard与同步限制局部核查                           | `ParticleSystem`自研CPU生成/运动/死亡/512容量，renderer透明Billboard已有代码；首轮人工验收总体通过，效果/遮挡未逐专项验收，GPU Compute未开始                                       |
+| 声音           | 已有笔记；所查Piccolo未见完整音频链，使用OpenAL独立依据                           | `PcmWave/AudioSystem`与8个运行WAV（7个Kenney转码音效＋1个生成循环测试音）已部署；真实OpenAL检查与首轮试听初步通过，方位听感/混音未逐专项验收                                       |
+| 工具链与资产   | 已有笔记；固定Piccolo资产/ID/编辑消费者与模式/重载差异已核查                      | SharpGLTF导入、严格JSON/资产路径、单层模板、受控父子树、有限编辑/100条历史已有代码；CPU历史/保存检查与自动GL编辑路径通过，首轮人工编辑/保存流程初步通过，全部控件/失败分支未逐项验收 |
+| Gameplay/3C    | 已有笔记；Piccolo输入/Motor/Camera及有限脚本路径局部核查                          | `TrainingWindow/TrainingSimulation`镜头相对移动、按钮门目标、一次事实已实现并检查通过；首轮镜头/角色操作初步通过，极端组合未穷尽                                                   |
+| AI             | 已有笔记；所查Piccolo无通用FSM/BT/感知/A*完整链                                   | `TrainingSimulation`巡逻/跟随/搜索/返回FSM与`NavigationGrid`平面A*实际跟随通过；BT/NavMesh/高级规划后续                                                                          |
+| 网络           | 已有笔记；Piccolo所查路径未见完整链路，另补固定参考                               | 未开始；传输/复制/预测/校正模型尚未选，保留独立延迟/丢包实验                                                                                                                         |
+| 核心架构       | 已有笔记；Piccolo串行主帧/双缓冲/对象组件/同步加载及后端线程局部核查              | `FixedStepClock/InputBuffer/SceneGraph/TrainingWindow`明确阶段已落地，30/60/144Hz及输入/层级/回滚CPU检查通过；布局/ECS/Job/Fiber专题未开始                                         |
+| 动态GI/Lumen   | 已有笔记；所查Piccolo未见完整Lumen链，另补参考                                    | 后续机制实践未开始，具体GI方法待定，不承诺复刻Lumen                                                                                                                                  |
+| GPU几何/Nanite | 已有笔记；Piccolo主几何链是CPU裁剪/直接提交，不是完整Nanite                       | 后续机制实践未开始，具体筛选/LOD/驻留方法待定，不承诺复刻Nanite                                                                                                                      |
+
+- 证据与学习验收：实际GL已完成240帧exercise、管线和调试入口；首轮画面检查初步通过，阴影/深度/法线/贴图/粒子/蒙皮仍可结合源码作专项学习核对，性能比较不由“无GL错误”证明。后续IBL、地形、天空/云、AO/雾等代表实验继续见 [rendering-roadmap.md](plans/rendering-roadmap.md)。
+- 证据与学习验收：CPU真实素材、贴图探针、STEP/LINEAR/短弧、非单位mesh空间、palette和事件通过；GPU代码与自动绘制存在，历史首轮人工验收总体通过，绑定姿态画面、脚滑、过渡和跳跃节奏未逐专项验收。Two-Bone IK、Mask/Additive、重定向、表示/压缩/性能见 [animation-roadmap.md](plans/animation-roadmap.md)，尚未实现。
+- 证据与学习验收：真实原生查询、高速墙阻挡/墙滑、跳跃落地/撞顶、初始重叠、30°坡/坡度拒绝、合法/超高台、动态箱、双世界、层级碰撞通过；首轮人工操控初步通过，极端复杂接触仍未验收。第7章运行保障与第9–13章布娃娃、车辆、PBD/XPBD、破坏，以及平台/推箱各自继续见 [physics-character-roadmap.md](plans/physics-character-roadmap.md)。
+- 证据与学习验收：WAV解析及实际OpenAL context/buffer/2D/3D/暂停恢复/清理通过；粒子渲染链已有并参与GL运行，首轮视听体验初步通过，粒子排序/遮挡和声音远近左右听感未逐专项验收。传播/遮挡/混响、GPU池/排序/深度碰撞见 [particles-audio-roadmap.md](plans/particles-audio-roadmap.md)。不把画面近似碰撞写回权威物理，不把玩家混音当AI听觉。
+- 证据与学习验收：CPU层级/非法字段/剪切/模板/历史/损坏保存检查通过，自动GL保存重载/UndoRedo路径通过；首轮人工编辑/保存/重启恢复流程初步通过，全部控件及损坏数据等失败分支未穷尽。完整工具、通用反射/导入管线和详细Profiler继续见 [assets-scene-roadmap.md](plans/assets-scene-roadmap.md)、[tools-debug-roadmap.md](plans/tools-debug-roadmap.md)。
+- 证据与学习验收：机关画面数据/碰撞/网格同步、关闭占用拒绝、目标一次完成、NPC实际路径/控制器跟随通过；首轮人工游玩和镜头体验初步通过，未逐项验证全部机关/NPC分支，也不代表已掌握实现原理。
+
+动画配置/显示收尾的历史记录：有限四状态动画定义已在assets/config/character-animation.json落实，实际非默认行为经AnimationVerification验证；上一/当前局部Pose的显示插值与SceneGraph共用alpha，mesh/palette/skeleton一致，显示不推进逻辑或事件。暂停/恢复仅ResetDisplayHistory，场景成功切换ResetAnimations。Debug/Release最终--verify及delivery图形回归通过，详细结果与剩余限制见实施复查/执行台账；声音听感和真实操控的首轮初步通过来自用户确认，不由自动日志代替。
+
+</details>
 
 [render]: ../../资料/笔记博客汇总/第04-07节_渲染部分总结/AI梳理2/GAMES104_第4-7节_渲染部分知识体系总结.md
 [animation]: ../../资料/笔记博客汇总/第08-09节_动画部分总结/GAMES104第08-09节_游戏动画系统完整梳理.md
@@ -245,42 +355,3 @@
 [architecture]: ../../资料/笔记博客汇总/第20节_现代游戏引擎架构总结/GAMES104_第20节_现代游戏引擎架构_详细总结.md
 [lumen]: ../../资料/笔记博客汇总/第21节_动态全局光照和Lumen总结/GAMES104_第21节_动态全局光照和Lumen知识体系总结.md
 [nanite]: ../../资料/笔记博客汇总/第22节_GPU驱动的几何管线-nanite总结/GAMES104_第22节_GPU驱动的几何管线与Nanite_知识体系总结.md
-
-<a id="learning-evidence"></a>
-## 可选：2026-10-04迁移前的模块学习/验证证据基线
-
-下表和各项摘录记录迁移前已保存的覆盖与缺口，不是现行任务播报；未来验回/体验更新只维护status和相应任务证据。精确日期、命令、日志在reviews/执行台账，阅读学习单元无需先打开它们。
-
-<details>
-<summary>历史模块表与各专题证据边界</summary>
-
-| 模块 | 理论/参考当前边界 | 本工程实际入口与证据 |
-| --- | --- | --- |
-| 渲染 | 已有笔记；固定 Piccolo Forward/Deferred/PBR/阴影/后处理局部核查，Vulkan细节需转换 | `TrainingRenderer/GpuResources` 与GLSL已实现；自动GL运行通过，首轮画面检查初步通过；专项质量/性能未全面验收，IBL等后移 |
-| 动画 | 已有笔记；采样/层级/palette及Piccolo首Clip固定权重差异已核查 | `GltfModel/AnimationController`、65关节素材与材质探针CPU检查通过；首轮人工验收总体通过，GPU蒙皮/脚滑/过渡观感未逐专项验收 |
-| 物理 | 已有笔记；Jolt查询/过滤/生命周期及固定包装层矩阵边界已核查 | `PhysicsWorld/KinematicCharacter`原生射线/扫掠/重叠、墙滑/跳跃/坡台/刚体与双世界清理通过；首轮人工操控初步通过，极端复杂接触未验收 |
-| 粒子 | 已有笔记；Piccolo Compute池/Billboard与同步限制局部核查 | `ParticleSystem`自研CPU生成/运动/死亡/512容量，renderer透明Billboard已有代码；首轮人工验收总体通过，效果/遮挡未逐专项验收，GPU Compute未开始 |
-| 声音 | 已有笔记；所查Piccolo未见完整音频链，使用OpenAL独立依据 | `PcmWave/AudioSystem`与8个运行WAV（7个Kenney转码音效＋1个生成循环测试音）已部署；真实OpenAL检查与首轮试听初步通过，方位听感/混音未逐专项验收 |
-| 工具链与资产 | 已有笔记；固定Piccolo资产/ID/编辑消费者与模式/重载差异已核查 | SharpGLTF导入、严格JSON/资产路径、单层模板、受控父子树、有限编辑/100条历史已有代码；CPU历史/保存检查与自动GL编辑路径通过，首轮人工编辑/保存流程初步通过，全部控件/失败分支未逐项验收 |
-| Gameplay/3C | 已有笔记；Piccolo输入/Motor/Camera及有限脚本路径局部核查 | `TrainingWindow/TrainingSimulation`镜头相对移动、按钮门目标、一次事实已实现并检查通过；首轮镜头/角色操作初步通过，极端组合未穷尽 |
-| AI | 已有笔记；所查Piccolo无通用FSM/BT/感知/A*完整链 | `TrainingSimulation`巡逻/跟随/搜索/返回FSM与`NavigationGrid`平面A*实际跟随通过；BT/NavMesh/高级规划后续 |
-| 网络 | 已有笔记；Piccolo所查路径未见完整链路，另补固定参考 | 未开始；传输/复制/预测/校正模型尚未选，保留独立延迟/丢包实验 |
-| 核心架构 | 已有笔记；Piccolo串行主帧/双缓冲/对象组件/同步加载及后端线程局部核查 | `FixedStepClock/InputBuffer/SceneGraph/TrainingWindow`明确阶段已落地，30/60/144Hz及输入/层级/回滚CPU检查通过；布局/ECS/Job/Fiber专题未开始 |
-| 动态GI/Lumen | 已有笔记；所查Piccolo未见完整Lumen链，另补参考 | 后续机制实践未开始，具体GI方法待定，不承诺复刻Lumen |
-| GPU几何/Nanite | 已有笔记；Piccolo主几何链是CPU裁剪/直接提交，不是完整Nanite | 后续机制实践未开始，具体筛选/LOD/驻留方法待定，不承诺复刻Nanite |
-
-- 证据与学习验收：实际GL已完成240帧exercise、管线和调试入口；首轮画面检查初步通过，阴影/深度/法线/贴图/粒子/蒙皮仍可结合源码作专项学习核对，性能比较不由“无GL错误”证明。后续IBL、地形、天空/云、AO/雾等代表实验继续见 [rendering-roadmap.md](plans/rendering-roadmap.md)。
-
-- 证据与学习验收：CPU真实素材、贴图探针、STEP/LINEAR/短弧、非单位mesh空间、palette和事件通过；GPU代码与自动绘制存在，历史首轮人工验收总体通过，绑定姿态画面、脚滑、过渡和跳跃节奏未逐专项验收。Two-Bone IK、Mask/Additive、重定向、表示/压缩/性能见 [animation-roadmap.md](plans/animation-roadmap.md)，尚未实现。
-
-- 证据与学习验收：真实原生查询、高速墙阻挡/墙滑、跳跃落地/撞顶、初始重叠、30°坡/坡度拒绝、合法/超高台、动态箱、双世界、层级碰撞通过；首轮人工操控初步通过，极端复杂接触仍未验收。第7章运行保障与第9–13章布娃娃、车辆、PBD/XPBD、破坏，以及平台/推箱各自继续见 [physics-character-roadmap.md](plans/physics-character-roadmap.md)。
-
-- 证据与学习验收：WAV解析及实际OpenAL context/buffer/2D/3D/暂停恢复/清理通过；粒子渲染链已有并参与GL运行，首轮视听体验初步通过，粒子排序/遮挡和声音远近左右听感未逐专项验收。传播/遮挡/混响、GPU池/排序/深度碰撞见 [particles-audio-roadmap.md](plans/particles-audio-roadmap.md)。不把画面近似碰撞写回权威物理，不把玩家混音当AI听觉。
-
-- 证据与学习验收：CPU层级/非法字段/剪切/模板/历史/损坏保存检查通过，自动GL保存重载/UndoRedo路径通过；首轮人工编辑/保存/重启恢复流程初步通过，全部控件及损坏数据等失败分支未穷尽。完整工具、通用反射/导入管线和详细Profiler继续见 [assets-scene-roadmap.md](plans/assets-scene-roadmap.md)、[tools-debug-roadmap.md](plans/tools-debug-roadmap.md)。
-
-- 证据与学习验收：机关画面数据/碰撞/网格同步、关闭占用拒绝、目标一次完成、NPC实际路径/控制器跟随通过；首轮人工游玩和镜头体验初步通过，未逐项验证全部机关/NPC分支，也不代表已掌握实现原理。
-
-动画配置/显示收尾的历史记录：有限四状态动画定义已在assets/config/character-animation.json落实，实际非默认行为经AnimationVerification验证；上一/当前局部Pose的显示插值与SceneGraph共用alpha，mesh/palette/skeleton一致，显示不推进逻辑或事件。暂停/恢复仅ResetDisplayHistory，场景成功切换ResetAnimations。Debug/Release最终--verify及delivery图形回归通过，详细结果与剩余限制见实施复查/执行台账；声音听感和真实操控的首轮初步通过来自用户确认，不由自动日志代替。
-
-</details>

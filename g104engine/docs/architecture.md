@@ -173,15 +173,15 @@ flowchart TD
 
 ## 坐标、矩阵与角色边界
 
-| 边界          | 实际约定                                                                                                            |
-| ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 世界          | Y-up、右手、米/秒；局部前 -Z、右 +X                                                                                 |
-| OpenTK CPU    | 行向量，局部 S×R×T；`world=local×parentWorld`                                                                  |
-| GLSL          | 列向量，`P×V×M×position`；OpenTK 原始行字节按 `transpose=false` 上传，GPU 数学矩阵相当于 CPU 转置            |
-| glTF 蒙皮     | `palette=inverseBind×jointWorld×inverse(meshWorld)`；`drawModel=meshWorld×instanceCorrection×sceneWorld`    |
-| Jolt 形状查询 | 当前绑定版本在 `ToJolt` 内转置；`PhysicsWorld.QueryTransform` 将 Numerics 行 TRS 预转置一次，集中适配该公开边界 |
+| 边界                                                           | 实际约定                                                                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 世界                                                           | Y-up、右手、米/秒；局部前 -Z、右 +X                                                                                 |
+| OpenTK CPU（cpu里计算场景物体的位置、缩放、旋转）              | 行向量，局部 S×R×T；`world=local×parentWorld`                                                                  |
+| GLSL（GLSL 是编写着色器的语言；gpu里着色器渲染时计算坐标变换） | 列向量，`P×V×M×position`；OpenTK 原始行字节按 `transpose=false` 上传，GPU 数学矩阵相当于 CPU 转置            |
+| glTF 蒙皮（动画骨骼皮肤计算）                                  | `palette=inverseBind×jointWorld×inverse(meshWorld)`；`drawModel=meshWorld×instanceCorrection×sceneWorld`    |
+| Jolt 形状查询（物理模拟相关计算）                              | 当前绑定版本在 `ToJolt` 内转置；`PhysicsWorld.QueryTransform` 将 Numerics 行 TRS 预转置一次，集中适配该公开边界 |
 
-不能把内存行/列布局等同于向量乘法约定，也不能把 GLSL 上传策略套到 Jolt 包装层。Jolt Body 的位置/四元数参数不经过查询矩阵路径。该差异曾由原生扫掠/穿透结果异常暴露，修复后行为检查通过；推导和固定版本源码见 [physics-and-gameplay.md](guides/physics-and-gameplay.md#固定jolt版本与矩阵边界)、[rendering-and-animation.md](guides/rendering-and-animation.md#空间矩阵与蒙皮) 与 [design-reference-checks-2026-10-03.md](reviews/design-reference-checks-2026-10-03.md)。
+不能把内存行/列布局等同于向量乘法约定（内存行列指代码的数据结构存储的行/列数据；意思是例如代码里的二维数组的行不一定就是指行向量），也不能把 GLSL 上传策略套到 Jolt 包装层。Jolt Body 的位置/四元数参数不经过查询矩阵路径。该差异曾由原生扫掠/穿透结果异常暴露，修复后行为检查通过；推导和固定版本源码见 [physics-and-gameplay.md](guides/physics-and-gameplay.md#固定jolt版本与矩阵边界)、[rendering-and-animation.md](guides/rendering-and-animation.md#空间矩阵与蒙皮) 与 [design-reference-checks-2026-10-03.md](reviews/design-reference-checks-2026-10-03.md)。
 
 受控场景树使用 LocalTRS、禁止环/无效父/外部缺失引用。所有接收可编辑子对象的节点要求正统一缩放；玩家/NPC 保持根和单位缩放。重挂接保持世界姿态后必须重组验证 TRS，不静默丢失剪切。活动相机由窗口单独管理，动态箱由物理验收创建；目前 DTO 没有可任意挂接的活动相机或动态刚体组件。
 
