@@ -20,6 +20,13 @@ using NVector2=System.Numerics.Vector2;
 namespace G104.Sandbox;
 
 /// <summary>组装训练场；通用功能在Engine，专属场景/交互及演示流程在Sandbox。</summary>
+/// <remarks>
+/// GameWindow（OpenTK 4.9.4）管理窗口生命周期：
+/// 创建窗口/上下文(new GameWindow()) → Run → OnLoad（初始化）→ 初始 OnResize。
+/// 主循环：处理窗口事件 → OnUpdateFrame（更新）→ OnRenderFrame（绘制、换帧）。
+/// 正常关闭：OnUnload（释放资源）→ Run 返回 → 外层 finally 清理 → using 调用 Dispose 销毁窗口/上下文。
+/// 异常可能跳过 OnUnload，由 finally 补充清理；Play/Stop 只切换运行状态，不重启窗口生命周期。
+/// </remarks>
 public sealed class TrainingWindow : GameWindow
 {
     /// <summary>本窗口的资产、用户数据与演练启动配置。</summary>
@@ -46,7 +53,7 @@ public sealed class TrainingWindow : GameWindow
     private TrainingSimulation? _simulation;
     /// <summary>窗口拥有的GL渲染器，必须在有效上下文线程释放。</summary>
     private TrainingRenderer? _renderer;
-    /// <summary>窗口拥有的ImGui输入与GL后端，随窗口清理。</summary>
+    /// <summary>当前GameWindow窗口拥有的ImGui输入与GL后端，随窗口清理。</summary>
     private ImGuiController? _ui;
     /// <summary>窗口寿命内共享音频Buffer和独立Voice；初始化失败时可为空。</summary>
     private AudioSystem? _audio;
@@ -116,7 +123,13 @@ public sealed class TrainingWindow : GameWindow
         Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}; GL: {GL.GetString(StringName.Version)}");
         int major=GL.GetInteger(GetPName.MajorVersion),minor=GL.GetInteger(GetPName.MinorVersion);
         if(major<4||(major==4&&minor<3)) throw new NotSupportedException("OpenGL4.3Core required.");
+
+        // 显示画面分两个步骤：GPU渲染（在gpu中计算图片）；显示器从gpu中读取图片并显示到屏幕。
+        // VSync=VSyncMode.On时，显示器每次刷新只读取最新GPU渲染完成的图片。
+        // VSync=VSyncMode.Off时，显示器每次刷新都读取GPU当前计算中的图片，可能是上一帧或本帧；
+        // 而显示器一般一行一行刷新，可能在GPU渲染还没完成时就读取了部分本帧图片，造成撕裂。
         VSync=_options.Exercise ? VSyncMode.Off : VSyncMode.On;
+
         _ui=new ImGuiController(this);
         SceneDocument initial;
         string seed=Path.Combine(_options.AssetRoot,"scenes","training-ground.json");

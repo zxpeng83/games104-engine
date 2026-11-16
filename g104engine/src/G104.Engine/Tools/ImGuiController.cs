@@ -8,7 +8,30 @@ using NVector2 = System.Numerics.Vector2;
 
 namespace G104.Engine.Tools;
 
-/// <summary>ImGui.NET只提供UI数据；这里负责OpenTK输入及GL3顶点/裁剪/状态适配。</summary>
+/// <summary>
+/// 本控制器连接窗口(_window)、ImGui与OpenGL，负责转交输入和绘制UI。
+/// _window是窗口对象引用，提供尺寸/输入；ImGui静态API处理控件并生成绘制数据；GL静态API提交GPU绘制。
+/// UI状态保存在_context=ImGui.CreateContext()指向的原生上下文中；ImGui.SetCurrentContext()选中当前操作的一份，也可切换到另一份。
+/// tips：这里绘制编辑器界面的GL和绘制游侠场景的GL是同一个。
+/// </summary>
+/// <example>
+/// 简化调用链，实际分布在构造函数、输入回调、BeginFrame、窗口UI代码和Render中：
+/// <code>
+/// // 初始化一次：保存窗口引用，创建并选中UI上下文。
+/// _window = window;                  // 此处绑定TrainingWindow传入的this。
+/// _context = ImGui.CreateContext();
+/// ImGui.SetCurrentContext(_context);
+/// // 输入与每帧处理：窗口信息 → ImGui控件 → 绘制数据。
+/// var io = ImGui.GetIO(); //取得当前 ImGui 上下文的输入、输出及配置数据的访问入口，保存到变量 io 中。
+/// io.AddMousePosEvent(_window.MousePosition.X, _window.MousePosition.Y);  // 把窗口中的鼠标位置交给ImGui，供后续控件悬停和点击判断使用。
+/// ImGui.NewFrame();                  // 开始一帧。
+/// ImGui.Button("Save");              // 定义按钮，并判断是否被点击。
+/// ImGui.Render();                    // 整理UI绘制数据，此时尚未通过GL绘制。
+/// var data = ImGui.GetDrawData();    // 取得当前上下文的绘制数据。
+/// // Render中用GL.BufferData上传、GL.DrawElementsBaseVertex提交绘制，另处理裁剪和GL状态恢复。
+/// // 最后由TrainingWindow调用SwapBuffers，将画面提交显示。
+/// </code>
+/// </example>
 public sealed class ImGuiController : IDisposable
 {
     /// <summary>本后端创建并销毁的ImGui原生上下文；输入回调先切换到此上下文。</summary>
