@@ -14,22 +14,65 @@ namespace G104.Engine.Tools;
 /// UI状态保存在_context=ImGui.CreateContext()指向的原生上下文中；ImGui.SetCurrentContext()选中当前操作的一份，也可切换到另一份。
 /// tips：这里绘制编辑器界面的GL和绘制游侠场景的GL是同一个。
 /// </summary>
+/// <remarks>
+/// 窗口事件只上报原始操作；Button/InputText等控件每帧结合输入判断交互，并准备外观数据，业务动作由项目代码处理。
+/// ImGui按控件ID保留交互状态，所以每帧调用控件不会忘记之前按住了哪个按钮。
+/// </remarks>
 /// <example>
-/// 简化调用链，实际分布在构造函数、输入回调、BeginFrame、窗口UI代码和Render中：
+/// 以下按流程摘录，分别属于构造函数、输入回调、窗口更新和绘制方法，并非同一个方法内的连续代码：
 /// <code>
-/// // 初始化一次：保存窗口引用，创建并选中UI上下文。
-/// _window = window;                  // 此处绑定TrainingWindow传入的this。
+/// // 1. 初始化一次：绑定窗口、创建UI状态，并注册输入回调。
+/// _window = window;                   // TrainingWindow传入的this。
 /// _context = ImGui.CreateContext();
 /// ImGui.SetCurrentContext(_context);
-/// // 输入与每帧处理：窗口信息 → ImGui控件 → 绘制数据。
-/// var io = ImGui.GetIO(); //取得当前 ImGui 上下文的输入、输出及配置数据的访问入口，保存到变量 io 中。
-/// io.AddMousePosEvent(_window.MousePosition.X, _window.MousePosition.Y);  // 把窗口中的鼠标位置交给ImGui，供后续控件悬停和点击判断使用。
-/// ImGui.NewFrame();                  // 开始一帧。
-/// ImGui.Button("Save");              // 定义按钮，并判断是否被点击。
-/// ImGui.Render();                    // 整理UI绘制数据，此时尚未通过GL绘制。
-/// var data = ImGui.GetDrawData();    // 取得当前上下文的绘制数据。
-/// // Render中用GL.BufferData上传、GL.DrawElementsBaseVertex提交绘制，另处理裁剪和GL状态恢复。
-/// // 最后由TrainingWindow调用SwapBuffers，将画面提交显示。
+/// _window.MouseDown += OnMouseDown;
+/// _window.MouseUp += OnMouseUp;
+///
+/// // 2. 鼠标回调：告诉ImGui在哪个坐标按下/松开，此时还未判断点中了哪个按钮。
+/// ImGui.SetCurrentContext(_context);
+/// var io = ImGui.GetIO();             // 当前上下文的输入/输出及配置接口。
+/// io.AddMousePosEvent(_window.MousePosition.X, _window.MousePosition.Y);
+/// io.AddMouseButtonEvent(index, down);// true表示按下，false表示松开。
+///
+/// // 3. TrainingWindow每帧更新：准备输入，再处理本帧控件。
+/// _ui.BeginFrame(this, dt);           // 同步尺寸、时间和键盘等状态，内部调用ImGui.NewFrame()。
+/// // DrawToolbar中的代码：Button判断点击并生成按钮外观数据，返回true才安排保存。
+/// if (ImGui.Button("Save design")) Enqueue(Save);
+/// ProcessCommands();                 // 窗口随后执行队列中的Save等操作；按钮文字本身不会保存。
+/// // 保存按钮的实际调用链（可按类名、方法名定位）：
+/// // TrainingWindow.OnUpdateFrame()
+/// //   ├─ ImGuiController.BeginFrame()                  准备尺寸、时间和输入
+/// //   │    └─ ImGui.NewFrame()                         开始本帧UI处理
+/// //   ├─ TrainingWindow.DrawToolbar()                  每帧处理工具栏控件
+/// //   │    └─ ImGui.Button("Save design")              判断按钮是否被点击并生成按钮外观数据
+/// //   │         └─ 返回true：TrainingWindow.Enqueue(Save)  只入队，尚未调用Save()
+/// //   └─ TrainingWindow.ProcessCommands()              逐个取出队列中的操作
+/// //        └─ TrainingWindow.ExecuteEditorCommand(...) 执行操作并处理异常
+/// //             └─ action()                           调用取出的委托
+/// //                  └─ TrainingWindow.Save()         保存设计并更新已保存状态
+/// //                       └─ SceneSerializer.Save(...) 将设计写入文件
+/// // Save方法作为Action委托入队；本按钮请求在同次OnUpdateFrame稍后执行，先收集控件请求再操作场景。
+///
+/// // 4. 窗口先用_renderer.Render绘制3D场景，再调用_ui.Render叠加UI；后者内部执行：
+/// ImGui.Render();                    // ImGui库的方法：整理UI绘制数据，不执行GL绘制。
+/// var data = ImGui.GetDrawData();     // 取得当前上下文的绘制数据。
+/// // 本控制器用GL.BufferData上传、GL.DrawElementsBaseVertex提交GPU绘制，并处理裁剪和GL状态恢复。
+/// // 因此_ui.Render()包含数据整理与实际绘制；完成后由窗口SwapBuffers提交场景和UI的完整画面。
+///
+/// // 对应的实际调用流程（省略专项检查及部分GL设置）：
+/// // TrainingWindow.OnRenderFrame()
+/// //   ├─ TrainingRenderer.Render(...)                 即_renderer.Render(...)，绘制3D场景
+/// //   ├─ ImGuiController.Render()                     即_ui.Render()，叠加UI
+/// //   │    ├─ ImGui.Render()                          整理UI绘制数据，尚未执行GL绘制
+/// //   │    ├─ ImGui.GetDrawData()                     取得顶点、索引及绘制指令
+/// //   │    ├─ 保存当前GL状态                          供绘制结束后恢复
+/// //   │    ├─ GL.UseProgram / GL.BindVertexArray      选择UI的shader和顶点格式
+/// //   │    ├─ GL.BufferData(...)                     上传顶点、索引数据
+/// //   │    ├─ GL.Scissor / GL.BindTexture             设置当前指令的裁剪范围和纹理
+/// //   │    ├─ GL.DrawElementsBaseVertex(...)          提交GPU绘制命令，使用前述shader画三角形
+/// //   │    └─ finally恢复GL状态                       避免UI绘制影响后续渲染
+/// //   └─ SwapBuffers()                               提交包含场景和UI的完整画面
+/// // 上传/绘制可能执行多次：每个列表分别上传顶点和索引，再遍历其中的指令设置裁剪、绑定纹理并绘制。
 /// </code>
 /// </example>
 public sealed class ImGuiController : IDisposable
@@ -104,7 +147,9 @@ public sealed class ImGuiController : IDisposable
             GL.TexParameter(TextureTarget.Texture2D,TextureParameterName.TextureMinFilter,(int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture2D,TextureParameterName.TextureMagFilter,(int)TextureMagFilter.Linear);
             io.Fonts.SetTexID((nint)_font); io.Fonts.ClearTexData(); GL.BindTexture(TextureTarget.Texture2D,0);
-            // 逐事件保留位置/按下/松开的顺序；帧间完整点击不能被最终MouseState吞掉。
+            // 鼠标移动/按键/滚轮、焦点和文字输入按事件顺序提交给ImGui。
+            // 鼠标事件这里是采用初始时注册的方式，而不是在 BeginFrame() 每帧判断，是因为这样的话如果在帧间快速按了又松开会检测不到。
+            // 键盘也支持KeyDown/KeyUp事件，但当前项目对键盘的事件采用在 BeginFrame() 每帧判断，这种方式也会出现快速按下又松开检测不到的情况，但目前没发现有严重负面影响，所以不改。
             _window.MouseMove += OnMouseMove;
             _window.MouseDown += OnMouseDown;
             _window.MouseUp += OnMouseUp;
@@ -119,21 +164,36 @@ public sealed class ImGuiController : IDisposable
         catch { Dispose(); throw; }
     }
 
-    /// <summary>切回绑定的ImGui上下文并提交一个Unicode码点。</summary>
-    public void AddCharacter(uint codePoint) { ImGui.SetCurrentContext(_context); ImGui.GetIO().AddInputCharacter(codePoint); }
+    /// <summary>
+    /// 处理界面的文本块的文本输入。
+    /// 窗口的输入框接收输入一个字符时调用；
+    /// 这里将字符信息交给ImGui处理，这里没有出现对应的输入框，是因为封装好了ImGui的输入处理机制，ImGui会根据当前活动控件的ID来决定哪个输入框接收这个字符。
+    /// </summary>
+    public void AddCharacter(uint codePoint) 
+    { 
+        ImGui.SetCurrentContext(_context); 
+        ImGui.GetIO().AddInputCharacter(codePoint); 
+    }
 
-    /// <summary>提交逻辑窗口坐标；失焦时使用无效位置，防止旧位置继续参与点击。</summary>
+    /// <summary>
+    /// 告诉 ImGui，鼠标当前在窗口的什么位置；窗口失去焦点时，告诉它这个位置已经无效，防止旧位置继续参与点击。
+    /// 注意这里只是报告ImGui信息，没有修改信息。
+    /// </summary>
     private void AddMousePosition(ImGuiIOPtr io)
     {
         io.AddMousePosEvent(_focused ? _window.MousePosition.X : -float.MaxValue,
                             _focused ? _window.MousePosition.Y : -float.MaxValue);
     }
 
-    /// <summary>按窗口事件顺序提交焦点内鼠标位置，不等待帧末状态采样。</summary>
+    /// <summary>
+    /// 和 AddMousePosition 类似，告诉 ImGui 鼠标当前在窗口的什么位置；窗口失去焦点时，告诉它这个位置已经无效，防止旧位置继续参与点击。
+    /// 这里是监听并实时更新，而 AddMousePosition 是为了主动调用刷新的辅助方法。
+    /// </summary>
     private void OnMouseMove(MouseMoveEventArgs e)
     {
         if (!_focused) return;
-        ImGui.SetCurrentContext(_context); ImGui.GetIO().AddMousePosEvent(e.X,e.Y);
+        ImGui.SetCurrentContext(_context); 
+        ImGui.GetIO().AddMousePosEvent(e.X,e.Y);
     }
 
     /// <summary>把窗口按下事件转交到统一按钮入口。</summary>
@@ -152,21 +212,30 @@ public sealed class ImGuiController : IDisposable
         io.AddMouseButtonEvent(index,down);
     }
 
-    /// <summary>将有焦点时的滚轮相对增量提交一次，避免后续帧重复采样。</summary>
+    /// <summary>
+    /// 鼠标滚轮滚动事件。
+    /// 将有焦点时的滚轮相对增量提交一次，避免后续帧重复采样。
+    /// </summary>
     private void OnMouseWheel(MouseWheelEventArgs e)
     {
         if (!_focused) return;
         ImGui.SetCurrentContext(_context);
-        var io=ImGui.GetIO(); AddMousePosition(io); io.AddMouseWheelEvent(e.OffsetX,e.OffsetY);
+        var io=ImGui.GetIO(); 
+        AddMousePosition(io); 
+        io.AddMouseWheelEvent(e.OffsetX,e.OffsetY);
     }
 
-    /// <summary>依事件值切换焦点；失焦先使位置无效再释放全部按钮，取消未完成点击。</summary>
+    /// <summary>
+    /// 窗口获得/失去焦点时触发（如Alt+Tab切出/切回），注意在当前运行窗口里从一个输入框点击到当前窗口的另一个输入框类似的情况不算；防止在别处松开鼠标后，UI仍停留在按下状态或误点击。
+    /// 依事件值切换焦点；失焦先使位置无效再释放全部按钮，取消未完成点击。
+    /// </summary>
     private void OnFocusedChanged(FocusedChangedEventArgs e)
     {
         // OpenTK先派发事件后更新IsFocused，回调必须读取事件值。
         _focused=e.IsFocused;
         ImGui.SetCurrentContext(_context);
-        var io=ImGui.GetIO(); io.AddFocusEvent(_focused);
+        var io=ImGui.GetIO(); 
+        io.AddFocusEvent(_focused);
         // 先使位置无效，再释放按钮；同一事件批次恢复焦点也不能完成旧点击。
         AddMousePosition(io);
         if (!_focused)
@@ -184,7 +253,9 @@ public sealed class ImGuiController : IDisposable
     /// <param name="deltaTime">显示帧间隔秒数，限制在可用范围内供ImGui消费。</param>
     public void BeginFrame(GameWindow window, float deltaTime)
     {
-        if (!ReferenceEquals(window,_window)) throw new ArgumentException("ImGui input belongs to its bound window.",nameof(window));
+        if (!ReferenceEquals(window,_window)) 
+            throw new ArgumentException("ImGui input belongs to its bound window.",nameof(window));
+            
         ImGui.SetCurrentContext(_context);
         if (_frame) { ImGui.EndFrame(); _frame = false; }
         var io = ImGui.GetIO();
@@ -194,6 +265,8 @@ public sealed class ImGuiController : IDisposable
         bool focused = _focused;
         // 位置可同步；按钮/滚轮/焦点只收事件，避免把排队的历史覆写成当前状态。
         AddMousePosition(io);
+        // 这里逐帧查询键盘当前按住状态；若两次采样间已按下又松开，仍可能漏掉短按。
+        // 文字字符由OnTextInput/AddCharacter事件链提交；此处同步按键状态，供导航、快捷键等使用。
         foreach (Keys key in Enum.GetValues<Keys>())
         {
             ImGuiKey mapped = MapKey(key);
@@ -225,7 +298,7 @@ public sealed class ImGuiController : IDisposable
         };
     }
 
-    /// <summary>消费本帧UI绘制列表，在当前GL上下文上传/裁剪/绘制，并在finally恢复所改GL状态。</summary>
+    /// <summary>消费本帧UI绘制列表，在当前GL上下文上传/裁剪/绘制（这里是绘制当前控制器的_window，不是场景），并在finally恢复所改GL状态。</summary>
     public unsafe void Render()
     {
         ImGui.SetCurrentContext(_context);
@@ -293,7 +366,12 @@ public sealed class ImGuiController : IDisposable
     }
 
     /// <summary>按保存的启用状态恢复一个GL能力开关。</summary>
-    private static void Set(EnableCap capability,bool enabled) { if(enabled) GL.Enable(capability); else GL.Disable(capability); }
+    private static void Set(EnableCap capability,bool enabled) 
+    { 
+        if(enabled) GL.Enable(capability); 
+        else GL.Disable(capability); 
+    }
+
     /// <summary>编译内嵌ASCII shader；成功转交句柄，失败先删除再抛出编译日志。</summary>
     private static int Shader(ShaderType type,string source)
     {
