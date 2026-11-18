@@ -34,7 +34,7 @@ namespace G104.Engine.Tools;
 /// io.AddMousePosEvent(_window.MousePosition.X, _window.MousePosition.Y);
 /// io.AddMouseButtonEvent(index, down);// true表示按下，false表示松开。
 ///
-/// // 3. TrainingWindow每帧更新：准备输入，再处理本帧控件。
+/// // 3. TrainingWindow每帧更新：准备输入，再处理本帧控件；注意这里是处理界面、控件的状态，还不是渲染。
 /// _ui.BeginFrame(this, dt);           // 同步尺寸、时间和键盘等状态，内部调用ImGui.NewFrame()。
 /// // DrawToolbar中的代码：Button判断点击并生成按钮外观数据，返回true才安排保存。
 /// if (ImGui.Button("Save design")) Enqueue(Save);

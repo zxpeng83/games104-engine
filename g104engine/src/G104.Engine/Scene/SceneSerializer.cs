@@ -15,17 +15,22 @@ public static class SceneSerializer
         WriteIndented = true,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         MaxDepth = 128,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+        Converters =
+        {
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false),
+        },
     };
 
     /// <summary>只读加载并校验大小、结构、设计与资产引用；失败不改原文件。</summary>
     public static SceneDocument Load(string path, string assetRoot)
     {
         var info = new FileInfo(path);
-        if (info.Length > 16 * 1024 * 1024) throw new SceneValidationException("Scene JSON exceeds the 16 MiB limit.");
+        if (info.Length > 16 * 1024 * 1024)
+            throw new SceneValidationException("Scene JSON exceeds the 16 MiB limit.");
         var json = File.ReadAllText(path, Encoding.UTF8);
         RejectDuplicateProperties(json);
-        var document = JsonSerializer.Deserialize<SceneDocument>(json, Options) ?? throw new SceneValidationException("Scene document cannot be null.");
+        var document = JsonSerializer.Deserialize<SceneDocument>(json, Options)
+            ?? throw new SceneValidationException("Scene document cannot be null.");
         SceneValidator.Validate(document);
         ValidateAssets(document, assetRoot);
         return document;
@@ -39,23 +44,38 @@ public static class SceneSerializer
         var destination = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(destination)!;
         Directory.CreateDirectory(directory);
-        var temporary = Path.Combine(directory, $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp");
+        var temporary = Path.Combine(
+            directory,
+            $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp"
+        );
         try
         {
             // 先将新内容写入同目录随机文件并刷盘；目标只在完整写入后替换。
-            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            using (
+                var stream = new FileStream(
+                    temporary,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    4096,
+                    FileOptions.WriteThrough
+                )
+            )
             {
                 var bytes = Encoding.UTF8.GetBytes(json);
                 stream.Write(bytes);
                 stream.Flush(flushToDisk: true);
             }
             // 临时文件位于同一目录；Replace失败时旧文件与内存文档保持有效。
-            if (File.Exists(destination)) File.Replace(temporary, destination, null);
-            else File.Move(temporary, destination);
+            if (File.Exists(destination))
+                File.Replace(temporary, destination, null);
+            else
+                File.Move(temporary, destination);
         }
         finally
         {
-            if (File.Exists(temporary)) File.Delete(temporary);
+            if (File.Exists(temporary))
+                File.Delete(temporary);
         }
     }
 
@@ -68,18 +88,28 @@ public static class SceneSerializer
     }
 
     /// <summary>通过同一JSON合同深复制设计数据，不复制运行时资源或句柄。</summary>
-    public static SceneDocument Clone(SceneDocument document) => JsonSerializer.Deserialize<SceneDocument>(Serialize(document), Options)!;
+    public static SceneDocument Clone(SceneDocument document) =>
+        JsonSerializer.Deserialize<SceneDocument>(Serialize(document), Options)!;
+
     /// <summary>按统一选项输出设计文本，供保存、快照比较和历史脏状态使用。</summary>
-    public static string Serialize(SceneDocument document) => JsonSerializer.Serialize(document, Options);
+    public static string Serialize(SceneDocument document) =>
+        JsonSerializer.Serialize(document, Options);
 
     /// <summary>检查场景对象和模板默认对象引用的模型与贴图均存在于资产根内。</summary>
     public static void ValidateAssets(SceneDocument document, string assetRoot)
     {
-        foreach (var item in document.Objects.Concat(document.Templates.Select(template => template.Defaults)))
+        foreach (
+            var item in document.Objects.Concat(
+                document.Templates.Select(template => template.Defaults)
+            )
+        )
         {
-            if (item.ModelPath is string model) AssetPath.Resolve(assetRoot, model, requireExisting: true);
-            if (item.Material.BaseColorTexture is string color) AssetPath.Resolve(assetRoot, color, requireExisting: true);
-            if (item.Material.NormalTexture is string normal) AssetPath.Resolve(assetRoot, normal, requireExisting: true);
+            if (item.ModelPath is string model)
+                AssetPath.Resolve(assetRoot, model, requireExisting: true);
+            if (item.Material.BaseColorTexture is string color)
+                AssetPath.Resolve(assetRoot, color, requireExisting: true);
+            if (item.Material.NormalTexture is string normal)
+                AssetPath.Resolve(assetRoot, normal, requireExisting: true);
         }
     }
 
@@ -87,12 +117,20 @@ public static class SceneSerializer
     private static void RejectDuplicateProperties(string json)
     {
         using var parsed = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 128 });
-        if (parsed.RootElement.ValueKind != JsonValueKind.Object || !parsed.RootElement.TryGetProperty("schemaVersion", out _) ||
-            !parsed.RootElement.TryGetProperty("objects", out var objects) || objects.ValueKind != JsonValueKind.Array)
-            throw new SceneValidationException("Scene JSON requires schemaVersion and an objects array.");
+        if (
+            parsed.RootElement.ValueKind != JsonValueKind.Object
+            || !parsed.RootElement.TryGetProperty("schemaVersion", out _)
+            || !parsed.RootElement.TryGetProperty("objects", out var objects)
+            || objects.ValueKind != JsonValueKind.Array
+        )
+            throw new SceneValidationException(
+                "Scene JSON requires schemaVersion and an objects array."
+            );
         foreach (var item in objects.EnumerateArray())
             if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("id", out _))
-                throw new SceneValidationException("Every scene object requires an explicit stable id.");
+                throw new SceneValidationException(
+                    "Every scene object requires an explicit stable id."
+                );
         // 逐对象建立字段名集合，并继续检查嵌套对象和数组。
         void Visit(JsonElement value)
         {
@@ -101,12 +139,16 @@ public static class SceneSerializer
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in value.EnumerateObject())
                 {
-                    if (!names.Add(property.Name)) throw new SceneValidationException($"Duplicate JSON field: {property.Name}.");
+                    if (!names.Add(property.Name))
+                        throw new SceneValidationException(
+                            $"Duplicate JSON field: {property.Name}."
+                        );
                     Visit(property.Value);
                 }
             }
             else if (value.ValueKind == JsonValueKind.Array)
-                foreach (var element in value.EnumerateArray()) Visit(element);
+                foreach (var element in value.EnumerateArray())
+                    Visit(element);
         }
         Visit(parsed.RootElement);
     }

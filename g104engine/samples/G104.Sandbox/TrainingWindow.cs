@@ -1,5 +1,5 @@
-using G104.Engine.Audio;
 using G104.Engine.Assets;
+using G104.Engine.Audio;
 using G104.Engine.Core;
 using G104.Engine.Editor;
 using G104.Engine.Effects;
@@ -15,7 +15,7 @@ using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using NVector2=System.Numerics.Vector2;
+using NVector2 = System.Numerics.Vector2;
 
 namespace G104.Sandbox;
 
@@ -31,335 +31,601 @@ public sealed class TrainingWindow : GameWindow
 {
     /// <summary>本窗口的资产、用户数据与演练启动配置。</summary>
     private readonly LaunchOptions _options;
+
     /// <summary>把显示帧时间换成固定模拟步，提供显示插值余量。</summary>
-    private readonly FixedStepClock _clock=new();
+    private readonly FixedStepClock _clock = new();
+
     /// <summary>缓存按住态、一次性边沿和单独消费的鼠标视角量。</summary>
-    private readonly InputBuffer _input=new();
+    private readonly InputBuffer _input = new();
+
     /// <summary>窗口拥有的CPU粒子实例；Play/Stop清空个体。</summary>
-    private readonly ParticleSystem _particles=new();
+    private readonly ParticleSystem _particles = new();
+
     /// <summary>UI请求队列，在本帧安全点统一修改设计或运行状态。</summary>
-    private readonly Queue<Action> _commands=[];
+    private readonly Queue<Action> _commands = [];
+
     /// <summary>场景编辑界面；通过命令队列提交设计变更。</summary>
-    private readonly SceneEditorPanel _editorPanel=new();
+    private readonly SceneEditorPanel _editorPanel = new();
+
     /// <summary>可编辑设计场景，Play期间仍保留其内存内容和历史。</summary>
-    private SceneGraph _design=null!;
+    private SceneGraph _design = null!;
+
     /// <summary>对当前设计执行受校验且可撤销的编辑操作。</summary>
-    private SceneEditor _editor=null!;
+    private SceneEditor _editor = null!;
+
     /// <summary>实际用户保存目标的内容快照，用来判断未保存更改。</summary>
     private SceneDocument? _savedDesignBaseline;
+
     /// <summary>Play时从设计深复制的独立逻辑场景；Stop后释放引用。</summary>
     private SceneGraph? _runtime;
+
     /// <summary>运行场景的玩法与物理世界；非null即处于Play。</summary>
     private TrainingSimulation? _simulation;
+
     /// <summary>窗口拥有的GL渲染器，必须在有效上下文线程释放。</summary>
     private TrainingRenderer? _renderer;
+
     /// <summary>当前GameWindow窗口拥有的ImGui输入与GL后端，随窗口清理。</summary>
     private ImGuiController? _ui;
+
     /// <summary>窗口寿命内共享音频Buffer和独立Voice；初始化失败时可为空。</summary>
     private AudioSystem? _audio;
+
     /// <summary>本显示帧的只读渲染描述，连接场景姿态与表现层。</summary>
-    private IReadOnlyList<RenderObject> _objects=[];
+    private IReadOnlyList<RenderObject> _objects = [];
+
     /// <summary>当前显示相机的位置、目标和视图/投影矩阵。</summary>
     private CameraState _camera;
+
     /// <summary>编辑器或骨骼调试当前选中的稳定对象ID。</summary>
     private Guid? _selected;
+
     /// <summary>
     /// _yaw/_pitch：相机水平角/俯仰角，单位弧度；_distance：目标距离，单位米。
     /// _alpha：显示插值比例；_fps：平滑帧率；_frameMilliseconds：平滑显示帧毫秒数。
     /// </summary>
-    private float _yaw,_pitch=.33f,_distance=7,_alpha=1,_fps,_frameMilliseconds;
+    private float _yaw,
+        _pitch = .33f,
+        _distance = 7,
+        _alpha = 1,
+        _fps,
+        _frameMilliseconds;
+
     /// <summary>Edit模式的世界空间观察目标；可聚焦选中对象。</summary>
-    private Vector3 _editTarget=new(0,1,0);
+    private Vector3 _editTarget = new(0, 1, 0);
+
     /// <summary>_paused为用户暂停，_suspended为实际暂停/失焦状态，_disposed防止重复释放。</summary>
-    private bool _paused,_suspended,_disposed;
+    private bool _paused,
+        _suspended,
+        _disposed;
+
     /// <summary>工具栏或状态区显示的最近操作结果。</summary>
-    private string _message="Ready. Select Play to explore the training ground.";
+    private string _message = "Ready. Select Play to explore the training ground.";
+
     /// <summary>音频后端信息或初始化失败原因，仅供状态展示。</summary>
-    private string _audioStatus="not initialized";
+    private string _audioStatus = "not initialized";
+
     /// <summary>_frame记录显示更新次数；_footstep用于交替选择两段脚步音。</summary>
-    private int _frame,_footstep;
+    private int _frame,
+        _footstep;
+
     /// <summary>手动循环测试音的Voice句柄；0表示未播放。</summary>
     private int _loopVoice;
+
     /// <summary>_showPath控制NPC路径叠加；_showSkeleton控制选中对象骨架叠加。</summary>
-    private bool _showPath=true,_showSkeleton;
+    private bool _showPath = true,
+        _showSkeleton;
+
     /// <summary>最近消费到的动画事件说明，供学习观察。</summary>
-    private string _animationEvent="none";
+    private string _animationEvent = "none";
+
     /// <summary>当前显示使用的管线；与设计中下次Play的配置分别记录。</summary>
     private RenderPipelineMode _activePipeline;
+
     /// <summary>_discardNextDelta丢弃切换后的旧帧时间；_rejectedSavedDesign记录原存档被拒绝。</summary>
-    private bool _discardNextDelta=true,_rejectedSavedDesign;
+    private bool _discardNextDelta = true,
+        _rejectedSavedDesign;
+
     /// <summary>被拒绝的原存档在再次保存前建立的备份路径。</summary>
     private string? _rejectedBackup;
+
     /// <summary>_exerciseJumpEvents统计跳跃事实；_exerciseMovementFrames统计实际移动的固定步。</summary>
-    private int _exerciseJumpEvents,_exerciseMovementFrames;
+    private int _exerciseJumpEvents,
+        _exerciseMovementFrames;
+
     /// <summary>演练在Play前保存的未保存设计文本，用于确认Stop没有覆盖设计。</summary>
     private string? _exerciseUnsavedDesign;
+
     /// <summary>演练在Play前记录的Undo条数，用于确认Stop保留编辑历史。</summary>
     private int _exerciseUnsavedHistory;
+
     /// <summary>等待未保存更改对话框决策的目标设计路径。</summary>
     private string? _pendingLoad;
+
     /// <summary>防止同一待加载请求每帧重复打开确认弹窗。</summary>
     private bool _loadModalOpened;
+
     /// <summary>渲染调试输出选择，如法线、深度或阴影。</summary>
     private RenderDebugView _debug;
+
     /// <summary>接触专项演练的输入、观测和断言状态，仅专项启动时创建。</summary>
     private ContactWindowExercise? _contactExercise;
+
     /// <summary>用户设计的固定保存路径，位于启动配置指定的数据根下。</summary>
-    private string SavePath=>Path.Combine(_options.UserDataRoot,"Scenes","training-ground.json");
+    private string SavePath =>
+        Path.Combine(_options.UserDataRoot, "Scenes", "training-ground.json");
+
     /// <summary>是否已提交运行模拟，作为Edit/Play切换的事实来源。</summary>
-    private bool Playing=>_simulation is not null;
+    private bool Playing => _simulation is not null;
 
     /// <summary>创建OpenGL4.3核心窗口；自动演练启动时隐藏窗口。</summary>
-    public TrainingWindow(LaunchOptions options):base(GameWindowSettings.Default,new NativeWindowSettings
+    public TrainingWindow(LaunchOptions options)
+        : base(
+            GameWindowSettings.Default,
+            new NativeWindowSettings
+            {
+                ClientSize = new Vector2i(1440, 900),
+                Title = "G104Engine | Training Ground V1",
+                API = ContextAPI.OpenGL,
+                APIVersion = new Version(4, 3),
+                Profile = ContextProfile.Core,
+                Flags = ContextFlags.ForwardCompatible,
+                StartVisible = !options.Exercise,
+            }
+        )
     {
-        ClientSize=new Vector2i(1440,900), Title="G104Engine | Training Ground V1", API=ContextAPI.OpenGL,
-        APIVersion=new Version(4,3),Profile=ContextProfile.Core,Flags=ContextFlags.ForwardCompatible,StartVisible=!options.Exercise
-    }) { _options=options; }
+        _options = options;
+    }
 
     /// <summary>在当前GL上下文准备设计、渲染、UI与可选音频，拒绝坏存档时保留原件。</summary>
     protected override void OnLoad()
     {
         base.OnLoad();
-        Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}; GL: {GL.GetString(StringName.Version)}");
-        int major=GL.GetInteger(GetPName.MajorVersion),minor=GL.GetInteger(GetPName.MinorVersion);
-        if(major<4||(major==4&&minor<3)) throw new NotSupportedException("OpenGL4.3Core required.");
+        Console.WriteLine(
+            $"GPU: {GL.GetString(StringName.Renderer)}; GL: {GL.GetString(StringName.Version)}"
+        );
+        int major = GL.GetInteger(GetPName.MajorVersion),
+            minor = GL.GetInteger(GetPName.MinorVersion);
+        if (major < 4 || (major == 4 && minor < 3))
+            throw new NotSupportedException("OpenGL4.3Core required.");
 
         // 显示画面分两个步骤：GPU渲染（在gpu中计算图片）；显示器从gpu中读取图片并显示到屏幕。
         // VSync=VSyncMode.On时，显示器每次刷新只读取最新GPU渲染完成的图片。
         // VSync=VSyncMode.Off时，显示器每次刷新都读取GPU当前计算中的图片，可能是上一帧或本帧；
         // 而显示器一般一行一行刷新，可能在GPU渲染还没完成时就读取了部分本帧图片，造成撕裂。
-        VSync=_options.Exercise ? VSyncMode.Off : VSyncMode.On;
+        VSync = _options.Exercise ? VSyncMode.Off : VSyncMode.On;
 
-        _ui=new ImGuiController(this);
+        _ui = new ImGuiController(this);
         SceneDocument initial;
-        string seed=Path.Combine(_options.AssetRoot,"scenes","training-ground.json");
-        bool hadUserSave=!_options.ContactExercise&&File.Exists(SavePath);
+        string seed = Path.Combine(_options.AssetRoot, "scenes", "training-ground.json");
+        bool hadUserSave = !_options.ContactExercise && File.Exists(SavePath);
         // 读取或资源准备失败都回退到种子；原用户文件只保留，不在加载时覆盖。
-        if(hadUserSave)
+        if (hadUserSave)
         {
-            try { initial=SceneSerializer.Load(SavePath,_options.AssetRoot); }
-            catch(Exception error) { _rejectedSavedDesign=true;_message="Saved scene rejected and preserved: "+error.Message;Console.WriteLine(_message); initial=SceneSerializer.Load(seed,_options.AssetRoot); }
+            try
+            {
+                initial = SceneSerializer.Load(SavePath, _options.AssetRoot);
+            }
+            catch (Exception error)
+            {
+                _rejectedSavedDesign = true;
+                _message = "Saved scene rejected and preserved: " + error.Message;
+                Console.WriteLine(_message);
+                initial = SceneSerializer.Load(seed, _options.AssetRoot);
+            }
         }
-        else initial=SceneSerializer.Load(seed,_options.AssetRoot);
-        _design=new SceneGraph(initial);_editor=new SceneEditor(_design);
-        _activePipeline=initial.Rendering.Pipeline;
-        _renderer=new TrainingRenderer(_options.AssetRoot,FramebufferSize.X,FramebufferSize.Y);
-        _objects=BuildObjects(_design,1);
-        try { _renderer.Prepare(_objects); }
-        catch(Exception error) when(hadUserSave&&!_rejectedSavedDesign)
+        else
+            initial = SceneSerializer.Load(seed, _options.AssetRoot);
+        _design = new SceneGraph(initial);
+        _editor = new SceneEditor(_design);
+        _activePipeline = initial.Rendering.Pipeline;
+        _renderer = new TrainingRenderer(_options.AssetRoot, FramebufferSize.X, FramebufferSize.Y);
+        _objects = BuildObjects(_design, 1);
+        try
         {
-            _rejectedSavedDesign=true;_message="Saved scene resource preparation failed; original preserved: "+error.Message;
+            _renderer.Prepare(_objects);
+        }
+        catch (Exception error) when (hadUserSave && !_rejectedSavedDesign)
+        {
+            _rejectedSavedDesign = true;
+            _message =
+                "Saved scene resource preparation failed; original preserved: " + error.Message;
             Console.WriteLine(_message);
-            initial=SceneSerializer.Load(seed,_options.AssetRoot);_design=new SceneGraph(initial);_editor=new SceneEditor(_design);
-            _activePipeline=initial.Rendering.Pipeline;_objects=BuildObjects(_design,1);_renderer.Prepare(_objects);
+            initial = SceneSerializer.Load(seed, _options.AssetRoot);
+            _design = new SceneGraph(initial);
+            _editor = new SceneEditor(_design);
+            _activePipeline = initial.Rendering.Pipeline;
+            _objects = BuildObjects(_design, 1);
+            _renderer.Prepare(_objects);
         }
-        _savedDesignBaseline=hadUserSave&&!_rejectedSavedDesign ? SceneSerializer.Clone(_design.Document) : null;
-        _editor=CreateDesignEditor(_design,_savedDesignBaseline);
+        _savedDesignBaseline =
+            hadUserSave && !_rejectedSavedDesign ? SceneSerializer.Clone(_design.Document) : null;
+        _editor = CreateDesignEditor(_design, _savedDesignBaseline);
         ConnectEditorPreparation();
-        try { _audio=new AudioSystem(_options.AssetRoot);_audioStatus=_audio.Backend; }
-        catch(Exception error) { _audioStatus="Unavailable: "+error.Message;Console.WriteLine(_audioStatus); }
-        _selected=initial.Objects.FirstOrDefault(o=>o.Kind==ObjectKind.Player)?.Id;
-        Console.WriteLine("Assets: "+_options.AssetRoot);Console.WriteLine("Design save: "+SavePath);
-        if(_options.ContactExercise) _contactExercise=new ContactWindowExercise(initial);
+        try
+        {
+            _audio = new AudioSystem(_options.AssetRoot);
+            _audioStatus = _audio.Backend;
+        }
+        catch (Exception error)
+        {
+            _audioStatus = "Unavailable: " + error.Message;
+            Console.WriteLine(_audioStatus);
+        }
+        _selected = initial.Objects.FirstOrDefault(o => o.Kind == ObjectKind.Player)?.Id;
+        Console.WriteLine("Assets: " + _options.AssetRoot);
+        Console.WriteLine("Design save: " + SavePath);
+        if (_options.ContactExercise)
+            _contactExercise = new ContactWindowExercise(initial);
     }
 
     /// <summary>窗口尺寸变化时，用实际帧缓冲像素尺寸调整渲染目标。</summary>
     protected override void OnResize(ResizeEventArgs e)
     {
         base.OnResize(e);
-        if(FramebufferSize.X>0&&FramebufferSize.Y>0) _renderer?.Resize(FramebufferSize.X,FramebufferSize.Y);
+        if (FramebufferSize.X > 0 && FramebufferSize.Y > 0)
+            _renderer?.Resize(FramebufferSize.X, FramebufferSize.Y);
     }
 
     /// <summary>接收DPI等引起的像素尺寸变化，仅为非零目标重建附件。</summary>
     protected override void OnFramebufferResize(FramebufferResizeEventArgs e)
     {
         base.OnFramebufferResize(e);
-        if(e.Width>0&&e.Height>0) _renderer?.Resize(e.Width,e.Height);
+        if (e.Width > 0 && e.Height > 0)
+            _renderer?.Resize(e.Width, e.Height);
     }
 
     /// <summary>采集显示帧输入、处理命令并推进固定步，最后生成插值画面数据。</summary>
     protected override void OnUpdateFrame(FrameEventArgs e)
     {
         base.OnUpdateFrame(e);
-        if(_ui is null||_renderer is null) return;
-        _frame++;bool discardedThisFrame=_discardNextDelta;
-        float dt=discardedThisFrame ? 0 : (float)Math.Clamp(e.Time,0,0.25);_discardNextDelta=false;
-        _frameMilliseconds=_frameMilliseconds==0 ? dt*1000 : MathHelper.Lerp(_frameMilliseconds,dt*1000,.08f);
-        _fps=_frameMilliseconds>0 ? 1000/_frameMilliseconds : 0;
-        _ui.BeginFrame(this,Math.Max(dt,1e-4f));
-        DrawToolbar();_selected=_editorPanel.Draw(_editor,Playing,_selected,Enqueue);DrawStatus();
+        if (_ui is null || _renderer is null)
+            return;
+        _frame++;
+        bool discardedThisFrame = _discardNextDelta;
+        float dt = discardedThisFrame ? 0 : (float)Math.Clamp(e.Time, 0, 0.25);
+        _discardNextDelta = false;
+        _frameMilliseconds =
+            _frameMilliseconds == 0
+                ? dt * 1000
+                : MathHelper.Lerp(_frameMilliseconds, dt * 1000, .08f);
+        _fps = _frameMilliseconds > 0 ? 1000 / _frameMilliseconds : 0;
+        _ui.BeginFrame(this, Math.Max(dt, 1e-4f));
+        DrawToolbar();
+        _selected = _editorPanel.Draw(_editor, Playing, _selected, Enqueue);
+        DrawStatus();
         ReleaseUiFocusForSceneClick(MouseState.IsButtonPressed(MouseButton.Left));
         // UI先收集请求，随后在采集角色输入和执行模拟前应用场景变更。
         ProcessCommands();
-        if(_options.ContactExercise) ExerciseContacts();
-        else if(_options.Exercise) Exercise();
-        bool suspended=(!_options.Exercise&&(!IsFocused||WindowState==OpenTK.Windowing.Common.WindowState.Minimized))||_paused;
+        if (_options.ContactExercise)
+            ExerciseContacts();
+        else if (_options.Exercise)
+            Exercise();
+        bool suspended =
+            (
+                !_options.Exercise
+                && (!IsFocused || WindowState == OpenTK.Windowing.Common.WindowState.Minimized)
+            ) || _paused;
         // 状态切换同时清输入、累计时间与显示历史，恢复时不补算暂停区间。
-        if(suspended!=_suspended) { _suspended=suspended;_discardNextDelta=true;_clock.Reset();_input.Clear();_runtime?.ResetInterpolation();_renderer.ResetDisplayHistory();_audio?.SetPaused(suspended); }
-        if(KeyboardState.IsKeyPressed(Keys.Escape)&&!_ui.WantsKeyboard) { if(Playing) Enqueue(Stop); else Close(); }
-        if(KeyboardState.IsKeyPressed(Keys.F5)&&!_ui.WantsKeyboard) Enqueue(Playing ? Stop : Play);
-        if(!Playing && !_ui.WantsKeyboard && KeyboardState.IsKeyDown(Keys.LeftControl))
+        if (suspended != _suspended)
         {
-            if(KeyboardState.IsKeyPressed(Keys.Z)) Enqueue(()=>_editor.History.Undo());
-            if(KeyboardState.IsKeyPressed(Keys.Y)) Enqueue(()=>_editor.History.Redo());
-            if(KeyboardState.IsKeyPressed(Keys.S)) Enqueue(Save);
+            _suspended = suspended;
+            _discardNextDelta = true;
+            _clock.Reset();
+            _input.Clear();
+            _runtime?.ResetInterpolation();
+            _renderer.ResetDisplayHistory();
+            _audio?.SetPaused(suspended);
         }
-        Vector2 move=new((KeyboardState.IsKeyDown(Keys.D)?1:0)-(KeyboardState.IsKeyDown(Keys.A)?1:0),
-                         (KeyboardState.IsKeyDown(Keys.W)?1:0)-(KeyboardState.IsKeyDown(Keys.S)?1:0));
-        Vector2 look=MouseState.IsButtonDown(MouseButton.Right) ? MouseState.Delta : Vector2.Zero;
-        bool jump=KeyboardState.IsKeyPressed(Keys.Space),interact=KeyboardState.IsKeyPressed(Keys.E),sprint=KeyboardState.IsKeyDown(Keys.LeftShift);
-        if(_options.ContactExercise)
+        if (KeyboardState.IsKeyPressed(Keys.Escape) && !_ui.WantsKeyboard)
         {
-            (move,sprint)=_contactExercise!.Input(_frame);
-            look=Vector2.Zero;jump=false;interact=false;
+            if (Playing)
+                Enqueue(Stop);
+            else
+                Close();
         }
-        else if(_options.Exercise)
+        if (KeyboardState.IsKeyPressed(Keys.F5) && !_ui.WantsKeyboard)
+            Enqueue(Playing ? Stop : Play);
+        if (!Playing && !_ui.WantsKeyboard && KeyboardState.IsKeyDown(Keys.LeftControl))
         {
-            move=(_frame is >=6 and <=65 || _frame is >=80 and <=130) ? Vector2.UnitY : Vector2.Zero;
-            look=Vector2.Zero;jump=_frame is 55 or 95;interact=false;sprint=_frame is >=35 and <=65 || _frame is >=80 and <=130;
+            if (KeyboardState.IsKeyPressed(Keys.Z))
+                Enqueue(() => _editor.History.Undo());
+            if (KeyboardState.IsKeyPressed(Keys.Y))
+                Enqueue(() => _editor.History.Redo());
+            if (KeyboardState.IsKeyPressed(Keys.S))
+                Enqueue(Save);
         }
-        _input.Push(new InputState(move,look,jump,interact,!suspended,
-            !_options.Exercise&&_ui.WantsKeyboard,!_options.Exercise&&_ui.WantsMouse,sprint));
+        Vector2 move = new(
+            (KeyboardState.IsKeyDown(Keys.D) ? 1 : 0) - (KeyboardState.IsKeyDown(Keys.A) ? 1 : 0),
+            (KeyboardState.IsKeyDown(Keys.W) ? 1 : 0) - (KeyboardState.IsKeyDown(Keys.S) ? 1 : 0)
+        );
+        Vector2 look = MouseState.IsButtonDown(MouseButton.Right) ? MouseState.Delta : Vector2.Zero;
+        bool jump = KeyboardState.IsKeyPressed(Keys.Space),
+            interact = KeyboardState.IsKeyPressed(Keys.E),
+            sprint = KeyboardState.IsKeyDown(Keys.LeftShift);
+        if (_options.ContactExercise)
+        {
+            (move, sprint) = _contactExercise!.Input(_frame);
+            look = Vector2.Zero;
+            jump = false;
+            interact = false;
+        }
+        else if (_options.Exercise)
+        {
+            move =
+                (_frame is >= 6 and <= 65 || _frame is >= 80 and <= 130)
+                    ? Vector2.UnitY
+                    : Vector2.Zero;
+            look = Vector2.Zero;
+            jump = _frame is 55 or 95;
+            interact = false;
+            sprint = _frame is >= 35 and <= 65 || _frame is >= 80 and <= 130;
+        }
+        _input.Push(
+            new InputState(
+                move,
+                look,
+                jump,
+                interact,
+                !suspended,
+                !_options.Exercise && _ui.WantsKeyboard,
+                !_options.Exercise && _ui.WantsMouse,
+                sprint
+            )
+        );
         // 视角每显示帧只消费一次；本帧所有模拟补步共享同一个水平参考。
-        Vector2 frameLook=_input.ConsumeLook();_yaw-=frameLook.X*.004f;_pitch=Math.Clamp(_pitch+frameLook.Y*.004f,.08f,1.25f);
-        if(!_ui.WantsMouse) _distance=Math.Clamp(_distance-MouseState.ScrollDelta.Y*.5f,2.5f,15);
-        if(_options.ContactExercise) { _yaw=0;_pitch=.33f;_distance=7; }
-        else if(_options.Exercise) { _yaw=_frame>=225 ? .4f : 0;_pitch=.33f;_distance=_frame>=225 ? 4 : 7; }
-        if(Playing&&!suspended)
+        Vector2 frameLook = _input.ConsumeLook();
+        _yaw -= frameLook.X * .004f;
+        _pitch = Math.Clamp(_pitch + frameLook.Y * .004f, .08f, 1.25f);
+        if (!_ui.WantsMouse)
+            _distance = Math.Clamp(_distance - MouseState.ScrollDelta.Y * .5f, 2.5f, 15);
+        if (_options.ContactExercise)
+        {
+            _yaw = 0;
+            _pitch = .33f;
+            _distance = 7;
+        }
+        else if (_options.Exercise)
+        {
+            _yaw = _frame >= 225 ? .4f : 0;
+            _pitch = .33f;
+            _distance = _frame >= 225 ? 4 : 7;
+        }
+        if (Playing && !suspended)
         {
             // 模拟、事实、动画/粒子按固定步推进；绘制只读取插值，不重发事件。
-            var result=_clock.Advance(_discardNextDelta||discardedThisFrame ? 0 : (_options.Exercise ? 1.0/60 : dt),step=>
+            var result = _clock.Advance(
+                _discardNextDelta || discardedThisFrame ? 0 : (_options.Exercise ? 1.0 / 60 : dt),
+                step =>
+                {
+                    _runtime!.CapturePrevious();
+                    var input = _input.Consume();
+                    _simulation!.Tick(
+                        step,
+                        new GameInput(
+                            input.Move,
+                            input.Sprint,
+                            input.JumpPressed,
+                            input.InteractPressed,
+                            _yaw
+                        )
+                    );
+                    if (_options.Exercise && _simulation.PlayerState.Velocity.Xz.Length > .2f)
+                        _exerciseMovementFrames++;
+                    foreach (var fact in _simulation.Events)
+                        Feedback(fact);
+                    _particles.Tick(step);
+                    _renderer.UpdateAnimations(step, BuildObjects(_runtime, 1));
+                    foreach (
+                        var actor in _runtime.Document.Objects.Where(o =>
+                            o.Kind is ObjectKind.Player or ObjectKind.Npc
+                        )
+                    )
+                    foreach (var animationEvent in _renderer.DrainAnimationEvents(actor.Id))
+                        _animationEvent =
+                            $"{actor.Name}: {animationEvent.Name} #{animationEvent.Sequence}";
+                    _contactExercise?.Observe(_runtime, _simulation, input.Sprint);
+                }
+            );
+            _alpha = result.Alpha;
+            if (_options.Exercise && !_options.ContactExercise && _frame == 206)
             {
-                _runtime!.CapturePrevious();var input=_input.Consume();
-                _simulation!.Tick(step,new GameInput(input.Move,input.Sprint,input.JumpPressed,input.InteractPressed,_yaw));
-                if(_options.Exercise&&_simulation.PlayerState.Velocity.Xz.Length>.2f) _exerciseMovementFrames++;
-                foreach(var fact in _simulation.Events) Feedback(fact);
-                _particles.Tick(step);_renderer.UpdateAnimations(step,BuildObjects(_runtime,1));
-                foreach(var actor in _runtime.Document.Objects.Where(o=>o.Kind is ObjectKind.Player or ObjectKind.Npc))
-                    foreach(var animationEvent in _renderer.DrainAnimationEvents(actor.Id))
-                        _animationEvent=$"{actor.Name}: {animationEvent.Name} #{animationEvent.Sequence}";
-                _contactExercise?.Observe(_runtime,_simulation,input.Sprint);
-            });
-            _alpha=result.Alpha;
-            if(_options.Exercise&&!_options.ContactExercise&&_frame==206)
-            {
-                if(!discardedThisFrame||result.Steps!=0) throw new InvalidOperationException("Synchronous preparation time entered simulation.");
-                Console.WriteLine($"Slow prepare 120ms: next raw frame {e.Time*1000:F2}ms, discarded; simulated steps {result.Steps}.");
+                if (!discardedThisFrame || result.Steps != 0)
+                    throw new InvalidOperationException(
+                        "Synchronous preparation time entered simulation."
+                    );
+                Console.WriteLine(
+                    $"Slow prepare 120ms: next raw frame {e.Time * 1000:F2}ms, discarded; simulated steps {result.Steps}."
+                );
             }
-            if(result.DroppedSteps>0) Console.WriteLine($"Fixed-step debt dropped: {result.DroppedSteps}");
+            if (result.DroppedSteps > 0)
+                Console.WriteLine($"Fixed-step debt dropped: {result.DroppedSteps}");
         }
         else
         {
-            _alpha=1;
-            if(!Playing&&!suspended)
+            _alpha = 1;
+            if (!Playing && !suspended)
             {
-                _renderer.UpdateAnimations(dt,BuildObjects(_design,1));
-                foreach(var actor in _design.Document.Objects.Where(o=>o.Kind is ObjectKind.Player or ObjectKind.Npc)) _renderer.DrainAnimationEvents(actor.Id);
+                _renderer.UpdateAnimations(dt, BuildObjects(_design, 1));
+                foreach (
+                    var actor in _design.Document.Objects.Where(o =>
+                        o.Kind is ObjectKind.Player or ObjectKind.Npc
+                    )
+                )
+                    _renderer.DrainAnimationEvents(actor.Id);
             }
         }
-        _objects=BuildObjects(_runtime??_design,_alpha);UpdateCamera();
+        _objects = BuildObjects(_runtime ?? _design, _alpha);
+        UpdateCamera();
         DrawWorldDebug();
-        _audio?.SetListener(_camera.Position,(_camera.Target-_camera.Position).Normalized());
+        _audio?.SetListener(_camera.Position, (_camera.Target - _camera.Position).Normalized());
     }
 
     /// <summary>点击非UI区域时释放文字/键盘焦点，恢复场景快捷键。</summary>
     internal static void ReleaseUiFocusForSceneClick(bool leftPressed)
     {
         // 控件激活会阻挡Hovered查询；Capture仍包含UI点击/拖动及弹窗归属。
-        if(leftPressed&&!ImGui.GetIO().WantCaptureMouse) ImGui.SetWindowFocus(null!);
+        if (leftPressed && !ImGui.GetIO().WantCaptureMouse)
+            ImGui.SetWindowFocus(null!);
     }
 
     /// <summary>把UI操作延迟到统一安全点，避免绘制控件时修改场景结构。</summary>
-    private void Enqueue(Action action)=>_commands.Enqueue(action);
+    private void Enqueue(Action action) => _commands.Enqueue(action);
+
     /// <summary>依序执行已排队命令；单条失败显示原因并继续处理队列。</summary>
     private void ProcessCommands()
     {
-        while(_commands.TryDequeue(out var action))
+        while (_commands.TryDequeue(out var action))
         {
-            ExecuteEditorCommand(_editor,action,error=>{ _message=error.Message;Console.WriteLine("Command rejected: "+error); });
+            ExecuteEditorCommand(_editor, action, error =>
+            {
+                _message = error.Message;
+                Console.WriteLine("Command rejected: " + error);
+            });
         }
     }
 
     /// <summary>执行一条编辑命令并报告拒绝，保留History已恢复的合法设计状态。</summary>
-    internal static void ExecuteEditorCommand(SceneEditor editor,Action action,Action<Exception> rejected)
+    internal static void ExecuteEditorCommand(
+        SceneEditor editor,
+        Action action,
+        Action<Exception> rejected
+    )
     {
-        try { action(); }
+        try
+        {
+            action();
+        }
         // Execute已恢复本次失败前的设计，保留拖动起点；面板继续负责提交/取消整段事务。
-        catch(Exception error) { rejected(error); }
+        catch (Exception error)
+        {
+            rejected(error);
+        }
     }
 
     /// <summary>完整准备运行副本、物理与渲染后再提交Play，失败不替换现有设计。</summary>
     private void Play()
     {
-        if(Playing) return;
-        if(_options.Exercise&&!_options.ContactExercise&&_frame==205) Thread.Sleep(120);
-        if(_editor.History.InTransaction) _editor.History.CommitTransaction();
-        var candidate=new SceneGraph(SceneSerializer.Clone(_design.Document));
-        TrainingSimulation? simulation=null;
+        if (Playing)
+            return;
+        if (_options.Exercise && !_options.ContactExercise && _frame == 205)
+            Thread.Sleep(120);
+        if (_editor.History.InTransaction)
+            _editor.History.CommitTransaction();
+        var candidate = new SceneGraph(SceneSerializer.Clone(_design.Document));
+        TrainingSimulation? simulation = null;
         try
         {
-            simulation=new TrainingSimulation(candidate.Document,candidate);
-            _renderer!.Prepare(BuildObjects(candidate,1));
+            simulation = new TrainingSimulation(candidate.Document, candidate);
+            _renderer!.Prepare(BuildObjects(candidate, 1));
         }
-        catch { simulation?.Dispose();throw; }
+        catch
+        {
+            simulation?.Dispose();
+            throw;
+        }
         // 到这里物理与渲染候选均已成功，才公开新的运行世界。
-        _runtime=candidate;_simulation=simulation;
-        _activePipeline=candidate.Document.Rendering.Pipeline;
+        _runtime = candidate;
+        _simulation = simulation;
+        _activePipeline = candidate.Document.Rendering.Pipeline;
         _renderer!.ResetAnimations();
-        _clock.Reset();_input.Clear();_particles.Clear();_audio?.StopAll();_loopVoice=0;_paused=false;_alpha=1;
-        _discardNextDelta=true;
-        _message="Play: WASD move, Shift run, Space jump, E interact, RMB orbit; Esc stops.";
+        _clock.Reset();
+        _input.Clear();
+        _particles.Clear();
+        _audio?.StopAll();
+        _loopVoice = 0;
+        _paused = false;
+        _alpha = 1;
+        _discardNextDelta = true;
+        _message = "Play: WASD move, Shift run, Space jump, E interact, RMB orbit; Esc stops.";
         ImGui.SetWindowFocus(null!);
-        Console.WriteLine("Play prepared: "+candidate.Document.Rendering.Pipeline);
+        Console.WriteLine("Play prepared: " + candidate.Document.Rendering.Pipeline);
     }
 
     /// <summary>切回原设计并释放运行世界，保留未保存编辑与Undo历史。</summary>
     private void Stop()
     {
-        if(!Playing) return;
+        if (!Playing)
+            return;
         // 保留原设计和Undo历史；运行变换/机关状态只存在独立Clone中。
-        _renderer!.Prepare(BuildObjects(_design,1));
-        _audio?.StopAll();_loopVoice=0;_particles.Clear();_simulation!.Dispose();_simulation=null;_runtime=null;
+        _renderer!.Prepare(BuildObjects(_design, 1));
+        _audio?.StopAll();
+        _loopVoice = 0;
+        _particles.Clear();
+        _simulation!.Dispose();
+        _simulation = null;
+        _runtime = null;
         _renderer.ResetAnimations();
-        _clock.Reset();_input.Clear();_design.ResetInterpolation();_paused=false;_alpha=1;
-        _discardNextDelta=true;
-        _message="Stopped; unsaved design edits and undo history retained.";Console.WriteLine("Stop restored design");
+        _clock.Reset();
+        _input.Clear();
+        _design.ResetInterpolation();
+        _paused = false;
+        _alpha = 1;
+        _discardNextDelta = true;
+        _message = "Stopped; unsaved design edits and undo history retained.";
+        Console.WriteLine("Stop restored design");
     }
 
     /// <summary>校验并原子保存设计；被拒绝的旧存档先备份，成功后更新保存基准。</summary>
     private void Save()
     {
-        if(_editor.History.InTransaction) _editor.History.CommitTransaction();
-        if(_rejectedSavedDesign&&File.Exists(SavePath))
+        if (_editor.History.InTransaction)
+            _editor.History.CommitTransaction();
+        if (_rejectedSavedDesign && File.Exists(SavePath))
         {
-            string backup=SavePath+".rejected-"+DateTime.UtcNow.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N")+".json";
-            File.Copy(SavePath,backup,overwrite:false);_rejectedBackup=backup;Console.WriteLine("Rejected original backed up: "+backup);
+            string backup =
+                SavePath
+                + ".rejected-"
+                + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss")
+                + "-"
+                + Guid.NewGuid().ToString("N")
+                + ".json";
+            File.Copy(SavePath, backup, overwrite: false);
+            _rejectedBackup = backup;
+            Console.WriteLine("Rejected original backed up: " + backup);
         }
-        SceneSerializer.Save(_design.Document,SavePath,_options.AssetRoot);_rejectedSavedDesign=false;
-        _savedDesignBaseline=SceneSerializer.Clone(_design.Document);
-        _editor.History.MarkSaved();_message="Saved design: "+SavePath;
+        SceneSerializer.Save(_design.Document, SavePath, _options.AssetRoot);
+        _rejectedSavedDesign = false;
+        _savedDesignBaseline = SceneSerializer.Clone(_design.Document);
+        _editor.History.MarkSaved();
+        _message = "Saved design: " + SavePath;
     }
 
     /// <summary>Edit下先校验并准备候选设计资源，成功后才替换当前设计。</summary>
     private void LoadDesign(string path)
     {
-        if(Playing) throw new InvalidOperationException("Stop before loading another design.");
+        if (Playing)
+            throw new InvalidOperationException("Stop before loading another design.");
         // 先准备候选资源；失败抛出时当前设计和编辑历史仍有效。
-        var candidate=new SceneGraph(SceneSerializer.Load(path,_options.AssetRoot));
-        _renderer!.Prepare(BuildObjects(candidate,1));
-        if(string.Equals(Path.GetFullPath(path),Path.GetFullPath(SavePath),StringComparison.OrdinalIgnoreCase))
-            _savedDesignBaseline=SceneSerializer.Clone(candidate.Document);
-        _design=candidate;_editor=CreateDesignEditor(candidate,_savedDesignBaseline);_selected=null;_clock.Reset();_input.Clear();_message="Loaded "+path;
-        _activePipeline=candidate.Document.Rendering.Pipeline;
-        _renderer.ResetAnimations();ConnectEditorPreparation();
-        _audio?.StopAll();_loopVoice=0;_particles.Clear();
-        _discardNextDelta=true;
+        var candidate = new SceneGraph(SceneSerializer.Load(path, _options.AssetRoot));
+        _renderer!.Prepare(BuildObjects(candidate, 1));
+        if (
+            string.Equals(
+                Path.GetFullPath(path),
+                Path.GetFullPath(SavePath),
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+            _savedDesignBaseline = SceneSerializer.Clone(candidate.Document);
+        _design = candidate;
+        _editor = CreateDesignEditor(candidate, _savedDesignBaseline);
+        _selected = null;
+        _clock.Reset();
+        _input.Clear();
+        _message = "Loaded " + path;
+        _activePipeline = candidate.Document.Rendering.Pipeline;
+        _renderer.ResetAnimations();
+        ConnectEditorPreparation();
+        _audio?.StopAll();
+        _loopVoice = 0;
+        _particles.Clear();
+        _discardNextDelta = true;
     }
 
     /// <summary>创建编辑历史并绑定实际保存文件基准，避免种子被误标为已保存。</summary>
-    internal static SceneEditor CreateDesignEditor(SceneGraph design,SceneDocument? savedBaseline)
+    internal static SceneEditor CreateDesignEditor(SceneGraph design, SceneDocument? savedBaseline)
     {
-        var editor=new SceneEditor(design);
+        var editor = new SceneEditor(design);
         editor.History.SetSavedBaseline(savedBaseline);
         return editor;
     }
@@ -367,323 +633,687 @@ public sealed class TrainingWindow : GameWindow
     /// <summary>存在未保存更改时挂起加载并交由弹窗决策，否则立即加载。</summary>
     private void RequestLoad(string path)
     {
-        if(_editor.History.IsDirty) { _pendingLoad=path;_loadModalOpened=false; }
-        else LoadDesign(path);
+        if (_editor.History.IsDirty)
+        {
+            _pendingLoad = path;
+            _loadModalOpened = false;
+        }
+        else
+            LoadDesign(path);
     }
 
     /// <summary>给历史操作接上资产/GL预备回调，资源失败发生在设计提交之前。</summary>
-    private void ConnectEditorPreparation() => _editor.History.PrepareChange = candidate =>
-    {
-        SceneSerializer.ValidateAssets(candidate.Document,_options.AssetRoot);
-        _renderer!.Prepare(BuildObjects(candidate,1));
-    };
+    private void ConnectEditorPreparation() =>
+        _editor.History.PrepareChange = candidate =>
+        {
+            SceneSerializer.ValidateAssets(candidate.Document, _options.AssetRoot);
+            _renderer!.Prepare(BuildObjects(candidate, 1));
+        };
 
     /// <summary>筛选可见对象并生成同一alpha的显示变换；动画输入来自实际运行状态。</summary>
-    private IReadOnlyList<RenderObject> BuildObjects(SceneGraph graph,float alpha)=>graph.Document.Objects
-        .Where(o=>o.Visible&&o.Kind!=ObjectKind.Group).Select(o=>new RenderObject(o.Id,graph.InterpolatedWorldMatrix(o.Id,alpha),o,
-            _simulation is not null && ReferenceEquals(graph,_runtime) ? _simulation.AnimationFor(o.Id) : new AnimationInputs(0,true,0),alpha)).ToArray();
+    private IReadOnlyList<RenderObject> BuildObjects(SceneGraph graph, float alpha) =>
+        graph
+            .Document.Objects.Where(o => o.Visible && o.Kind != ObjectKind.Group)
+            .Select(o => new RenderObject(
+                o.Id,
+                graph.InterpolatedWorldMatrix(o.Id, alpha),
+                o,
+                _simulation is not null && ReferenceEquals(graph, _runtime)
+                    ? _simulation.AnimationFor(o.Id)
+                    : new AnimationInputs(0, true, 0),
+                alpha
+            ))
+            .ToArray();
 
     /// <summary>围绕显示目标构建右手相机，Play时通过射线缩短距离以避开遮挡。</summary>
     private void UpdateCamera()
     {
-        Vector3 target=_editTarget;
-        if(Playing)
+        Vector3 target = _editTarget;
+        if (Playing)
         {
-            var player=_runtime!.Document.Objects.First(o=>o.Kind==ObjectKind.Player);
-            target=_runtime.InterpolatedWorldMatrix(player.Id,_alpha).ExtractTranslation()+new Vector3(0,1.15f,0);
+            var player = _runtime!.Document.Objects.First(o => o.Kind == ObjectKind.Player);
+            target =
+                _runtime.InterpolatedWorldMatrix(player.Id, _alpha).ExtractTranslation()
+                + new Vector3(0, 1.15f, 0);
         }
-        Vector3 offset=new(MathF.Sin(_yaw)*MathF.Cos(_pitch),MathF.Sin(_pitch),MathF.Cos(_yaw)*MathF.Cos(_pitch));
-        float distance=_distance;
-        if(Playing)
+        Vector3 offset = new(
+            MathF.Sin(_yaw) * MathF.Cos(_pitch),
+            MathF.Sin(_pitch),
+            MathF.Cos(_yaw) * MathF.Cos(_pitch)
+        );
+        float distance = _distance;
+        if (Playing)
         {
-            var hit=_simulation!.World.Raycast(target,offset,_distance);
-            if(hit is not null) distance=Math.Clamp(hit.Value.Distance-.25f,.6f,_distance);
+            var hit = _simulation!.World.Raycast(target, offset, _distance);
+            if (hit is not null)
+                distance = Math.Clamp(hit.Value.Distance - .25f, .6f, _distance);
         }
-        Vector3 position=target+offset*distance;
-        _camera=new CameraState(position,target,Matrix4.LookAt(position,target,Vector3.UnitY),
-            Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(55),Math.Max(1,FramebufferSize.X)/(float)Math.Max(1,FramebufferSize.Y),.08f,120));
+        Vector3 position = target + offset * distance;
+        _camera = new CameraState(
+            position,
+            target,
+            Matrix4.LookAt(position, target, Vector3.UnitY),
+            Matrix4.CreatePerspectiveFieldOfView(
+                MathHelper.DegreesToRadians(55),
+                Math.Max(1, FramebufferSize.X) / (float)Math.Max(1, FramebufferSize.Y),
+                .08f,
+                120
+            )
+        );
     }
 
     /// <summary>将本固定步的一次玩法事实映射为声音与粒子，不由绘制重复触发。</summary>
     private void Feedback(SimulationEvent fact)
     {
-        if(_options.Exercise&&fact.Sound=="jump") _exerciseJumpEvents++;
-        string clip=fact.Sound switch { "footstep"=>"step"+((_footstep++)%2),"land"=>"step0","button"=>"switch","denied"=>"click",_=>fact.Sound };
-        if(_audio is not null)
+        if (_options.Exercise && fact.Sound == "jump")
+            _exerciseJumpEvents++;
+        string clip = fact.Sound switch
         {
-            bool spatial=fact.Sound is not "complete" and not "denied";
-            _audio.Play(clip,fact.Position,spatial,gain:_options.Exercise ? .02f : (fact.Sound=="footstep" ? .22f : .6f));
+            "footstep" => "step" + ((_footstep++) % 2),
+            "land" => "step0",
+            "button" => "switch",
+            "denied" => "click",
+            _ => fact.Sound,
+        };
+        if (_audio is not null)
+        {
+            bool spatial = fact.Sound is not "complete" and not "denied";
+            _audio.Play(
+                clip,
+                fact.Position,
+                spatial,
+                gain: _options.Exercise ? .02f : (fact.Sound == "footstep" ? .22f : .6f)
+            );
         }
-        if(fact.Particles) _particles.Burst(fact.Position+Vector3.UnitY*.5f,fact.Color);
+        if (fact.Particles)
+            _particles.Burst(fact.Position + Vector3.UnitY * .5f, fact.Color);
     }
 
     /// <summary>绘制Play/保存/加载等入口，破坏性状态切换统一排入命令队列。</summary>
     private void DrawToolbar()
     {
-        ImGui.SetNextWindowPos(new NVector2(12,12),ImGuiCond.Always);ImGui.SetNextWindowSize(new NVector2(680,112),ImGuiCond.Always);
-        ImGui.Begin("Training Ground V1",ImGuiWindowFlags.NoResize|ImGuiWindowFlags.NoCollapse);
-        if(ImGui.Button(Playing ? "Stop (F5)" : "Play (F5)")) Enqueue(Playing ? Stop : Play);
-        ImGui.SameLine();if(ImGui.Button("Save design")) Enqueue(Save);
-        ImGui.SameLine();ImGui.BeginDisabled(Playing);if(ImGui.Button("Load saved")) Enqueue(()=>RequestLoad(SavePath));
-        ImGui.SameLine();if(ImGui.Button("Reset seed")) Enqueue(()=>RequestLoad(Path.Combine(_options.AssetRoot,"scenes","training-ground.json")));ImGui.EndDisabled();
-        if(Playing) { ImGui.SameLine();if(ImGui.Button(_paused ? "Resume" : "Pause")) Enqueue(()=>_paused=!_paused); }
-        ImGui.TextUnformatted($"{(Playing ? "PLAY" : "EDIT")} | {(_editor.History.IsDirty ? "Unsaved" : "Saved")} | {_fps:F0} FPS / {_frameMilliseconds:F2} ms");
-        ImGui.BeginDisabled(Playing);int pipeline=(int)_design.Document.Rendering.Pipeline;
-        if(ImGui.Combo("Pipeline (next Play)",ref pipeline,"Forward\0Deferred\0")) { var mode=(RenderPipelineMode)pipeline;Enqueue(()=>_editor.SetRenderPipeline(mode)); }
+        ImGui.SetNextWindowPos(new NVector2(12, 12), ImGuiCond.Always);
+        ImGui.SetNextWindowSize(new NVector2(680, 112), ImGuiCond.Always);
+        ImGui.Begin("Training Ground V1", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse);
+        if (ImGui.Button(Playing ? "Stop (F5)" : "Play (F5)"))
+            Enqueue(Playing ? Stop : Play);
+        ImGui.SameLine();
+        if (ImGui.Button("Save design"))
+            Enqueue(Save);
+        ImGui.SameLine();
+        ImGui.BeginDisabled(Playing);
+        if (ImGui.Button("Load saved"))
+            Enqueue(() => RequestLoad(SavePath));
+        ImGui.SameLine();
+        if (ImGui.Button("Reset seed"))
+            Enqueue(() =>
+                RequestLoad(Path.Combine(_options.AssetRoot, "scenes", "training-ground.json"))
+            );
+        ImGui.EndDisabled();
+        if (Playing)
+        {
+            ImGui.SameLine();
+            if (ImGui.Button(_paused ? "Resume" : "Pause"))
+                Enqueue(() => _paused = !_paused);
+        }
+        ImGui.TextUnformatted(
+            $"{(Playing ? "PLAY" : "EDIT")} | {(_editor.History.IsDirty ? "Unsaved" : "Saved")} | {_fps:F0} FPS / {_frameMilliseconds:F2} ms"
+        );
+        ImGui.BeginDisabled(Playing);
+        int pipeline = (int)_design.Document.Rendering.Pipeline;
+        if (ImGui.Combo("Pipeline (next Play)", ref pipeline, "Forward\0Deferred\0"))
+        {
+            var mode = (RenderPipelineMode)pipeline;
+            Enqueue(() => _editor.SetRenderPipeline(mode));
+        }
         ImGui.EndDisabled();
         // 确认弹窗先决策，再在安全点执行保存/加载；取消只清待处理请求。
-        if(_pendingLoad is not null&&!_loadModalOpened) { ImGui.OpenPopup("Unsaved design");_loadModalOpened=true; }
-        bool modalOpen=true;
-        if(ImGui.BeginPopupModal("Unsaved design",ref modalOpen,ImGuiWindowFlags.AlwaysAutoResize))
+        if (_pendingLoad is not null && !_loadModalOpened)
         {
-            ImGui.TextUnformatted("This design has unsaved edits. Choose how to load another design.");
-            if(ImGui.Button("Save and load"))
+            ImGui.OpenPopup("Unsaved design");
+            _loadModalOpened = true;
+        }
+        bool modalOpen = true;
+        if (
+            ImGui.BeginPopupModal(
+                "Unsaved design",
+                ref modalOpen,
+                ImGuiWindowFlags.AlwaysAutoResize
+            )
+        )
+        {
+            ImGui.TextUnformatted(
+                "This design has unsaved edits. Choose how to load another design."
+            );
+            if (ImGui.Button("Save and load"))
             {
-                string path=_pendingLoad!;_pendingLoad=null;_loadModalOpened=false;ImGui.CloseCurrentPopup();
-                Enqueue(()=>{ Save();LoadDesign(path); });
+                string path = _pendingLoad!;
+                _pendingLoad = null;
+                _loadModalOpened = false;
+                ImGui.CloseCurrentPopup();
+                Enqueue(() =>
+                {
+                    Save();
+                    LoadDesign(path);
+                });
             }
-            ImGui.SameLine();if(ImGui.Button("Discard and load"))
+            ImGui.SameLine();
+            if (ImGui.Button("Discard and load"))
             {
-                string path=_pendingLoad!;_pendingLoad=null;_loadModalOpened=false;ImGui.CloseCurrentPopup();Enqueue(()=>LoadDesign(path));
+                string path = _pendingLoad!;
+                _pendingLoad = null;
+                _loadModalOpened = false;
+                ImGui.CloseCurrentPopup();
+                Enqueue(() => LoadDesign(path));
             }
-            ImGui.SameLine();if(ImGui.Button("Cancel")) { _pendingLoad=null;_loadModalOpened=false;ImGui.CloseCurrentPopup(); }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel"))
+            {
+                _pendingLoad = null;
+                _loadModalOpened = false;
+                ImGui.CloseCurrentPopup();
+            }
             ImGui.EndPopup();
         }
-        if(!modalOpen) { _pendingLoad=null;_loadModalOpened=false; }
+        if (!modalOpen)
+        {
+            _pendingLoad = null;
+            _loadModalOpened = false;
+        }
         ImGui.End();
     }
 
     /// <summary>展示运行与渲染状态，并提供叠加显示及音频测试控制。</summary>
     private void DrawStatus()
     {
-        ImGui.SetNextWindowPos(new NVector2(Math.Max(710,ClientSize.X-350),12),ImGuiCond.Always);
-        ImGui.SetNextWindowSize(new NVector2(338,0),ImGuiCond.Always);ImGui.Begin("Runtime / Render debug",ImGuiWindowFlags.NoResize);
-        int view=(int)_debug;if(ImGui.Combo("View",ref view,"Final\0Base color\0Normals\0Roughness\0Depth\0Shadow\0")) _debug=(RenderDebugView)view;
+        ImGui.SetNextWindowPos(
+            new NVector2(Math.Max(710, ClientSize.X - 350), 12),
+            ImGuiCond.Always
+        );
+        ImGui.SetNextWindowSize(new NVector2(338, 0), ImGuiCond.Always);
+        ImGui.Begin("Runtime / Render debug", ImGuiWindowFlags.NoResize);
+        int view = (int)_debug;
+        if (ImGui.Combo("View", ref view, "Final\0Base color\0Normals\0Roughness\0Depth\0Shadow\0"))
+            _debug = (RenderDebugView)view;
         ImGui.TextWrapped(_message);
         ImGui.TextUnformatted("RMB drag: orbit | Wheel: distance");
-        if(!Playing&&_selected is Guid selected && ImGui.Button("Focus selected")) _editTarget=_design.WorldPosition(selected)+Vector3.UnitY;
-        if(_simulation is not null)
+        if (!Playing && _selected is Guid selected && ImGui.Button("Focus selected"))
+            _editTarget = _design.WorldPosition(selected) + Vector3.UnitY;
+        if (_simulation is not null)
         {
-            ImGui.Separator();ImGui.TextUnformatted($"Player grounded: {_simulation.PlayerState.Grounded}");
+            ImGui.Separator();
+            ImGui.TextUnformatted($"Player grounded: {_simulation.PlayerState.Grounded}");
             ImGui.TextUnformatted($"Speed: {_simulation.PlayerState.Velocity.Xz.Length:F2} m/s");
-            ImGui.TextUnformatted($"Door: {(_simulation.DoorOpen ? "open" : "closed")} | Goal: {_simulation.Completed}");
-            ImGui.TextUnformatted($"NPC: {_simulation.NpcMode} | Path: {_simulation.NpcPath.Count} nodes");
+            ImGui.TextUnformatted(
+                $"Door: {(_simulation.DoorOpen ? "open" : "closed")} | Goal: {_simulation.Completed}"
+            );
+            ImGui.TextUnformatted(
+                $"NPC: {_simulation.NpcMode} | Path: {_simulation.NpcPath.Count} nodes"
+            );
             ImGui.TextWrapped(_simulation.Feedback);
-            if(_selected is Guid actor) ImGui.TextWrapped(_renderer!.AnimationDebug(actor));
-            ImGui.TextWrapped("Animation event: "+_animationEvent);
+            if (_selected is Guid actor)
+                ImGui.TextWrapped(_renderer!.AnimationDebug(actor));
+            ImGui.TextWrapped("Animation event: " + _animationEvent);
         }
-        ImGui.Separator();ImGui.TextWrapped("Audio: "+_audioStatus);ImGui.TextUnformatted($"Voices {_audio?.ActiveVoices??0} | Particles {_particles.Count}");
-        ImGui.Checkbox("NPC path overlay",ref _showPath);ImGui.Checkbox("Selected skeleton overlay",ref _showSkeleton);
-        if(_audio is not null)
+        ImGui.Separator();
+        ImGui.TextWrapped("Audio: " + _audioStatus);
+        ImGui.TextUnformatted($"Voices {_audio?.ActiveVoices ?? 0} | Particles {_particles.Count}");
+        ImGui.Checkbox("NPC path overlay", ref _showPath);
+        ImGui.Checkbox("Selected skeleton overlay", ref _showSkeleton);
+        if (_audio is not null)
         {
-            if(ImGui.Button("2D test")) Enqueue(()=>_audio.Play("click",Vector3.Zero,false));ImGui.SameLine();
-            if(ImGui.Button("3D test")) Enqueue(()=>_audio.Play("door",new Vector3(3,1,0)));
-            if(ImGui.Button(_loopVoice==0 ? "Loop test" : "Stop loop")) Enqueue(()=>
-            {
-                if(_loopVoice==0) _loopVoice=_audio.Play("loop-test",Vector3.Zero,false,true,.2f);
-                else { _audio.Stop(_loopVoice);_loopVoice=0; }
-            });
+            if (ImGui.Button("2D test"))
+                Enqueue(() => _audio.Play("click", Vector3.Zero, false));
+            ImGui.SameLine();
+            if (ImGui.Button("3D test"))
+                Enqueue(() => _audio.Play("door", new Vector3(3, 1, 0)));
+            if (ImGui.Button(_loopVoice == 0 ? "Loop test" : "Stop loop"))
+                Enqueue(() =>
+                {
+                    if (_loopVoice == 0)
+                        _loopVoice = _audio.Play("loop-test", Vector3.Zero, false, true, .2f);
+                    else
+                    {
+                        _audio.Stop(_loopVoice);
+                        _loopVoice = 0;
+                    }
+                });
         }
-        if(_rejectedSavedDesign) ImGui.TextWrapped("Original save rejected. Save will preserve a backup before replacement.");
-        if(_rejectedBackup is not null) ImGui.TextWrapped("Preserved original: "+_rejectedBackup);
-        ImGui.TextWrapped("Save: "+SavePath);ImGui.End();
+        if (_rejectedSavedDesign)
+            ImGui.TextWrapped(
+                "Original save rejected. Save will preserve a backup before replacement."
+            );
+        if (_rejectedBackup is not null)
+            ImGui.TextWrapped("Preserved original: " + _rejectedBackup);
+        ImGui.TextWrapped("Save: " + SavePath);
+        ImGui.End();
     }
 
     /// <summary>按预定显示帧执行综合窗口演练，检查模式切换、编辑回滚及资源准备。</summary>
     private void Exercise()
     {
-        if(_frame==3)
+        if (_frame == 3)
         {
-            string original=SceneSerializer.Serialize(_design.Document);
-            _editor.Create(new SceneObjectData { Name="Preparation failure fixture",Transform=new TransformData { Scale=new Float3(1,1,2) },
-                Collider=new ColliderData { Kind=ColliderKind.Capsule,Size=new Float3(1,3,1) } });
-            string before=SceneSerializer.Serialize(_design.Document);bool rejected=false;
-            try { Play(); } catch(ArgumentException) { rejected=true; }
-            if(!rejected||Playing||SceneSerializer.Serialize(_design.Document)!=before||PhysicsWorld.ActiveWorlds!=0)
-                throw new InvalidOperationException("Failed Play lost preview/design or leaked physics resources.");
+            string original = SceneSerializer.Serialize(_design.Document);
+            _editor.Create(
+                new SceneObjectData
+                {
+                    Name = "Preparation failure fixture",
+                    Transform = new TransformData { Scale = new Float3(1, 1, 2) },
+                    Collider = new ColliderData
+                    {
+                        Kind = ColliderKind.Capsule,
+                        Size = new Float3(1, 3, 1),
+                    },
+                }
+            );
+            string before = SceneSerializer.Serialize(_design.Document);
+            bool rejected = false;
+            try
+            {
+                Play();
+            }
+            catch (ArgumentException)
+            {
+                rejected = true;
+            }
+            if (
+                !rejected
+                || Playing
+                || SceneSerializer.Serialize(_design.Document) != before
+                || PhysicsWorld.ActiveWorlds != 0
+            )
+                throw new InvalidOperationException(
+                    "Failed Play lost preview/design or leaked physics resources."
+                );
             _editor.History.Undo();
-            if(SceneSerializer.Serialize(_design.Document)!=original) throw new InvalidOperationException("Preparation failure fixture did not restore original preview.");
-            Console.WriteLine("Exercise failed Play preserved preview/design and disposed partial physics world.");
+            if (SceneSerializer.Serialize(_design.Document) != original)
+                throw new InvalidOperationException(
+                    "Preparation failure fixture did not restore original preview."
+                );
+            Console.WriteLine(
+                "Exercise failed Play preserved preview/design and disposed partial physics world."
+            );
         }
-        if(_frame==5) Play();
-        if(_frame==75) { Stop();_editor.SetRenderPipeline(RenderPipelineMode.Deferred);Play(); }
-        if(_frame==135) ClientSize=new Vector2i(1280,800);
-        if(_frame==150) _debug=RenderDebugView.Normals;
-        if(_frame==165) _debug=RenderDebugView.Shadow;
-        if(_frame==180)
-        {
-            Stop();_debug=RenderDebugView.Final;
-            int count=_design.Document.Objects.Count;int history=_editor.History.UndoCount;
-            var model=_design.Document.Objects.First(o=>o.Kind==ObjectKind.Player);
-            string before=model.ModelPath!;
-            try { _editor.SetAsset(model.Id,"models/missing-bad-edit.glb");throw new InvalidOperationException("Invalid model edit unexpectedly committed."); }
-            catch(SceneValidationException) { }
-            if(model.ModelPath!=before||_design.Document.Objects.Count!=count||_editor.History.UndoCount!=history)
-                throw new InvalidOperationException("Failed asset edit changed design/history.");
-            Guid cube=_editor.Create("cube");_editor.SetTransform(cube,new TransformData { Position=new Float3(3,.5f,7) });
-            _editor.History.Undo();_editor.History.Redo();Save();LoadDesign(SavePath);
-            Console.WriteLine("Exercise save/load/undo/redo passed");
-        }
-        if(_frame==185)
-        {
-            Guid unsaved=_editor.Create("cube");_editor.SetTransform(unsaved,new TransformData { Position=new Float3(7,.5f,9) });
-            _exerciseUnsavedDesign=SceneSerializer.Serialize(_design.Document);_exerciseUnsavedHistory=_editor.History.UndoCount;
-        }
-        if(_frame==190) { Play();_paused=true; }
-        if(_frame==200) _paused=false;
-        if(_frame==205)
+        if (_frame == 5)
+            Play();
+        if (_frame == 75)
         {
             Stop();
-            if(!_editor.History.IsDirty||!_editor.History.CanUndo||_editor.History.UndoCount!=_exerciseUnsavedHistory||
-                SceneSerializer.Serialize(_design.Document)!=_exerciseUnsavedDesign)
-                throw new InvalidOperationException("Play/Stop lost unsaved edits or undo history.");
-            Console.WriteLine("Exercise Play/Stop retained unsaved design and undo history.");Play();
+            _editor.SetRenderPipeline(RenderPipelineMode.Deferred);
+            Play();
         }
-        if(_frame==215) Stop();
-        if(_frame==218) VerifyStaticSkeletonSpace();
-        if(_frame==225)
+        if (_frame == 135)
+            ClientSize = new Vector2i(1280, 800);
+        if (_frame == 150)
+            _debug = RenderDebugView.Normals;
+        if (_frame == 165)
+            _debug = RenderDebugView.Shadow;
+        if (_frame == 180)
         {
-            var probe=_design.Document.Objects.First(o=>o.ModelPath=="models/material-probe.glb");
-            _editTarget=_design.WorldPosition(probe.Id);_selected=probe.Id;
+            Stop();
+            _debug = RenderDebugView.Final;
+            int count = _design.Document.Objects.Count;
+            int history = _editor.History.UndoCount;
+            var model = _design.Document.Objects.First(o => o.Kind == ObjectKind.Player);
+            string before = model.ModelPath!;
+            try
+            {
+                _editor.SetAsset(model.Id, "models/missing-bad-edit.glb");
+                throw new InvalidOperationException("Invalid model edit unexpectedly committed.");
+            }
+            catch (SceneValidationException) { }
+            if (
+                model.ModelPath != before
+                || _design.Document.Objects.Count != count
+                || _editor.History.UndoCount != history
+            )
+                throw new InvalidOperationException("Failed asset edit changed design/history.");
+            Guid cube = _editor.Create("cube");
+            _editor.SetTransform(cube, new TransformData { Position = new Float3(3, .5f, 7) });
+            _editor.History.Undo();
+            _editor.History.Redo();
+            Save();
+            LoadDesign(SavePath);
+            Console.WriteLine("Exercise save/load/undo/redo passed");
         }
-        if(_frame==233) _editor.History.Execute("Shadow isolation",()=>_design.Document.Rendering.Shadows=false);
-        if(_frame==238) _editor.History.Undo();
+        if (_frame == 185)
+        {
+            Guid unsaved = _editor.Create("cube");
+            _editor.SetTransform(unsaved, new TransformData { Position = new Float3(7, .5f, 9) });
+            _exerciseUnsavedDesign = SceneSerializer.Serialize(_design.Document);
+            _exerciseUnsavedHistory = _editor.History.UndoCount;
+        }
+        if (_frame == 190)
+        {
+            Play();
+            _paused = true;
+        }
+        if (_frame == 200)
+            _paused = false;
+        if (_frame == 205)
+        {
+            Stop();
+            if (
+                !_editor.History.IsDirty
+                || !_editor.History.CanUndo
+                || _editor.History.UndoCount != _exerciseUnsavedHistory
+                || SceneSerializer.Serialize(_design.Document) != _exerciseUnsavedDesign
+            )
+                throw new InvalidOperationException(
+                    "Play/Stop lost unsaved edits or undo history."
+                );
+            Console.WriteLine("Exercise Play/Stop retained unsaved design and undo history.");
+            Play();
+        }
+        if (_frame == 215)
+            Stop();
+        if (_frame == 218)
+            VerifyStaticSkeletonSpace();
+        if (_frame == 225)
+        {
+            var probe = _design.Document.Objects.First(o =>
+                o.ModelPath == "models/material-probe.glb"
+            );
+            _editTarget = _design.WorldPosition(probe.Id);
+            _selected = probe.Id;
+        }
+        if (_frame == 233)
+            _editor.History.Execute("Shadow isolation", () =>
+                _design.Document.Rendering.Shadows = false
+            );
+        if (_frame == 238)
+            _editor.History.Undo();
     }
 
     /// <summary>准备接触专项的独立运行场景，之后由真实窗口链采集输入与结果。</summary>
     private void ExerciseContacts()
     {
-        if(!_contactExercise!.BeginFrame(_frame)) return;
+        if (!_contactExercise!.BeginFrame(_frame))
+            return;
         Stop();
         // 仅重建隔离的内存设计；从不保存路线起点，也不修改展示球或坡的几何/碰撞。
-        LoadDesign(Path.Combine(_options.AssetRoot,"scenes","training-ground.json"));
-        var player=_design.Document.Objects.Single(item=>item.Kind==ObjectKind.Player);
-        _editor.SetTransform(player.Id,_contactExercise.StartTransform(_design.Document));
-        _selected=player.Id;
+        LoadDesign(Path.Combine(_options.AssetRoot, "scenes", "training-ground.json"));
+        var player = _design.Document.Objects.Single(item => item.Kind == ObjectKind.Player);
+        _editor.SetTransform(player.Id, _contactExercise.StartTransform(_design.Document));
+        _selected = player.Id;
         Play();
-        _contactExercise.Prepared(_runtime!,_simulation!);
+        _contactExercise.Prepared(_runtime!, _simulation!);
     }
 
     /// <summary>把NPC路径和选中骨架投影到ImGui背景层，仅最终画面显示叠加。</summary>
     private void DrawWorldDebug()
     {
-        if(_debug!=RenderDebugView.Final) return;
-        var draw=ImGui.GetBackgroundDrawList();
+        if (_debug != RenderDebugView.Final)
+            return;
+        var draw = ImGui.GetBackgroundDrawList();
         // 世界点经view/projection变换到客户区坐标；相机后方的点不绘制。
         NVector2? Project(Vector3 point)
         {
-            Vector4 clip=Vector4.TransformRow(new Vector4(point,1),_camera.View*_camera.Projection);
-            if(clip.W<=.01f) return null;
-            return new NVector2((clip.X/clip.W*.5f+.5f)*ClientSize.X,(-clip.Y/clip.W*.5f+.5f)*ClientSize.Y);
+            Vector4 clip = Vector4.TransformRow(
+                new Vector4(point, 1),
+                _camera.View * _camera.Projection
+            );
+            if (clip.W <= .01f)
+                return null;
+            return new NVector2(
+                (clip.X / clip.W * .5f + .5f) * ClientSize.X,
+                (-clip.Y / clip.W * .5f + .5f) * ClientSize.Y
+            );
         }
         // 两个端点都可投影时才提交屏幕线段。
-        void Line(Vector3 a,Vector3 b,uint color)
+        void Line(Vector3 a, Vector3 b, uint color)
         {
-            var first=Project(a);var second=Project(b);if(first.HasValue&&second.HasValue) draw.AddLine(first.Value,second.Value,color,2);
+            var first = Project(a);
+            var second = Project(b);
+            if (first.HasValue && second.HasValue)
+                draw.AddLine(first.Value, second.Value, color, 2);
         }
-        if(_showPath&&_simulation is not null)
-            for(int i=1;i<_simulation.NpcPath.Count;i++) Line(_simulation.NpcPath[i-1]+Vector3.UnitY*.08f,_simulation.NpcPath[i]+Vector3.UnitY*.08f,0xfff0b540);
-        if(_showSkeleton&&_selected is Guid id)
+        if (_showPath && _simulation is not null)
+            for (int i = 1; i < _simulation.NpcPath.Count; i++)
+                Line(
+                    _simulation.NpcPath[i - 1] + Vector3.UnitY * .08f,
+                    _simulation.NpcPath[i] + Vector3.UnitY * .08f,
+                    0xfff0b540
+                );
+        if (_showSkeleton && _selected is Guid id)
         {
-            var item=_objects.FirstOrDefault(o=>o.Id==id);
-            if(item is not null) foreach(var segment in _renderer!.SkeletonDebug(id,item.ModelMatrix,item.InterpolationAlpha)) Line(segment.Start,segment.End,0xff60ff90);
+            var item = _objects.FirstOrDefault(o => o.Id == id);
+            if (item is not null)
+                foreach (
+                    var segment in _renderer!.SkeletonDebug(
+                        id,
+                        item.ModelMatrix,
+                        item.InterpolationAlpha
+                    )
+                )
+                    Line(segment.Start, segment.End, 0xff60ff90);
         }
     }
 
     /// <summary>检查同GUID从角色切到静态模型时骨架空间不残留角色校正。</summary>
     private void VerifyStaticSkeletonSpace()
     {
-        var original=_objects.First(o=>o.Design.Kind==ObjectKind.Player);
-        var design=new SceneObjectData { Kind=ObjectKind.StaticMesh,Primitive=PrimitiveKind.Model,ModelPath=original.Design.ModelPath };
-        var item=original with { Design=design,ModelMatrix=Matrix4.Identity,InterpolationAlpha=1 };
-        var model=new GltfModelLoader(new AssetRoot(_options.AssetRoot)).Load(design.ModelPath!);
-        var world=new Matrix4[model.Nodes.Length];model.EvaluateWorld(model.CreateDefaultPose(),world);
-        var joints=model.Skins.SelectMany(s=>s.Joints).ToHashSet();
-        var expected=joints.Where(j=>model.Nodes[j].Parent>=0&&joints.Contains(model.Nodes[j].Parent)).ToArray();
-        _renderer!.UpdateAnimations(0,[item]);
-        var actual=_renderer.SkeletonDebug(item.Id,Matrix4.Identity,1);
-        if(actual.Count!=expected.Length) throw new InvalidOperationException("Static skeleton debug segment count changed.");
-        for(int i=0;i<expected.Length;i++)
+        var original = _objects.First(o => o.Design.Kind == ObjectKind.Player);
+        var design = new SceneObjectData
         {
-            int joint=expected[i],parent=model.Nodes[joint].Parent;
-            if((actual[i].Start-world[parent].ExtractTranslation()).Length>1e-4f||
-               (actual[i].End-world[joint].ExtractTranslation()).Length>1e-4f)
-                throw new InvalidOperationException("Static skeleton overlay applied character correction or wrong space.");
+            Kind = ObjectKind.StaticMesh,
+            Primitive = PrimitiveKind.Model,
+            ModelPath = original.Design.ModelPath,
+        };
+        var item = original with
+        {
+            Design = design,
+            ModelMatrix = Matrix4.Identity,
+            InterpolationAlpha = 1,
+        };
+        var model = new GltfModelLoader(new AssetRoot(_options.AssetRoot)).Load(design.ModelPath!);
+        var world = new Matrix4[model.Nodes.Length];
+        model.EvaluateWorld(model.CreateDefaultPose(), world);
+        var joints = model.Skins.SelectMany(s => s.Joints).ToHashSet();
+        var expected = joints
+            .Where(j => model.Nodes[j].Parent >= 0 && joints.Contains(model.Nodes[j].Parent))
+            .ToArray();
+        _renderer!.UpdateAnimations(0, [item]);
+        var actual = _renderer.SkeletonDebug(item.Id, Matrix4.Identity, 1);
+        if (actual.Count != expected.Length)
+            throw new InvalidOperationException("Static skeleton debug segment count changed.");
+        for (int i = 0; i < expected.Length; i++)
+        {
+            int joint = expected[i],
+                parent = model.Nodes[joint].Parent;
+            if (
+                (actual[i].Start - world[parent].ExtractTranslation()).Length > 1e-4f
+                || (actual[i].End - world[joint].ExtractTranslation()).Length > 1e-4f
+            )
+                throw new InvalidOperationException(
+                    "Static skeleton overlay applied character correction or wrong space."
+                );
         }
-        _renderer.ResetAnimations();_renderer.Prepare(_objects);
-        Console.WriteLine("Exercise same model GUID switched character/static: bind skeleton space matches raw model nodes.");
+        _renderer.ResetAnimations();
+        _renderer.Prepare(_objects);
+        Console.WriteLine(
+            "Exercise same model GUID switched character/static: bind skeleton space matches raw model nodes."
+        );
     }
 
     /// <summary>只读取显示数据绘制场景和UI，按演练配置留图并判断退出条件。</summary>
     protected override void OnRenderFrame(FrameEventArgs e)
     {
         base.OnRenderFrame(e);
-        if(_renderer is null||_ui is null||FramebufferSize.X<=0||FramebufferSize.Y<=0) return;
-        RenderSettings settings=(_runtime??_design).Document.Rendering;
-        if(!Playing) settings=new RenderSettings { Pipeline=_activePipeline,SunDirection=settings.SunDirection,SunColor=settings.SunColor,
-            SunIntensity=settings.SunIntensity,Exposure=settings.Exposure,Shadows=settings.Shadows,Fxaa=settings.Fxaa };
-        _renderer.Render(_camera,_objects,settings,_particles.Visuals(),_debug);
-        if(_options.Exercise&&!_options.ContactExercise&&_frame==125) ComparePipelines(settings);
+        if (_renderer is null || _ui is null || FramebufferSize.X <= 0 || FramebufferSize.Y <= 0)
+            return;
+        RenderSettings settings = (_runtime ?? _design).Document.Rendering;
+        if (!Playing)
+            settings = new RenderSettings
+            {
+                Pipeline = _activePipeline,
+                SunDirection = settings.SunDirection,
+                SunColor = settings.SunColor,
+                SunIntensity = settings.SunIntensity,
+                Exposure = settings.Exposure,
+                Shadows = settings.Shadows,
+                Fxaa = settings.Fxaa,
+            };
+        _renderer.Render(_camera, _objects, settings, _particles.Visuals(), _debug);
+        if (_options.Exercise && !_options.ContactExercise && _frame == 125)
+            ComparePipelines(settings);
         _ui.Render();
-        var error=GL.GetError();if(error!=OpenTK.Graphics.OpenGL4.ErrorCode.NoError) throw new InvalidOperationException("GL frame error: "+error);
+        var error = GL.GetError();
+        if (error != OpenTK.Graphics.OpenGL4.ErrorCode.NoError)
+            throw new InvalidOperationException("GL frame error: " + error);
         _contactExercise?.Rendered(_frame);
-        if(!_options.ContactExercise&&_options.CaptureRoot is not null && (_frame==60||_frame==105||_frame==125||_frame==144||_frame==155||_frame==170||_frame==230||_frame==235))
+        if (
+            !_options.ContactExercise
+            && _options.CaptureRoot is not null
+            && (
+                _frame == 60
+                || _frame == 105
+                || _frame == 125
+                || _frame == 144
+                || _frame == 155
+                || _frame == 170
+                || _frame == 230
+                || _frame == 235
+            )
+        )
         {
-            string label=_frame switch {60=>"forward",105=>"jump",125=>"deferred",144=>"landed",155=>"normals",170=>"shadow",230=>"material-probe",_=>"material-probe-no-shadow"};
-            FramebufferCapture.Save(Path.Combine(_options.CaptureRoot,label+".png"),FramebufferSize.X,FramebufferSize.Y);
+            string label = _frame switch
+            {
+                60 => "forward",
+                105 => "jump",
+                125 => "deferred",
+                144 => "landed",
+                155 => "normals",
+                170 => "shadow",
+                230 => "material-probe",
+                _ => "material-probe-no-shadow",
+            };
+            FramebufferCapture.Save(
+                Path.Combine(_options.CaptureRoot, label + ".png"),
+                FramebufferSize.X,
+                FramebufferSize.Y
+            );
         }
         SwapBuffers();
-        if(_options.Frames>0&&_frame>=_options.Frames)
+        if (_options.Frames > 0 && _frame >= _options.Frames)
         {
             _contactExercise?.VerifyComplete();
-            if(_options.Exercise&&!_options.ContactExercise&&(_exerciseJumpEvents<2||_exerciseMovementFrames<30))
-                throw new InvalidOperationException($"Exercise movement/animation chain failed: jump events {_exerciseJumpEvents}, moving steps {_exerciseMovementFrames}.");
-            Console.WriteLine($"Graphics exercise reached {_frame} frames; GL errors: none; jump events {_exerciseJumpEvents}; moving steps {_exerciseMovementFrames}.");Close();
+            if (
+                _options.Exercise
+                && !_options.ContactExercise
+                && (_exerciseJumpEvents < 2 || _exerciseMovementFrames < 30)
+            )
+                throw new InvalidOperationException(
+                    $"Exercise movement/animation chain failed: jump events {_exerciseJumpEvents}, moving steps {_exerciseMovementFrames}."
+                );
+            Console.WriteLine(
+                $"Graphics exercise reached {_frame} frames; GL errors: none; jump events {_exerciseJumpEvents}; moving steps {_exerciseMovementFrames}."
+            );
+            Close();
         }
     }
 
     /// <summary>窗口卸载时先清理自有资源，再执行基类卸载。</summary>
-    protected override void OnUnload() { DisposeResources();base.OnUnload(); }
+    protected override void OnUnload()
+    {
+        DisposeResources();
+        base.OnUnload();
+    }
 
     /// <summary>同帧读取两条管线的RGB差异作一致性检查，最后恢复原管线配置。</summary>
     private void ComparePipelines(RenderSettings settings)
     {
-        RenderPipelineMode original=settings.Pipeline;
+        RenderPipelineMode original = settings.Pipeline;
         // 读取当前颜色缓冲的RGBA8像素，供同帧管线误差统计。
         byte[] ReadPixels()
         {
-            byte[] data=new byte[checked(FramebufferSize.X*FramebufferSize.Y*4)];
-            GL.ReadPixels(0,0,FramebufferSize.X,FramebufferSize.Y,PixelFormat.Rgba,PixelType.UnsignedByte,data);
+            byte[] data = new byte[checked(FramebufferSize.X * FramebufferSize.Y * 4)];
+            GL.ReadPixels(
+                0,
+                0,
+                FramebufferSize.X,
+                FramebufferSize.Y,
+                PixelFormat.Rgba,
+                PixelType.UnsignedByte,
+                data
+            );
             return data;
         }
         try
         {
-            settings.Pipeline=RenderPipelineMode.Forward;_renderer!.Render(_camera,_objects,settings,_particles.Visuals(),RenderDebugView.Final);
+            settings.Pipeline = RenderPipelineMode.Forward;
+            _renderer!.Render(
+                _camera,
+                _objects,
+                settings,
+                _particles.Visuals(),
+                RenderDebugView.Final
+            );
             // 两条管线一致只证明本场景输出接近；独立光照正确性由专项参考检查。
-            byte[] forward=ReadPixels();
-            settings.Pipeline=RenderPipelineMode.Deferred;_renderer.Render(_camera,_objects,settings,_particles.Visuals(),RenderDebugView.Final);
-            byte[] deferred=ReadPixels();long difference=0;int maximum=0;
-            for(int i=0;i<forward.Length;i++) if((i&3)!=3) { int value=Math.Abs(forward[i]-deferred[i]);difference+=value;maximum=Math.Max(maximum,value); }
-            double mean=difference/(forward.Length/4.0*3);
-            Console.WriteLine($"Same-frame Forward/Deferred RGB difference: mean {mean:F4}/255; max {maximum}/255.");
-            if(mean>3) throw new InvalidOperationException("Same-scene pipeline comparison exceeds the documented quantization tolerance.");
+            byte[] forward = ReadPixels();
+            settings.Pipeline = RenderPipelineMode.Deferred;
+            _renderer.Render(
+                _camera,
+                _objects,
+                settings,
+                _particles.Visuals(),
+                RenderDebugView.Final
+            );
+            byte[] deferred = ReadPixels();
+            long difference = 0;
+            int maximum = 0;
+            for (int i = 0; i < forward.Length; i++)
+                if ((i & 3) != 3)
+                {
+                    int value = Math.Abs(forward[i] - deferred[i]);
+                    difference += value;
+                    maximum = Math.Max(maximum, value);
+                }
+            double mean = difference / (forward.Length / 4.0 * 3);
+            Console.WriteLine(
+                $"Same-frame Forward/Deferred RGB difference: mean {mean:F4}/255; max {maximum}/255."
+            );
+            if (mean > 3)
+                throw new InvalidOperationException(
+                    "Same-scene pipeline comparison exceeds the documented quantization tolerance."
+                );
         }
-        finally { settings.Pipeline=original; }
+        finally
+        {
+            settings.Pipeline = original;
+        }
     }
 
     /// <summary>幂等释放音频、物理、渲染与UI；单项失败仍继续清理其余资源。</summary>
     public void DisposeResources()
     {
-        if(_disposed) return;
+        if (_disposed)
+            return;
         // 外层finally也调用本方法；GL释放必须发生在窗口Context仍有效时。
-        Exception? failure=null;
+        Exception? failure = null;
         // 记录首个释放异常并继续其余清理，避免一个失败遗留整组资源。
-        void Release(Action action) { try { action(); } catch(Exception error) { failure??=error; } }
-        if(_audio is not null) Release(_audio.Dispose);
-        if(_simulation is not null) Release(_simulation.Dispose);
-        if(_renderer is not null) Release(_renderer.Dispose);
-        if(_ui is not null) Release(_ui.Dispose);
-        _disposed=true;
-        if(failure is not null) Console.Error.WriteLine("Cleanup failure: "+failure);
+        void Release(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception error)
+            {
+                failure ??= error;
+            }
+        }
+        if (_audio is not null)
+            Release(_audio.Dispose);
+        if (_simulation is not null)
+            Release(_simulation.Dispose);
+        if (_renderer is not null)
+            Release(_renderer.Dispose);
+        if (_ui is not null)
+            Release(_ui.Dispose);
+        _disposed = true;
+        if (failure is not null)
+            Console.Error.WriteLine("Cleanup failure: " + failure);
     }
 }
