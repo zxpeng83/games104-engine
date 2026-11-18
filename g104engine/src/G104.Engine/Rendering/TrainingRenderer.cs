@@ -169,6 +169,7 @@ public sealed class TrainingRenderer : IDisposable
                 continue;
             active.Add(item.Id);
             var instance = Instance(item);
+            // 每个GUID独立推进Controller；网格、骨骼定义和动画片段仍按模型路径共享。
             instance.Controller.Update(dt, item.Animation);
         }
         foreach (Guid id in instances.Keys.Where(id => !active.Contains(id)).ToArray())
@@ -526,6 +527,7 @@ public sealed class TrainingRenderer : IDisposable
         bool shadowPass
     )
     {
+        // 将场景/动画数据拆成矩阵、纹理和网格交给GL；GL不识别RenderObject等C#对象。
         program.Use();
         program.Set("uViewProjection", viewProjection);
         GL.Enable(EnableCap.DepthTest);
@@ -539,6 +541,7 @@ public sealed class TrainingRenderer : IDisposable
             {
                 var entry = Instance(item);
                 bool actor = item.Design.Kind is ObjectKind.Player or ObjectKind.Npc;
+                // 同一对象ID找到更新过的Controller，再按本帧alpha计算显示姿态。
                 Matrix4[] displayWorld = entry.Controller.GetDisplayWorld(item.InterpolationAlpha);
                 Matrix4 correction = actor ? entry.Model.ActorCorrection : Matrix4.Identity;
                 for (int i = 0; i < entry.Model.Data.Primitives.Length; i++)
@@ -558,6 +561,7 @@ public sealed class TrainingRenderer : IDisposable
                             displayWorld
                         );
                         GL.BindBuffer(BufferTarget.UniformBuffer, boneBuffer);
+                        // CPU的palette上传到骨骼缓冲，对应mesh.vert绑定点0的uBones；每个mat4占64字节。
                         GL.BufferSubData(
                             BufferTarget.UniformBuffer,
                             IntPtr.Zero,
@@ -573,6 +577,7 @@ public sealed class TrainingRenderer : IDisposable
                         true
                     );
                     SetCulling(primitive.Material.DoubleSided, meshWorld);
+                    // 复用已上传的网格，提交绘制；mesh.vert结合骨骼矩阵和uModel计算顶点位置。
                     Draw(entry.Model.Meshes[i]);
                 }
             }

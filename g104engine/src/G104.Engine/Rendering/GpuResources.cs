@@ -74,6 +74,7 @@ internal sealed class ShaderProgram : IDisposable
     public void Set(string name, Matrix4 value)
     {
         // CPU为行向量矩阵；行字节按GLSL列主序读取即为所需转置，不能再transpose=true。
+        // OpenTK将Matrix4的16个float交给GL，Shader通过对应的mat4 uniform读取。
         GL.UniformMatrix4(Location(name), false, ref value);
     }
     /// <summary>在当前GL上下文删除程序；重复调用由零句柄保护。</summary>
@@ -97,11 +98,13 @@ internal sealed class GpuMesh : IDisposable
         {
             Vao = GL.GenVertexArray(); vbo = GL.GenBuffer(); ebo = GL.GenBuffer();
             GL.BindVertexArray(Vao); GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+            // 上传顶点/三角形索引的连续数值；场景对象ID、层级和动画状态保留在CPU。
             GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
             GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
             GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices, BufferUsageHint.StaticDraw);
             // 布局依次为位置、法线、UV、切线及手性、关节索引、权重；偏移均以float计。
             int[] sizes = [3, 3, 2, 4, 4, 4]; int[] offsets = [0, 3, 6, 8, 12, 16];
+            // VAO记录属性0～5的格式、80字节步长和偏移，匹配mesh.vert的layout(location=...)。
             for (int i = 0; i < sizes.Length; i++) { GL.EnableVertexAttribArray(i); GL.VertexAttribPointer(i, sizes[i], VertexAttribPointerType.Float, false, 20 * sizeof(float), offsets[i] * sizeof(float)); }
             GL.BindVertexArray(0);
         }
@@ -149,6 +152,7 @@ internal sealed class TextureCache(AssetRoot assets) : IDisposable
         {
             GL.BindTexture(TextureTarget.Texture2D, handle);
             // glTF图像第一个像素对应UV(0,0)，不额外翻转Y；颜色贴图由硬件sRGB解码。
+            // 图片先解码为RGBA像素再上传；Shader采样纹理，不读取C#图片对象。
             GL.TexImage2D(TextureTarget.Texture2D, 0, srgb ? PixelInternalFormat.Srgb8Alpha8 : PixelInternalFormat.Rgba8, image.Width, image.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, image.Data);
             GL.GenerateMipmap(GenerateMipmapTarget.Texture2D);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, sampler?.MinFilter ?? (int)TextureMinFilter.LinearMipmapLinear);

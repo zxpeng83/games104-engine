@@ -181,6 +181,8 @@ public sealed class PhysicsWorld : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!float.IsFinite(dt) || dt <= 0 || dt > 0.1f) throw new ArgumentOutOfRangeException(nameof(dt));
+        // System为Jolt物理系统（第三方库）。
+        // 普通训练场注册静态环境；角色由KinematicCharacter求解，再由TrainingSimulation写回场景。
         var error = System.Update(dt, 1, _jobs!);
         if (error != PhysicsUpdateError.None) throw new InvalidOperationException($"Jolt update exceeded capacity: {error}.");
     }

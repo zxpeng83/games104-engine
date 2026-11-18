@@ -165,6 +165,7 @@ public sealed class AnimationController
         // 先获得目标状态姿态，再从切换瞬间的旧姿态渐入，避免状态间跳变。
         float blend = TransitionWeight;
         if (blend < 1) for (int i = 0; i < Pose.Length; i++) Pose[i] = NodePose.Blend(transitionFrom[i], Pose[i], blend);
+        // Pose保存节点局部TRS，World保存模型内部累计矩阵；角色整体场景变换另由SceneGraph保存。
         model.EvaluateWorld(Pose, World);
         poseRevision++;
     }
@@ -172,6 +173,7 @@ public sealed class AnimationController
     /// <summary>按相邻局部TRS及统一alpha求显示矩阵，可重复调用且不推进时间或事件。</summary>
     public Matrix4[] GetDisplayWorld(float alpha)
     {
+        // DrawObjects读取这里的显示矩阵生成蒙皮palette；逻辑World不会直接作为骨骼数据上传。
         if (!float.IsFinite(alpha)) throw new ArgumentOutOfRangeException(nameof(alpha));
         alpha = Math.Clamp(alpha, 0, 1);
         if (displayRevision == poseRevision && displayAlpha == alpha) return displayWorld;

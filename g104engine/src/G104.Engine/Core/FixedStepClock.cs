@@ -35,7 +35,10 @@ public sealed class FixedStepClock
     /// <summary>累计余量与固定步长的比值，供显示姿态插值使用。</summary>
     public float Alpha => (float)Math.Clamp(_accumulator / FixedSeconds, 0, 1);
 
-    /// <summary>接收真实帧秒数并调用固定步回调，返回本次步数与丢时。</summary>
+    /// <summary>
+    /// 接收真实帧秒数并调用固定步回调，返回本次步数与丢时。
+    /// 场景逻辑更新。
+    /// </summary>
     public FixedStepResult Advance(double frameSeconds, Action<float> step)
     {
         ArgumentNullException.ThrowIfNull(step);
@@ -46,6 +49,7 @@ public sealed class FixedStepClock
         _accumulator += accepted;
         int steps = 0;
         // 小容差只抵消累计浮点误差；每次回调始终收到相同dt。
+        // 追帧。
         while (steps < MaximumSteps && _accumulator + FixedSeconds * 1e-10 >= FixedSeconds)
         {
             _accumulator = Math.Max(0, _accumulator - FixedSeconds);

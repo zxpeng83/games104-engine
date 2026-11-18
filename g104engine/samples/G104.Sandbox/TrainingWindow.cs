@@ -393,13 +393,15 @@ public sealed class TrainingWindow : GameWindow
         }
         if (Playing && !suspended)
         {
-            // 模拟、事实、动画/粒子按固定步推进；绘制只读取插值，不重发事件。
+            // tick 3D场景逻辑数据；模拟、事实、动画/粒子按固定步推进；绘制只读取插值，不重发事件。
             var result = _clock.Advance(
                 _discardNextDelta || discardedThisFrame ? 0 : (_options.Exercise ? 1.0 / 60 : dt),
                 step =>
                 {
                     _runtime!.CapturePrevious();
                     var input = _input.Consume();
+                    // 更新玩法、玩家和NPC的物理模拟（如位置朝向等，但这里没有涉及动画），更新后将物理模拟状态写入场景数据中（Simulation里的_graph）；
+                    // Simulation中的_graph就是这里的_runtime，接收角色整体位置和朝向。
                     _simulation!.Tick(
                         step,
                         new GameInput(
@@ -412,9 +414,11 @@ public sealed class TrainingWindow : GameWindow
                     );
                     if (_options.Exercise && _simulation.PlayerState.Velocity.Xz.Length > .2f)
                         _exerciseMovementFrames++;
+                    // 当步事实触发声音/粒子；随后推进粒子和动画，绘制时不会重复触发。
                     foreach (var fact in _simulation.Events)
                         Feedback(fact);
                     _particles.Tick(step);
+                    // 根据实际速度/接地状态更新动画，动画的姿态等数据保存在渲染器按对象ID持有的动画控制器中（AnimationController）。
                     _renderer.UpdateAnimations(step, BuildObjects(_runtime, 1));
                     foreach (
                         var actor in _runtime.Document.Objects.Where(o =>
@@ -455,6 +459,8 @@ public sealed class TrainingWindow : GameWindow
                     _renderer.DrainAnimationEvents(actor.Id);
             }
         }
+        // 可见场景对象以插值变换生成RenderObject；ID用于关联模型实例，骨骼姿态另存于Controller。
+        // 这个_objects就包含了上面物理模拟的数据（如位置、朝向等），然后根据id到动画系统查找动画controller获取动画数据（姿态、皮肤等），有了这些数据就可以使用gl进行渲染（在onrenderframe接口进行）。
         _objects = BuildObjects(_runtime ?? _design, _alpha);
         UpdateCamera();
         DrawWorldDebug();
@@ -1155,13 +1161,20 @@ public sealed class TrainingWindow : GameWindow
                 Shadows = settings.Shadows,
                 Fxaa = settings.Fxaa,
             };
+        // 3D场景渲染，根据配置使用forward或deferred渲染。
+        // 这里的_objects包含了场景的静态物体（墙壁、地面等）、角色、npc等，传递给 _renderer.render()进行渲染；
+        // 这个_objects 里的对象数据结构包含了物体的位置、朝向、缩放等物理模拟数据，然后物体的动画数据（姿态、皮肤等）是根据其id去动画系统查找的；
+        // 因此，通过_objects 就可以获取全场景的物体以及动画数据，根据这些数据使用gl进行渲染。
         _renderer.Render(_camera, _objects, settings, _particles.Visuals(), _debug);
+        // 也是3D场景渲染，这里是测试用的，使用forward和deferred各渲染一次并对比渲染结果。
         if (_options.Exercise && !_options.ContactExercise && _frame == 125)
             ComparePipelines(settings);
+        // 编辑器ui渲染
         _ui.Render();
         var error = GL.GetError();
         if (error != OpenTK.Graphics.OpenGL4.ErrorCode.NoError)
             throw new InvalidOperationException("GL frame error: " + error);
+        // 接触专项记录绘制进度；普通运行时没有此演练对象。
         _contactExercise?.Rendered(_frame);
         if (
             !_options.ContactExercise
@@ -1189,13 +1202,16 @@ public sealed class TrainingWindow : GameWindow
                 230 => "material-probe",
                 _ => "material-probe-no-shadow",
             };
+            //测试用的，获取场景截图。
             FramebufferCapture.Save(
                 Path.Combine(_options.CaptureRoot, label + ".png"),
                 FramebufferSize.X,
                 FramebufferSize.Y
             );
         }
+        //将包含场景和 UI 的完整画面提交给窗口系统显示
         SwapBuffers();
+        // 仅设置帧数上限时检查结果并关闭；普通运行返回主循环继续下一帧。
         if (_options.Frames > 0 && _frame >= _options.Frames)
         {
             _contactExercise?.VerifyComplete();
@@ -1281,6 +1297,7 @@ public sealed class TrainingWindow : GameWindow
         }
         finally
         {
+            // 这里只恢复配置；正常完成比较时，本帧缓冲区保留最后的Deferred画面。
             settings.Pipeline = original;
         }
     }
